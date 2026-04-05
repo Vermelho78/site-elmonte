@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL MONTE | Desenvolvimento de Plugins para Softwares BIM e CAD</title>
+    <meta name="description" content="A EL MONTE combina a dureza da engenharia civil com a fluidez da engenharia de software elaborando plugins precisos para Softwares BIM e CAD. Caso de sucesso: Dutotec BIM IA.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- HUD Overlay Background Elements -->
+    <div class="hud-background">
+        <div class="hud-grid"></div>
+        <div class="hud-ring-1"></div>
+        <div class="hud-ring-2"></div>
+        <div class="math-equations">
+            <span>∑ (fx × dx) = 0</span>
+            <br><br>
+            <span>Δy / Δx = ∇f</span>
+            <br><br>
+            <span>v = ∫ a dt</span>
+        </div>
+        <canvas id="hudCanvas"></canvas>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <img src="assets/logo.png" alt="EL MONTE Logo" class="brand-logo">
+            </div>
+            <div class="nav-links">
+                <a href="#hero">Início</a>
+                <a href="#case">Dutotec BIM IA</a>
+                <a href="#contato" class="btn-outline">Contato</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section id="hero" class="hero-section">
+            <div class="hero-content">
+                <div class="badge-container">
+                    <img src="assets/logo.png" alt="EL MONTE HUD" class="hero-logo">
+                </div>
+                <h1 class="glitch" data-text="ENGENHARIA DE PRECISÃO">ENGENHARIA DE PRECISÃO</h1>
+                <h2 class="subtitle">Desenvolvimento de Plugins Avançados para Softwares BIM e CAD</h2>
+                <p class="description">
+                    Automatização de processos, inteligência de dados e exatidão analítica. Elevamos o BIM ao mais alto nível técnico.
+                </p>
+                <div class="cta-group">
+                    <a href="#contato" class="btn-primary">
+                        <span class="btn-text">Iniciar Projeto</span>
+                        <div class="btn-glow"></div>
+                    </a>
+                    <a href="#case" class="btn-secondary">Explorar Case</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Target Audience Section -->
+        <section id="solucoes" class="target-section">
+            <div class="container">
+                <div class="section-header center">
+                    <span class="section-badge">SYS.TARGET.AUDIENCE</span>
+                    <h2>FOCO DE ATUAÇÃO</h2>
+                    <p>Engenharia de software aplicada aos dois principais eixos do ecossistema BIM.</p>
+                    <div class="divider center"></div>
+                </div>
+                
+                <div class="target-grid">
+                    <div class="target-card">
+                        <div class="target-icon">
+                            <img src="assets/1.png" alt="Icon Fabricantes" style="width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 0 10px rgba(255,0,0,0.5)); mix-blend-mode:screen;">
+                        </div>
+                        <h3>Para Fabricantes</h3>
+                        <p>Desenvolva um plugin que insere seus produtos no fluxo central da metodologia BIM. Facilite o uso de suas famílias paramétricas e assegure que seu material seja a escolha natural na especificação dos escritórios.</p>
+                    </div>
+                    
+                    <div class="target-card">
+                        <div class="target-icon">
+                            <img src="assets/3.png" alt="Icon Projetistas" style="width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 0 10px rgba(255,0,0,0.5)); mix-blend-mode:screen;">
+                        </div>
+                        <h3>Para Escritórios de Projeto</h3>
+                        <p>Multiplique sua eficiência produtiva e elimine gargalos técnicos. Construímos ferramentas sob medida para elevar a performance do seu time de projetistas e garantir consistência na entrega dos modelos BIM e CAD.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study Section -->
+        <section id="case" class="case-section">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-badge">SYS.CASE.STUDY</span>
+                    <h2>DUTOTEC BIM IA</h2>
+                    <div class="divider"></div>
+                </div>
+                
+                <div class="case-grid">
+                    <div class="case-info">
+                        <p>O <strong>Dutotec BIM IA</strong> (disponível em <a href="https://www.dutotecbimia.com.br" target="_blank" style="color: var(--color-accent-glow); text-decoration: none; border-bottom: 1px solid;">www.dutotecbimia.com.br</a>) é a prova material do nosso compromisso com a excelência em software para construção civil. Criamos um sistema poderoso, que organiza produtos com maestria lógica, integrando ferramentas proprietárias em uma suíte completa e altamente performática.</p>
+                        
+                        <ul class="feature-list">
+                            <li>
+                                <div class="feature-icon"></div>
+                                <span>Algoritmos de roteamento automático para eletrocalhas</span>
+                            </li>
+                            <li>
+                                <div class="feature-icon"></div>
+                                <span>Geração inteligente de faturamento e listas de materiais</span>
+                            </li>
+                            <li>
+                                <div class="feature-icon"></div>
+                                <span>UX/UI Sci-Fi inspirada em terminais de alta precisão</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="case-visual">
+                        <div class="dashboard-mockup">
+                            <div class="mockup-header">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                                <span class="mockup-title">EL.MONTE // DUTOTEC_BIM_IA_SYS_OVERRIDE</span>
+                            </div>
+                            <div class="mockup-body">
+                                <img src="assets/Interface_Ortogonal_Render.png" alt="Dutotec BIM IA Interface" class="dashboard-image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Contact Section -->
+        <section id="contato" class="contact-section">
+            <div class="container">
+                <div class="contact-card">
+                    <div class="contact-visual">
+                        <img src="assets/4.png" alt="Conexão Visual" style="width:100%; height:100%; object-fit:cover; mix-blend-mode:lighten; opacity: 0.7;">
+                    </div>
+                    <div class="contact-content">
+                        <h2>INICIAR PROTOCOLO DE CONEXÃO</h2>
+                        <p>Pronto para desenvolver uma solução customizada para o seu fluxo de trabalho? Conecte-se aos nossos engenheiros de software.</p>
+                        
+                        <div class="contact-actions">
+                            <a href="https://wa.me/5548999799162" target="_blank" class="contact-btn wpp">
+                                <span class="btn-icon">💬</span>
+                                TERMINAL WHATSAPP
+                            </a>
+                            <a href="mailto:contato@elmonte.dev.br" class="contact-btn mail">
+                                <span class="btn-icon">✉️</span>
+                                TRANSMISSÃO E-MAIL
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content">
+            <div class="footer-logo">
+                <img src="assets/logo.png" alt="EL MONTE Logo" class="footer-brand-logo">
+            </div>
+            <div class="footer-info">
+                <span>ENG. CIVIL ⨯ ENG. SOFTWARE</span>
+                <span>MÓDULO SISTEMA ONLINE</span>
+            </div>
+            <div class="footer-copy">
+                &copy; <span id="year"></span> EL MONTE. Todos os diretórios reservados.
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
