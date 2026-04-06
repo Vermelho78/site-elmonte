@@ -744,8 +744,14 @@ footer {
     .cta-group { flex-direction: column; }
     
     /* Mobile Fixes */
+    .navbar {
+        padding: 0.5rem 0;
+    }
+    .nav-container {
+        padding: 0.8rem 1rem;
+    }
     .hero-section {
-        padding-top: 100px;
+        padding-top: 160px;
     }
     .hero-logo {
         height: 100px;
