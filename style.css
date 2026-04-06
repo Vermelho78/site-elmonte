@@ -364,29 +364,13 @@ section {
 /* Case Study */
 .case-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4rem;
-    align-items: center;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: center;
 }
 
-.feature-list {
-    list-style: none;
-    margin-top: 2rem;
-}
-
-.feature-list li {
-    display: flex;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.feature-icon {
-    width: 12px;
-    height: 12px;
-    background: var(--color-accent-solid);
-    margin-right: 15px;
-    box-shadow: 0 0 8px var(--color-accent-solid);
-}
 
 .dashboard-mockup {
     background: linear-gradient(135deg, #2a323a, #1b1e23);
@@ -656,9 +640,11 @@ section {
 /* Feature List Simplified */
 .feature-list {
     list-style: none;
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
     gap: 1.2rem;
+    text-align: left;
+    margin-top: 2rem;
 }
 
 .feature-list li {
