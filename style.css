@@ -166,13 +166,11 @@ canvas#hudCanvas {
 }
 
 .brand-logo {
-    height: 44px;
-    width: 44px;
-    object-fit: cover;
-    border-radius: 50%;
+    height: 54px;
+    width: auto;
+    object-fit: contain;
     background: transparent;
-    border: 1px solid rgba(255,0,0,0.3);
-    box-shadow: 0 0 10px rgba(255,0,0,0.2);
+    filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.3));
 }
 
 .nav-links {
@@ -224,14 +222,11 @@ canvas#hudCanvas {
 }
 
 .hero-logo {
-    height: 180px;
-    width: 180px;
-    object-fit: cover;
-    border-radius: 50%;
+    height: 200px;
+    width: auto;
+    object-fit: contain;
     background: transparent;
-    border: 2px solid rgba(255,0,0,0.5);
-    box-shadow: 0 0 30px rgba(255, 0, 0, 0.4), inset 0 0 20px rgba(255,0,0,0.2);
-    filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.5));
+    filter: drop-shadow(0 0 30px rgba(255, 0, 0, 0.4));
     animation: floatingLogo 4s ease-in-out infinite;
 }
 
@@ -672,12 +667,11 @@ footer {
 }
 
 .footer-brand-logo {
-    height: 30px;
-    width: 30px;
-    object-fit: cover;
-    border-radius: 50%;
+    height: 40px;
+    width: auto;
+    object-fit: contain;
     background: transparent;
-    border: 1px solid rgba(255,0,0,0.4);
+    filter: brightness(0.8) drop-shadow(0 0 5px rgba(255, 0, 0, 0.2));
 }
 
 .footer-info {
