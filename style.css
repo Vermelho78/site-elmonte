@@ -159,10 +159,10 @@ canvas#hudCanvas {
 .nav-container {
     max-width: 1200px;
     margin: 0 auto;
+    padding: 1.2rem 2rem;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    padding: 0 2rem;
 }
 
 .brand-logo {
@@ -751,12 +751,22 @@ footer {
     .contact-actions { flex-direction: column; }
     .cta-group { flex-direction: column; }
     
-    /* Mobile Header Fix */
+    /* Mobile Fixes */
     .hero-section {
-        padding-top: 120px;
+        padding-top: 100px;
     }
     .hero-logo {
-        height: 140px;
-        width: 140px;
+        height: 120px;
+        width: 120px;
+    }
+    .case-main-img {
+        max-height: 220px;
+    }
+    .info-value {
+        font-size: 1.05rem;
+    }
+    .nav-links {
+        display: flex;
+        gap: 1.5rem;
     }
 }
