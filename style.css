@@ -149,7 +149,7 @@ canvas#hudCanvas {
     position: fixed;
     top: 0;
     width: 100%;
-    padding: 1.5rem 0;
+    padding: 0.5rem 0;
     background: rgba(26, 29, 36, 0.8);
     backdrop-filter: blur(10px);
     z-index: 100;
@@ -159,7 +159,7 @@ canvas#hudCanvas {
 .nav-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1.2rem 2rem;
+    padding: 0.5rem 2rem;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -745,13 +745,20 @@ footer {
     
     /* Mobile Fixes */
     .navbar {
-        padding: 0.5rem 0;
+        padding: 0;
     }
     .nav-container {
-        padding: 0.8rem 1rem;
+        padding: 0.5rem 1rem;
+    }
+    .nav-links {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        width: 100%;
+        padding: 0.2rem 0;
     }
     .hero-section {
-        padding-top: 160px;
+        padding-top: 140px;
     }
     .hero-logo {
         height: 100px;
