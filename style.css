@@ -495,15 +495,7 @@ section {
     overflow: hidden;
 }
 
-.contact-visual {
-    width: 40%;
-    background: rgba(0,0,0,0.2);
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-right: 1px solid rgba(255,255,255,0.05);
-}
+
 
 .radar-scan {
     width: 150px;
@@ -571,44 +563,59 @@ section {
     letter-spacing: 1px;
 }
 
+.contact-visual {
+    width: 35%;
+    background: rgba(0,0,0,0.3);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden;
+}
+
 .qr-col {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 1rem;
-    padding: 2rem;
-    background: rgba(0, 0, 0, 0.4);
-    height: 100%;
-    justify-content: center;
+    padding: 1.5rem;
+    width: 100%;
 }
 
 .qr-label {
     font-family: monospace;
-    font-size: 0.75rem;
-    color: var(--color-accent-glow);
-    letter-spacing: 3px;
+    font-size: 0.7rem;
+    color: var(--color-accent-solid);
+    letter-spacing: 2px;
 }
 
 .qr-frame {
     padding: 10px;
     background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.2);
-    max-width: 200px;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.2);
+    width: 160px;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .qr-image {
-    width: 100%;
-    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
     display: block;
 }
 
 .qr-instruction {
     font-family: var(--font-body);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
+    text-align: center;
 }
 
 .contact-actions {
