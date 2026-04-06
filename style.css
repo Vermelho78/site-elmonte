@@ -149,7 +149,8 @@ canvas#hudCanvas {
     position: fixed;
     top: 0;
     width: 100%;
-    padding: 0.5rem 0;
+    height: 25px;
+    padding: 0;
     background: rgba(26, 29, 36, 0.8);
     backdrop-filter: blur(10px);
     z-index: 100;
@@ -159,7 +160,7 @@ canvas#hudCanvas {
 .nav-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0.5rem 2rem;
+    padding: 3px 2rem;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -177,12 +178,14 @@ canvas#hudCanvas {
     display: flex;
     gap: 2rem;
     align-items: center;
+    padding: 2.5px 0;
 }
 
 .nav-links a {
     color: var(--color-text-main);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 14px;
+    line-height: 14px;
     letter-spacing: 1px;
     text-transform: uppercase;
     transition: color 0.3s ease;
@@ -731,7 +734,7 @@ footer {
         gap: 1rem;
         justify-content: center;
         width: 100%;
-        padding: 0.5rem 0;
+        padding: 2.5px 0;
     }
     .glitch { font-size: 2.5rem; }
     .target-grid { grid-template-columns: 1fr; }
@@ -745,17 +748,11 @@ footer {
     
     /* Mobile Fixes */
     .navbar {
+        height: 25px;
         padding: 0;
     }
     .nav-container {
-        padding: 0.5rem 1rem;
-    }
-    .nav-links {
-        display: flex;
-        gap: 1rem;
-        justify-content: center;
-        width: 100%;
-        padding: 0.2rem 0;
+        padding: 3px 1rem;
     }
     .hero-section {
         padding-top: 140px;
