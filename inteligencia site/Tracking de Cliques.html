@@ -1,0 +1,61 @@
+<script>
+(function() {
+  // Gera ou recupera client_id para GA4 Measurement Protocol
+  function getClientId() {
+    let cid = localStorage.getItem('_ga_cid');
+    if (!cid) {
+      cid = crypto.randomUUID();
+      localStorage.setItem('_ga_cid', cid);
+    }
+    return cid;
+  }
+
+  document.querySelectorAll('[data-cta]').forEach(link => {
+    link.addEventListener('click', function(e) {
+      const ctaType = this.dataset.cta;
+      const targetUrl = new URL(this.href);
+
+      // Adiciona UTMs automáticos (funciona para WhatsApp, ignorado por clientes de email)
+      if (!targetUrl.searchParams.has('utm_source')) {
+        targetUrl.searchParams.set('utm_source', 'site_organico');
+        targetUrl.searchParams.set('utm_medium', 'cta_button');
+        targetUrl.searchParams.set('utm_campaign', `contato_${ctaType}`);
+        this.href = targetUrl.toString();
+      }
+
+      // Envio via gtag (padrão)
+      if (typeof gtag === 'function') {
+        gtag('event', 'click_cta', {
+          cta_type: ctaType,
+          page_location: window.location.href,
+          page_title: document.title,
+          link_url: this.href
+        });
+      }
+
+      // Fallback via sendBeacon + Measurement Protocol (100% confiável em saída de página)
+      try {
+        const payload = JSON.stringify({
+          client_id: getClientId(),
+          events: [{
+            name: 'click_cta',
+            params: {
+              cta_type: ctaType,
+              page_location: window.location.href,
+              page_title: document.title,
+              link_url: this.href,
+              timestamp: Date.now()
+            }
+          }]
+        });
+        navigator.sendBeacon(
+          `https://www.google-analytics.com/mp/collect?measurement_id={{GA4_MEASUREMENT_ID}}&api_secret={{GA4_API_SECRET}}`,
+          payload
+        );
+      } catch (err) {
+        console.warn('sendBeacon fallback failed:', err);
+      }
+    });
+  });
+})();
+</script>
