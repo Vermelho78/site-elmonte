@@ -75,20 +75,58 @@ function draw() {
         }
     });
     
-    requestAnimationFrame(draw);
+    if (isCanvasVisible) {
+        requestAnimationFrame(draw);
+    }
 }
 
 // Initial setup
 init();
-draw();
-window.addEventListener('resize', init);
+
+let isCanvasVisible = true;
+let resizeTimer;
+
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(init, 250);
+});
+
+// Performance: Intersection Observer for Canvas
+const heroSection = document.getElementById('hero');
+if(heroSection) {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if(entry.isIntersecting) {
+                if(!isCanvasVisible) {
+                    isCanvasVisible = true;
+                    draw();
+                }
+            } else {
+                isCanvasVisible = false;
+            }
+        });
+    }, { threshold: 0.1 });
+    // O canvas fica visual em hero e em partes do top.
+    observer.observe(heroSection);
+} else {
+    draw();
+}
 
 // Glitch text effect logic
 const glitchText = document.querySelector('.glitch');
 const originalText = glitchText.getAttribute('data-text');
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*()<>{}[]';
 
+let isGlitchVisible = true;
+if(heroSection && glitchText) {
+    const glitchObserver = new IntersectionObserver((entries) => {
+        isGlitchVisible = entries[0].isIntersecting;
+    }, { threshold: 0.1 });
+    glitchObserver.observe(heroSection);
+}
+
 setInterval(() => {
+    if(!isGlitchVisible) return;
     if(Math.random() > 0.95) {
         let textArray = originalText.split('');
         const indices = [
