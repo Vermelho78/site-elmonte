@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaa Vermelho - Dashboard de Remada</title>
+    <!-- Google Fonts: Outfit e Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Leaflet CSS para Mapas -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- CSS Customizado -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Logo Estético Fixo no Canto Superior Direito -->
+    <div class="fixed-top-right-logo">
+        <img src="logo_vaa.png" alt="Logo Fixo Vaa Vermelho">
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar lateral -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <img src="logo_vaa.png" alt="Logo Vaa Vermelho" class="logo-img">
+                    <span>Vaa <span class="highlight">Vermelho</span></span>
+                </div>
+                <div class="subtitle">Controle Analítico de Remada</div>
+            </div>
+
+            <!-- Perfil do Atleta -->
+            <div class="athlete-profile" id="sidebar-profile-card" onclick="openProfileTab()" style="cursor: pointer;">
+                <div class="profile-header">
+                    <div class="avatar-container">
+                        <img id="profile-sidebar-img" src="" alt="" style="display: none;">
+                        <i class="fa-solid fa-circle-user avatar-icon" id="profile-sidebar-fallback"></i>
+                    </div>
+                    <div class="profile-info">
+                        <span class="athlete-name" id="sidebar-name">Remador</span>
+                    </div>
+                </div>
+                <ul class="athlete-details">
+                    <li id="sidebar-height"><i class="fa-solid fa-arrows-up-down"></i> 1,80 m</li>
+                    <li id="sidebar-weight"><i class="fa-solid fa-weight-hanging"></i> 78 kg</li>
+                    <li id="sidebar-age"><i class="fa-solid fa-cake-candles"></i> 47 anos</li>
+                    <li id="sidebar-since"><i class="fa-solid fa-clock-rotate-left"></i> Desde 2022</li>
+                    <li id="sidebar-watch"><i class="fa-solid fa-clock"></i> Garmin 165 Music</li>
+                    <li id="sidebar-paddle"><i class="fa-solid fa-square-envelope"></i> Remo Crespo C118</li>
+                </ul>
+            </div>
+
+            <!-- Navegação -->
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="tab-dashboard" id="btn-dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Base
+                </button>
+                <button class="nav-item" data-tab="tab-workouts" id="btn-workouts">
+                    <i class="fa-solid fa-circle-play"></i> Remadas
+                </button>
+                <button class="nav-item" data-tab="tab-referencial" id="btn-referencial">
+                    <i class="fa-solid fa-book-open-reader"></i> Técnica Referencial
+                </button>
+                <button class="nav-item" data-tab="tab-drills" id="btn-drills">
+                    <i class="fa-solid fa-square-poll-horizontal"></i> Autoavaliação
+                </button>
+                <button class="nav-item" data-tab="tab-planning" id="btn-planning">
+                    <i class="fa-solid fa-calendar-days"></i> Planejamento
+                </button>
+                <button class="nav-item" data-tab="tab-thibaux" id="btn-thibaux">
+                    <i class="fa-solid fa-sliders"></i> Simulador
+                </button>
+                <button class="nav-item" data-tab="tab-gamification" id="btn-gamification">
+                    <i class="fa-solid fa-map"></i> Jornada
+                </button>
+                <button class="nav-item" data-tab="tab-profile" id="btn-profile">
+                    <i class="fa-solid fa-user-gear"></i> meu perfil
+                </button>
+            </nav>
+
+            <!-- Backups e Configurações -->
+            <div class="sidebar-footer">
+                <div class="backup-section">
+                    <button class="btn btn-secondary btn-full" id="btn-export-backup">
+                        <i class="fa-solid fa-download"></i> Exportar Backup
+                    </button>
+                    <button class="btn btn-secondary btn-full" id="btn-trigger-import">
+                        <i class="fa-solid fa-upload"></i> Importar Backup
+                    </button>
+                    <input type="file" id="input-import-backup" accept=".json" style="display: none;" />
+                </div>
+                <div class="footer-credits">
+                    Vaa Vermelho &copy; 2026
+                </div>
+            </div>
+        </aside>
+
+        <!-- Área de Conteúdo Principal -->
+        <main class="main-content">
+            <section id="tab-dashboard" class="tab-content active active">
+                <div class="section-header">
+                    <h1>Base de Controle Semanal</h1>
+                    <p class="section-desc">Monitore seu volume semanal, tempo acumulado e metas de distância.</p>
+                </div>
+
+                <!-- Grid de Métricas Principais -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon speed-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                        <div class="stat-value" id="dash-avg-speed">9,0 <span class="unit">km/h</span></div>
+                        <div class="stat-label">Velocidade Média Global</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon max-speed-icon"><i class="fa-solid fa-bolt"></i></div>
+                        <div class="stat-value" id="dash-max-speed">0,0 <span class="unit">km/h</span></div>
+                        <div class="stat-label">Velocidade Máxima Registrada</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon dist-icon"><i class="fa-solid fa-route"></i></div>
+                        <div class="stat-value" id="dash-total-distance">0,0 <span class="unit">km</span></div>
+                        <div class="stat-label">Distância Total Remada</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon time-icon"><i class="fa-solid fa-clock"></i></div>
+                        <div class="stat-value" id="dash-weekly-time">0h 00m</div>
+                        <div class="stat-label">Tempo Total Semanal</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon score-icon"><i class="fa-solid fa-star"></i></div>
+                        <div class="stat-value" id="dash-drill-score">0 <span class="unit">%</span></div>
+                        <div class="stat-label">Média de Proficiência Técnica</div>
+                    </div>
+                </div>
+
+                <!-- Progresso da Meta Semanal (Km e Tempo Total) -->
+                <div class="card goal-card glass">
+                    <div class="goal-header">
+                        <h2 id="goal-title">Meta da Semana Atual: -- km</h2>
+                        <span class="goal-badge" id="goal-remaining-badge">Calculando...</span>
+                    </div>
+                    <p class="goal-desc" id="goal-desc-text">Seu progresso acumulado zera no início de cada ciclo semanal (Segunda-feira 00:00).</p>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="goal-progress-bar" style="width: 0%;"></div>
+                        <span class="progress-bar-text" id="goal-progress-text">0% da meta semanal alcançada</span>
+                    </div>
+                    <div class="goal-footer">
+                        <span id="goal-baseline-val">Acumulado: 0,0 km</span>
+                        <span id="goal-weekly-time-val">Tempo Total: 0h 00m</span>
+                        <strong id="goal-target-val">Meta: -- km</strong>
+                    </div>
+                </div>
+
+                <!-- Linha com Gráfico e Divisão de Canoas -->
+                <div class="layout-row">
+                    <!-- Gráfico Histórico -->
+                    <div class="card chart-card glass flex-2">
+                        <h3>Evolução da Velocidade Média</h3>
+                        <div class="chart-container">
+                            <canvas id="chart-speed-evolution"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Divisão por Canoas -->
+                    <div class="card boat-card glass flex-1">
+                        <h3>Desempenho por Canoa</h3>
+                        <div class="boat-stat-box">
+                            <div class="boat-header">
+                                <span class="boat-title"><i class="fa-solid fa-anchor"></i> OC1</span>
+                                <span class="count-badge" id="oc1-count">0 treinos</span>
+                            </div>
+                            <div class="boat-body">
+                                <div class="metric-row">
+                                    <span>Distância Total:</span>
+                                    <strong id="oc1-dist">0.0 km</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Vel. Média:</span>
+                                    <strong id="oc1-avg-speed">0.0 km/h</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="boat-stat-box mt-20">
+                            <div class="boat-header">
+                                <span class="boat-title"><i class="fa-solid fa-shield-halved"></i> V1</span>
+                                <span class="count-badge" id="v1-count">0 treinos</span>
+                            </div>
+                            <div class="boat-body">
+                                <div class="metric-row">
+                                    <span>Distância Total:</span>
+                                    <strong id="v1-dist">0.0 km</strong>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Vel. Média:</span>
+                                    <strong id="v1-avg-speed">0.0 km/h</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumo de Semanas Anteriores -->
+                <div class="card glass mt-20">
+                    <h3><i class="fa-solid fa-clock-rotate-left" style="color: var(--blue-info);"></i> Resumo de Semanas Anteriores</h3>
+                    <p class="card-desc-muted">Resumo de desempenho nas semanas civis passadas (Segunda a Domingo).</p>
+                    <div class="table-responsive mt-15">
+                        <table class="weekly-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Semana</th>
+                                    <th>Distância Total</th>
+                                    <th>Tempo Total</th>
+                                    <th>Remadas</th>
+                                    <th>Status Meta</th>
+                                </tr>
+                            </thead>
+                            <tbody id="weekly-history-tbody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center;" class="text-muted">Nenhum histórico semanal consolidado.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                        </section>
+
+            <section id="tab-workouts" class="tab-content">
+                <div class="section-header">
+                    <h1>Histórico de Treinos e Garmin</h1>
+                    <p class="section-desc">Importe seus arquivos GPX ou TCX e analise o mapa e gráficos de desempenho de cada sessão.</p>
+                </div>
+
+                <div class="layout-row">
+                    <!-- Painel de Upload e Lista de Treinos -->
+                    <div class="card flex-1 glass list-card-container">
+                        <h3>Importar Treinos</h3>
+                        <div class="drop-zone" id="drop-zone">
+                            <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                            <p>Arraste e solte arquivos GPX ou TCX do Garmin aqui</p>
+                            <span>ou clique para selecionar do computador</span>
+                            <input type="file" id="input-garmin-file" multiple accept=".gpx,.tcx" style="display: none;" />
+                        </div>
+
+                        <!-- Área de lista de treinos -->
+
+                        <div class="mt-20">
+                            <div class="list-header">
+                                <h3>Seus Treinos</h3>
+                                <span class="list-count" id="workout-list-count">0 treinos</span>
+                            </div>
+                            <div class="workout-list" id="workout-list">
+                                <div class="empty-list-msg">Nenhum treino cadastrado. Faça upload de arquivos GPX/TCX do Garmin ou carregue dados de demonstração.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visualizador de Treino Selecionado -->
+                    <div class="card flex-2 glass workout-details-card" id="workout-details-container" style="display: none;">
+                        <div class="workout-detail-header">
+                            <div>
+                                <h2 id="detail-title">Treino de Remada</h2>
+                                <span class="badge" id="detail-boat-badge">OC1</span>
+                                <span class="date-text" id="detail-date">18/06/2026</span>
+                            </div>
+                            <button class="btn btn-danger btn-sm" id="btn-delete-workout">
+                                <i class="fa-solid fa-trash-can"></i> Excluir
+                            </button>
+                        </div>
+
+                        <!-- Métricas Rápidas do Treino -->
+                        <div class="details-stats-grid">
+                            <div class="details-stat-item">
+                                <span class="lbl">Distância</span>
+                                <strong id="detail-distance">10.2 km</strong>
+                            </div>
+                            <div class="details-stat-item">
+                                <span class="lbl">Duração</span>
+                                <strong id="detail-duration">01:08:15</strong>
+                            </div>
+                            <div class="details-stat-item">
+                                <span class="lbl">Velocidade Média</span>
+                                <strong id="detail-avg-speed">9.0 km/h</strong>
+                            </div>
+                            <div class="details-stat-item">
+                                <span class="lbl">Velocidade Máxima</span>
+                                <strong id="detail-max-speed">11.5 km/h</strong>
+                            </div>
+                            <div class="details-stat-item">
+                                <span class="lbl">Cadência Média</span>
+                                <strong id="detail-avg-cadence">62 spm</strong>
+                            </div>
+                            <div class="details-stat-item">
+                                <span class="lbl">FC Média</span>
+                                <strong id="detail-avg-hr">145 bpm</strong>
+                            </div>
+                        </div>
+
+                        <!-- Condições Climáticas e Marítimas do Treino -->
+                        <div class="workout-weather-box mt-20" id="detail-weather-container" style="display: none;">
+                            <h4><i class="fa-solid fa-cloud-sun"></i> Condições Climáticas e de Mar</h4>
+                            <div class="weather-grid">
+                                <div class="weather-item">
+                                    <span class="weather-lbl"><i class="fa-solid fa-temperature-half"></i> Temp.</span>
+                                    <strong id="detail-weather-temp">-- °C</strong>
+                                </div>
+                                <div class="weather-item">
+                                    <span class="weather-lbl"><i class="fa-solid fa-wind"></i> Vento</span>
+                                    <strong id="detail-weather-wind">--</strong>
+                                </div>
+                                <div class="weather-item">
+                                    <span class="weather-lbl"><i class="fa-solid fa-cloud-rain"></i> Chuva</span>
+                                    <strong id="detail-weather-rain">--</strong>
+                                </div>
+                                <div class="weather-item">
+                                    <span class="weather-lbl"><i class="fa-solid fa-water"></i> Swell</span>
+                                    <strong id="detail-weather-swell">--</strong>
+                                </div>
+                                <div class="weather-item">
+                                    <span class="weather-lbl"><i class="fa-solid fa-circle-chevron-up"></i> Maré</span>
+                                    <strong id="detail-weather-tide">--</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção de Mapa e Gráficos -->
+                        <div class="details-map-container mt-20">
+                            <div class="map-header-row">
+                                <h4>Mapa da Rota (Trajeto Colorido por Velocidade)</h4>
+                                <button class="btn btn-secondary btn-sm" id="btn-center-map">
+                                    <i class="fa-solid fa-crosshairs"></i> Centralizar Rota
+                                </button>
+                            </div>
+                            <div id="map"></div>
+                            <div class="map-legend">
+                                <span class="legend-lbl">Velocidade:</span>
+                                <span class="legend-color-bar"></span>
+                                <div class="legend-values">
+                                    <span>Lenta</span>
+                                    <span>Alvo (11 km/h)</span>
+                                    <span>Rápida</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gráficos de Série Temporal -->
+                        <div class="details-charts-container mt-20">
+                            <h4>Gráficos Detalhados</h4>
+                            <div class="details-tabs-nav">
+                                <button class="details-tab-btn active" data-detail-chart="chart-speed-wrapper">Velocidade</button>
+                                <button class="details-tab-btn" data-detail-chart="chart-cadence-wrapper" id="detail-tab-cadence">Cadência</button>
+                                <button class="details-tab-btn" data-detail-chart="chart-hr-wrapper" id="detail-tab-hr">Batimentos Cardíacos</button>
+                            </div>
+                            
+                            <div class="detail-chart-wrapper active" id="chart-speed-wrapper">
+                                <canvas id="chart-workout-speed"></canvas>
+                            </div>
+                            <div class="detail-chart-wrapper" id="chart-cadence-wrapper">
+                                <canvas id="chart-workout-cadence"></canvas>
+                            </div>
+                            <div class="detail-chart-wrapper" id="chart-hr-wrapper">
+                                <canvas id="chart-workout-hr"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Nota do Treino / Autoavaliação acoplada -->
+                        <div class="workout-evaluation-summary mt-20">
+                            <h4>Autoavaliação Técnica Associada</h4>
+                            <div id="detail-eval-linked">
+                                <p>Este treino ainda não possui uma autoavaliação de técnica registrada.</p>
+                                <button class="btn btn-primary" id="btn-link-evaluation-redirect">
+                                    <i class="fa-solid fa-clipboard-question"></i> Avaliar Técnica Deste Treino
+                                </button>
+                            </div>
+                            <div id="detail-eval-display" style="display: none;">
+                                <div class="eval-score-bar-container">
+                                    <span>Proficiência Técnica (<span id="detail-eval-tech-name">Geral</span>): <strong id="detail-eval-score-val">80%</strong></span>
+                                    <div class="eval-score-bar-outer">
+                                        <div class="eval-score-bar-inner" id="detail-eval-score-bar" style="width: 80%;"></div>
+                                    </div>
+                                </div>
+                                <div class="eval-details-summary mt-10">
+                                    <div class="eval-col">
+                                        <h5>Erros Identificados:</h5>
+                                        <ul class="error-tags-list" id="detail-eval-errors-list"></ul>
+                                    </div>
+                                    <div class="eval-col">
+                                        <h5>Drills Executados:</h5>
+                                        <ul class="drill-tags-list" id="detail-eval-drills-list"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                        </section>
+
+            <section id="tab-referencial" class="tab-content">
+                <div class="section-header referencial-section-header">
+                    <div class="ref-header-title">
+                        <h1>Técnicas de Referencial</h1>
+                        <span class="ref-external-badge"><i class="fa-solid fa-globe"></i> Referências Externas</span>
+                    </div>
+                    <p class="section-desc">Estudo das técnicas consagradas por grandes remadores e treinadores mundiais. Conteúdo complementar ao Método Drill — para absorver, comparar e refinar.</p>
+                </div>
+                <div class="ref-controls" style="margin-bottom: 20px;">
+                    <button class="btn btn-secondary btn-sm" onclick="expandAllTechniques()"><i class="fa-solid fa-expand"></i> Expandir Todas</button>
+                    <button class="btn btn-secondary btn-sm" onclick="collapseAllTechniques()"><i class="fa-solid fa-compress"></i> Colapsar Todas</button>
+                </div>
+
+
+                <!-- BLOCO 0: MÉTODO DRILL -->
+                <div class="ref-technique-card collapsed" id="ref-card-drill">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <div class="ref-source-badge" style="background: rgba(255, 0, 60, 0.1); border-color: rgba(255, 0, 60, 0.2); color: var(--accent-neon);"><i class="fa-solid fa-medal"></i>
+                                <span>Estilo Base</span></div>
+                            <h2>Método Drill — Remada de Trava Progressiva</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">O método Drill é a base biomecânica de referência deste aplicativo. Foca na trava progressiva, alinhamento vertical rigoroso da lâmina e no uso do tórax como biela de transmissão mecânica. É ideal para manter estabilidade lateral e gerar altos índices de força no início da puxada.</p>
+                        <div class="card glass ref-principles-card">
+                    <h3><i class="fa-solid fa-layer-group" style="color: var(--accent-neon);"></i> Princípios Fundamentais — Método Drill</h3>
+
+                    <div class="accordion">
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num ref-phase-num">1</strong> Fase 1: A Trava (Catch)</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Objetivo:</strong> Ancorar a lâmina verticalmente na água antes de iniciar qualquer puxada.</p>
+                                        <ul>
+                                            <li><strong>Pés:</strong> Pressão firme no footrest.</li>
+                                            <li><strong>Tórax:</strong> Rotacionado 45° (carregando a mola corporal).</li>
+                                            <li><strong>Mão Superior:</strong> Altura da têmpora/orelha, empurra à frente.</li>
+                                            <li><strong>Mão Inferior:</strong> Altura do esterno, com braço totalmente estendido.</li>
+                                        </ul>
+                                        <div class="drill-tip ref-tip"><strong>Drill Recomendado:</strong> Catch e Congela (parar 2-3s após a entrada).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num ref-phase-num">2</strong> Fase 2: Pivô do Núcleo (Power Phase)</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Objetivo:</strong> Transferir a força do tronco para a canoa através do braço inferior agindo como uma biela rígida.</p>
+                                        <ul>
+                                            <li><strong>Tórax:</strong> Desenrola da rotação de 45° para 0°.</li>
+                                            <li><strong>Braço Inferior:</strong> Rígido, não dobra (biela de aço).</li>
+                                            <li><strong>Mão Superior:</strong> Altura da bochecha/mandíbula, empurra ativamente para baixo.</li>
+                                            <li><strong>Quadril:</strong> Totalmente estável, bloqueando a bacia.</li>
+                                        </ul>
+                                        <div class="drill-tip ref-tip"><strong>Drill Recomendado:</strong> Biela de Aço (braço rígido puxado pelo core).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num ref-phase-num">3</strong> Fase 3: Binário Progressivo (Pitch)</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Objetivo:</strong> Rotacionar os punhos no final da remada para manter a lâmina em ângulo hidrodinâmico positivo.</p>
+                                        <ul>
+                                            <li><strong>Mão Superior:</strong> Altura do queixo, inicia a pronação (giro do polegar).</li>
+                                            <li><strong>Mão Inferior:</strong> Altura do quadril, funciona como o pivô.</li>
+                                            <li><strong>Lâmina:</strong> Gira como o acelerador de uma motocicleta.</li>
+                                        </ul>
+                                        <div class="drill-tip ref-tip"><strong>Drill Recomendado:</strong> Acelerador de Moto (giro progressivo dos punhos).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num ref-phase-num">4</strong> Fase 4: Saída Limpa (Snap)</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Objetivo:</strong> Retirar o remo da água lateralmente de forma seca, sem levantar respingos ou frear o casco.</p>
+                                        <ul>
+                                            <li><strong>Mão Superior:</strong> Empurra para frente e para fora.</li>
+                                            <li><strong>Mão Inferior:</strong> Sobe em direção ao peito com pegada relaxada.</li>
+                                            <li><strong>Lâmina:</strong> Fatia a água rente à borda lateral da canoa.</li>
+                                        </ul>
+                                        <div class="drill-tip ref-tip"><strong>Drill Recomendado:</strong> A Espada na Bainha (zero respingos na saída).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                        
+                    </div>
+                </div>
+
+
+                <!-- BLOCO 1: TEPAVA -->
+                <div class="ref-technique-card collapsed" id="ref-card-tepava">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <div class="ref-source-badge"><i class="fa-solid fa-wave-square"></i>
+                        <span>Fonte Principal</span></div>
+                            <h2>Tepava — Shell Va'a Team</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Héroe Terorotua, conhecido como <strong>Tepava</strong>, é treinador do lendário time Shell Va'a do Tahiti — a potência dominante do va'a mundial. Seu método é ensinado em cursos presenciais e documentado em vídeos ricos publicados no YouTube. A técnica foca em leveza, verticalidade e uso fluido do ombro como motor primário da remada.</p>
+                        
+                        <div class="card glass ref-drills-card">
+                            <h3><i class="fa-solid fa-dumbbell" style="color: var(--gold-accent);"></i> Drills Específicos — Método Tepava</h3>
+                            <div class="ref-drills-grid">
+                                <div class="ref-drill-card">
+                                    <div class="ref-drill-icon">🎯</div>
+                                    <h4>Remada de Um Braço</h4>
+                                    <p>Remar usando apenas o braço inferior para isolar e sentir a contribuição do ombro. O braço superior fica relaxado no colo. Revela desequilíbrios e fortalece a sensação de "ombro como motor".</p>
+                                    <span class="ref-drill-focus">Foco: Ativação do ombro</span>
+                                </div>
+                                <div class="ref-drill-card">
+                                    <div class="ref-drill-icon">⏸️</div>
+                                    <h4>Pausa no Catch</h4>
+                                    <p>Inserir a lâmina e pausar 2-3 segundos antes de qualquer força. Força o remador a verificar a posição do corpo, o alinhamento da lâmina e a profundidade antes de puxar.</p>
+                                    <span class="ref-drill-focus">Foco: Qualidade do catch</span>
+                                </div>
+                                <div class="ref-drill-card">
+                                    <div class="ref-drill-icon">🐢</div>
+                                    <h4>Remada Ultra-Lenta</h4>
+                                    <p>Realizar cada remada em câmera lenta (15-20 ppm), sentindo cada micro-fase da remada. Permite ao cérebro criar o mapa neuromotor correto sem interferência da fadiga ou velocidade.</p>
+                                    <span class="ref-drill-focus">Foco: Consciência corporal</span>
+                                </div>
+                                <div class="ref-drill-card">
+                                    <div class="ref-drill-icon">📐</div>
+                                    <h4>Catch & Hold</h4>
+                                    <p>Entrar com a lâmina e manter a posição de catch por 3s enquanto a canoa desliza sobre o remo fixo. Treinamento proprioceptivo que desenvolve a sensação de "ancorar" sem puxar.</p>
+                                    <span class="ref-drill-focus">Foco: Profundidade e ancoragem</span>
+                                </div>
+                                <div class="ref-drill-card">
+                                    <div class="ref-drill-icon">🌊</div>
+                                    <h4>Remada "Silêncio Total"</h4>
+                                    <p>Nenhum ruído de água permitido — nem na entrada, nem na puxada, nem na saída. Qualquer som indica erro técnico. Treino de alta qualidade que desenvolve eficiência hidrodinâmica instintiva.</p>
+                                    <span class="ref-drill-focus">Foco: Eficiência hidrodinâmica</span>
+                                </div>
+                                <div class="ref-drill-card">
+                                    <div class="ref-drill-icon">🔄</div>
+                                    <h4>Rotação Exagerada</h4>
+                                    <p>Exagerar deliberadamente a rotação do tronco, tocando o ombro quase na maçaneta do remo. Constrói a amplitude de rotação necessária e acostuma o corpo a usar toda a musculatura do torso.</p>
+                                    <span class="ref-drill-focus">Foco: Amplitude de rotação</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- BLOCO 3: TRAVIS GRANT -->
+                <div class="ref-technique-card collapsed" id="ref-card-travis">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <div class="ref-source-badge" style="background: rgba(6,214,160,0.12); border-color: rgba(6,214,160,0.3); color: var(--green-correct);"><i class="fa-solid fa-bolt"></i>
+                        <span>Coach Referencial</span></div>
+                            <h2>Travis Grant — Técnica Australiana</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Múltiplo campeão mundial de OC1 (Molokai Hoe, Na Pali Challenge, Carolina Cup) e SUP. Seu estilo é marcado por alta cadência, catch extremamente agressivo e uso explosivo dos ombros. Referência absoluta no flat water de elite mundial.</p>
+                        <div class="card glass ref-principles-card" style="border-left-color: var(--green-correct);">
+                    <h3><i class="fa-solid fa-layer-group" style="color: var(--green-correct);"></i> Princípios Fundamentais — Técnica Travis Grant</h3>
+                    <div class="accordion">
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--green-correct); color: #000;">1</strong> Postura e Posição no Banco</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> Corpo ereto e ativo, inclinado levemente para frente. Travis enfatiza que a postura é o alicerce de tudo — sem ela, toda a mecânica seguinte colapsa.</p>
+                                        <ul>
+                                            <li><strong>Posição:</strong> Sentado na ponta do banco, peso levemente à frente — não encostado.</li>
+                                            <li><strong>Coluna:</strong> Ereta, neutro — não curvada nem arqueada.</li>
+                                            <li><strong>Ombros:</strong> Abertos e ativos — prontos para rotar na próxima remada.</li>
+                                            <li><strong>Olhar:</strong> Fixo à frente, num ponto num horizonte — não no remo.</li>
+                                            <li><strong>Grip:</strong> Leve na mão superior, firme na inferior — nunca apertado ao ponto de travar.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(6,214,160,0.07); border-left: 3px solid var(--green-correct);"><strong>Ponto-chave Travis:</strong> "Sentar na ponta do banco ativa o core automaticamente. É a maneira mais simples de melhorar sua remada sem mudar nada no stroke."</div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?grjdDBFngoo" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Travis Grant Part 1 Tahitian Paddle Technique — Técnica Taitiana Pt.1 (The Paddle Channel)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--green-correct); color: #000;">2</strong> O Catch Explosivo — "Swing the Axe"</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> Travis descreve o catch como "balancear o machado" — o remo é lançado à água com intenção e velocidade, não inserido suavemente. O objetivo é agarrar água imediatamente.</p>
+                                        <ul>
+                                            <li><strong>Alcance:</strong> Máximo — o ombro inferior se projeta o mais à frente possível.</li>
+                                            <li><strong>Velocidade de entrada:</strong> O remo entra rápido, não lento — impacto controlado é aceito.</li>
+                                            <li><strong>Profundidade:</strong> Lâmina totalmente submersa antes do pull — zero pá no ar.</li>
+                                            <li><strong>Timing:</strong> Imediatamente após a entrada, a puxada começa — sem pausa.</li>
+                                            <li><strong>Cadência alta:</strong> O ciclo rápido exige que o catch seja preciso e automático.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(6,214,160,0.07); border-left: 3px solid var(--green-correct);"><strong>Ponto-chave Travis:</strong> É o oposto da "pausa no catch" do Tepava. Travis acredita que o ritmo e a velocidade de entrada são tão importantes quanto a profundidade.</div>
+                                        <div class="ref-comparison-note">
+                                            <i class="fa-solid fa-code-compare"></i>
+                                            <span><strong>vs. Drill / Tepava ⚡ Divergência:</strong> O Drill usa "freeze" e o Tepava usa catch suave. Travis usa catch agressivo e rápido — filosofia diferente, adequada para cadências altas de prova.</span>
+                                        </div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?JHpM32aWp0I" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Travis Grant Part 2 Tahitian Paddle Technique — Técnica Taitiana Pt.2</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--green-correct); color: #000;">3</strong> Power Phase — Cadência e Engrenagens</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> Travis treina em diferentes "engrenagens" — ritmos diferentes de cadência e intensidade. A fase de potência é curta e explosiva, com o remo longo na água mas a puxada concentrada.</p>
+                                        <ul>
+                                            <li><strong>Ombros:</strong> São o principal motor — rotam completamente a cada remada.</li>
+                                            <li><strong>Braço inferior:</strong> Pode dobrar levemente — não é biela rígida como no Drill.</li>
+                                            <li><strong>Braço superior:</strong> Empurra ativo e decisivo para frente/baixo.</li>
+                                            <li><strong>Core:</strong> Ativado pela postura, estabiliza durante a puxada.</li>
+                                            <li><strong>Cadência de prova:</strong> 70-85 ppm — substancialmente maior que a maioria dos estilos.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(6,214,160,0.07); border-left: 3px solid var(--green-correct);"><strong>Ponto-chave Travis:</strong> Treinar em diferentes engrenagens (Gear 1 a 4) prepara o remador para qualquer ritmo de prova. A forma técnica deve permanecer a mesma em todas as engrenagens.</div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?xlDJOeRP2Sw" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Travis Grant Part 3 Tahitian Paddle Technique — Técnica Taitiana Pt.3: Engrenagens</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--green-correct); color: #000;">4</strong> Saída e Recuperação Compacta</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> A saída é precoce (antes do quadril) e a recuperação é rápida e compacta. Em alta cadência, não há tempo para recuperação longa — o remo precisa voltar à frente rapidamente.</p>
+                                        <ul>
+                                            <li><strong>Saída antes do joelho:</strong> Em alta cadência, o remo sai ainda mais cedo que no Tepava.</li>
+                                            <li><strong>Recuperação:</strong> Alta e rápida — o remo passa sobre a água, não ao lado.</li>
+                                            <li><strong>Silêncio:</strong> Mesmo com cadência alta, a saída deve ser limpa — mão superior empurra para fora.</li>
+                                            <li><strong>Glide:</strong> Menor que no Tepava por design — a frequência compensa o glide reduzido.</li>
+                                            <li><strong>Respiração:</strong> Sincronizada com a saída — expira na retirada do remo.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(6,214,160,0.07); border-left: 3px solid var(--green-correct);"><strong>Ponto-chave Travis:</strong> A fórmula não é potência + glide. É potência x frequência. Mais remadas por minuto, cada uma perfeita, supera o glide longo.</div>
+                                        <div class="ref-comparison-note">
+                                            <i class="fa-solid fa-code-compare"></i>
+                                            <span><strong>vs. Tepava:</strong> Tepava prioriza glide longo e cadência média. Travis prioriza cadência alta com saída mais cedo. Filosofias opostas sobre a equação velocidade = potência × cadência.</span>
+                                        </div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?grjdDBFngoo&t=300" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Travis Grant OC1 Basics Paddle Monster — Fundamentos OC1 (Paddle Monster)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                        <div class="card glass ref-drills-card" style="border-left-color: var(--green-correct);">
+                    <h3><i class="fa-solid fa-dumbbell" style="color: var(--green-correct);"></i> Drills Travis Grant — Alta Cadência e Eficiência</h3>
+                    <div class="ref-drills-grid">
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">⚡</div>
+                            <h4>Sprint de Cadência (10s ON / 20s OFF)</h4>
+                            <p>10 segundos de cadência máxima mantendo forma impecável, 20s de recuperação. Treina o sistema neuromuscular a manter técnica mesmo em frequência extrema.</p>
+                            <span class="ref-drill-focus" style="background: rgba(6,214,160,0.12); border-color: rgba(6,214,160,0.3); color: var(--green-correct);">Foco: Cadência máxima</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🎯</div>
+                            <h4>"Swing the Axe" Drill</h4>
+                            <p>Praticar a entrada do remo com velocidade deliberada e intenção. O objetivo é sentir o remo "agarrar" a água imediatamente, sem hesitação. Faz 20 remadas com foco total nesse gesto.</p>
+                            <span class="ref-drill-focus" style="background: rgba(6,214,160,0.12); border-color: rgba(6,214,160,0.3); color: var(--green-correct);">Foco: Catch agressivo</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🏆</div>
+                            <h4>Troca de Engrenagem (Gear Shifts)</h4>
+                            <p>3 min na Engrenagem 1 (cadenciado, técnico), 2 min na Gear 2, 1 min na Gear 3, 30s na Gear 4 (máximo). A forma técnica não muda, apenas a intensidade aumenta.</p>
+                            <span class="ref-drill-focus" style="background: rgba(6,214,160,0.12); border-color: rgba(6,214,160,0.3); color: var(--green-correct);">Foco: Consistência técnica</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🔄</div>
+                            <h4>"Long in the Water" Drill</h4>
+                            <p>Garantir que a lâmina permaneça totalmente submersa durante toda a fase de potência. Qualquer borbulha ou cavitação indica limpeza insuficiente.</p>
+                            <span class="ref-drill-focus" style="background: rgba(6,214,160,0.12); border-color: rgba(6,214,160,0.3); color: var(--green-correct);">Foco: Profundidade efetiva</span>
+                        </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+
+
+                <!-- BLOCO 4: JOHN PUAKEA -->
+                <div class="ref-technique-card collapsed" id="ref-card-puakea">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <div class="ref-source-badge" style="background: rgba(0,180,216,0.12); border-color: rgba(0,180,216,0.3); color: var(--blue-info);"><i class="fa-solid fa-flask"></i>
+                        <span>Coach Referencial</span></div>
+                            <h2>John Puakea — Técnica Taitiana Clássica</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Designer das lendarias canoas Puakea e um dos maiores analistas de técnica de remada do mundo. Criou e divulgou o conceito de "Técnica Taitiana" para o mundo ocidental, com vídeos e artigos técnicos profundos sobre a biomecânica da remada havaiana e polinesia.</p>
+                        <div class="card glass ref-principles-card" style="border-left-color: var(--blue-info);">
+                    <h3><i class="fa-solid fa-layer-group" style="color: var(--blue-info);"></i> Princípios Fundamentais — John Puakea</h3>
+                    <div class="accordion">
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--blue-info); color: #000;">1</strong> A Trava da Âgua — Water Lock</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> John Puakea ensina que o segredo da técnica taitiana é criar uma "trava" de água com a lâmina antes de qualquer movimento de corpo. A água se torna o ponto fixo; o remador move a canoa sobre a pá imovível.</p>
+                                        <ul>
+                                            <li><strong>Mental:</strong> Imagine que a lâmina está pregada no fundo do mar. O corpo é que se move, não o remo.</li>
+                                            <li><strong>Entrada:</strong> A pá entra e "segura" — não há puxada; há propulsão do corpo para frente.</li>
+                                            <li><strong>Pressão:</strong> Imediata e sustentada desde o momento da entrada.</li>
+                                            <li><strong>Braço inferior:</strong> Extended — o mais esticado possível para maximizar o braço de alavanca.</li>
+                                            <li><strong>Analogia:</strong> Como agarrar uma pedra submersa e puxar o corpo para ela.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(0,180,216,0.07); border-left: 3px solid var(--blue-info);"><strong>Ponto-chave Puakea:</strong> "Você não puxa o remo. Você usa o remo para puxar a canoa sobre a água." Esta mentalidade transforma completamente como o atleta percebe a remada.</div>
+                                        <div class="ref-comparison-note">
+                                            <i class="fa-solid fa-circle-check" style="color: var(--green-correct);"></i>
+                                            <span><strong>vs. Drill ✅ Convergência Total:</strong> Este conceito é idêntico ao que o Drill chama de "A Trava (Catch)" na Fase 1 — ancorar a lâmina antes de qualquer força.</span>
+                                        </div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?NFoIwFx8LtI" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">John Puakea Outrigger Canoe Technique — Técnica Taitiana completa</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--blue-info); color: #000;">2</strong> Rotação do Tronco — Upper Body Rotation</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> A rotação do tronco é o gerador de potência. Não os braços, não as pernas — o torso que gira de um lado para o outro é o motor real da propulsão.</p>
+                                        <ul>
+                                            <li><strong>Ombro a ombro:</strong> O ombro que vai à frente no catch deve cruzar a linha central do corpo no início do pull.</li>
+                                            <li><strong>Quadril:</strong> Estável — apenas o tronco superior rota.</li>
+                                            <li><strong>Amplitude:</strong> Máxima rotação torácica — até 60-70° em cada lado.</li>
+                                            <li><strong>Timing:</strong> A rotação PRECEDE qualquer pressão dos braços.</li>
+                                            <li><strong>Energia elástica:</strong> O torso carregado como uma mola é o que gera a explosão da remada.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(0,180,216,0.07); border-left: 3px solid var(--blue-info);"><strong>Ponto-chave Puakea:</strong> "Se você sente seus braços trabalhando muito, seu tronco está trabalhando pouco."</div>
+                                        <div class="ref-comparison-note">
+                                            <i class="fa-solid fa-circle-check" style="color: var(--green-correct);"></i>
+                                            <span><strong>vs. Drill ✅ Convergência:</strong> O Drill chama isso de "Pivô do Núcleo" (Fase 2). Ambos coincidem: o tronco é o motor; os braços são transmissores.</span>
+                                        </div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?q0dK7O-iTj0" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">John Puakea Paddling Technique Analysis — Análise detalhada da técnica</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--blue-info); color: #000;">3</strong> Exit — A Saída pelo Joelho</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> John Puakea foi um dos primeiros a sistematizar e nomear a "exit zone" — a saída pelo joelho como ponto ideal para retirar a lâmina, preservando o momentum da canoa.</p>
+                                        <ul>
+                                            <li><strong>Zona de saída:</strong> Ao lado do joelho — nem muito cedo, nem tarde demais.</li>
+                                            <li><strong>Direção:</strong> Lateral e para fora, nunca para cima.</li>
+                                            <li><strong>Mão superior:</strong> Lidera o movimento de saída, empurrando para fora.</li>
+                                            <li><strong>Silêncio:</strong> Zero barulho de água — a lâmina sai como faca na banha.</li>
+                                            <li><strong>Feathering:</strong> A pá gira para ficar paralela à superfície durante a recuperação aérea.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(0,180,216,0.07); border-left: 3px solid var(--blue-info);"><strong>Ponto-chave Puakea:</strong> "Cada segundo que você deixa o remo na água além da zona do joelho, você está freando a canoa, não acelerando."</div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?eED7G4Nw2N0" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Shell Va'a Stroke Analysis — Análise do stroke Shell Va'a (PaddleNinja)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                        <div class="card glass ref-drills-card" style="border-left-color: var(--blue-info);">
+                    <h3><i class="fa-solid fa-dumbbell" style="color: var(--blue-info);"></i> Drills John Puakea — Técnica Taitiana</h3>
+                    <div class="ref-drills-grid">
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">⚓️</div>
+                            <h4>"Pedra no Fundo" (Water Lock)</h4>
+                            <p>Inserir o remo, imaginar que ele está preso ao fundo, e mover apenas o corpo para frente. Depois de 3 segundos, completar a remada normalmente. Cria a mentalidade correta de propulsão.</p>
+                            <span class="ref-drill-focus" style="background: rgba(0,180,216,0.12); border-color: rgba(0,180,216,0.3); color: var(--blue-info);">Foco: Propulsão pelo corpo</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🔄</div>
+                            <h4>Rotação Exagerada do Tronco</h4>
+                            <p>Exagerar deliberadamente o giro do tronco a cada remada. O ombro do lado da remada deve cruzar a linha da proa. Constrói amplitude e forcça o remador a usar os músculos corretos.</p>
+                            <span class="ref-drill-focus" style="background: rgba(0,180,216,0.12); border-color: rgba(0,180,216,0.3); color: var(--blue-info);">Foco: Motor do tronco</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🛶</div>
+                            <h4>Saída pelo Joelho (Exit Zone)</h4>
+                            <p>Colocar um adesivo/marca no remo na altura do joelho. A saída da água deve ocorrer exatamente nesse ponto. Drilla a consistência da zona de saída.</p>
+                            <span class="ref-drill-focus" style="background: rgba(0,180,216,0.12); border-color: rgba(0,180,216,0.3); color: var(--blue-info);">Foco: Timing da saída</span>
+                        </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+
+
+                <!-- BLOCO 5: RAPHAEL THIBAUX -->
+                <div class="ref-technique-card collapsed" id="ref-card-thibaux">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <div class="ref-source-badge" style="background: rgba(157,78,221,0.12); border-color: rgba(157,78,221,0.3); color: var(--purple-long);"><i class="fa-solid fa-water"></i>
+                        <span>Coach Referencial</span></div>
+                            <h2>Raphael Thibaux — Escola Polinésia</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Treinador de longa tradição na escola francesa de va'a, com forte influência da cultura polinesia. Sua abordagem combina rigor técnico com a fluidez e conexão com a água da Polinésia — filosofia holística da remada como diálogo com o oceano.</p>
+                        <div class="card glass ref-principles-card" style="border-left-color: var(--purple-long);">
+                    <h3><i class="fa-solid fa-layer-group" style="color: var(--purple-long);"></i> Princípios Fundamentais — Raphael Thibaux</h3>
+                    <div class="accordion">
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--purple-long); color: #fff;">1</strong> Conexão com a Água — Feel the Flow</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> A remada não é uma luta contra a água — é um diálogo. O remador precisa sentir as microforces da água em cada fase do stroke e adaptar continuamente a pressão da lâmina.</p>
+                                        <ul>
+                                            <li><strong>Sensibilidade:</strong> Desenvolver propriocepção da lâmina — sentir a pressão da água em tempo real.</li>
+                                            <li><strong>Adaptação:</strong> Ajustar o ângulo e a pressão da pá a cada remada conforme as condições mudam.</li>
+                                            <li><strong>Fluidez:</strong> A remada perfeita é silenciosa, contínua e sem esforço aparente.</li>
+                                            <li><strong>Leveza:</strong> Não forçar a água — usar a resistencia da água como alavanca, não como obstáculo.</li>
+                                            <li><strong>Filosofia:</strong> O oceano sempre vence. Trabalhe com ele, nunca contra.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(157,78,221,0.07); border-left: 3px solid var(--purple-long);"><strong>Ponto-chave Thibaux:</strong> "Um remador forte força a água. Um remador sutil usa a água. Seja sutil."</div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?mhPzjMxuZ2w" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Va'a Technique Polynesian Style — David Tepava / Va'a Vitals</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--purple-long); color: #fff;">2</strong> O Glide Sagrado — Honrar o Deslize</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> O glide (deslize entre as remadas) é o indicador mais honesto da qualidade da remada. Se a canoa não desliza, a energia está sendo desperdiçada. Cada remada deve ser suficientemente poderosa e limpa para sustenter o deslize.</p>
+                                        <ul>
+                                            <li><strong>Economia:</strong> Menor número de remadas com máximo glide é mais eficiente que alta cadência sem glide.</li>
+                                            <li><strong>Qualidade sobre quantidade:</strong> Uma remada perfeita vale mais que três remadas medianas.</li>
+                                            <li><strong>Recuperação contemplativa:</strong> Usar a fase aérea para resetar mentalmente e preparar o próximo catch.</li>
+                                            <li><strong>Indicadores:</strong> Silencio da água durante o glide é o sinal de que o casco está deslizando bem.</li>
+                                            <li><strong>Cadência:</strong> Moderada (55-65 ppm) — nunca sacrificar o glide por velocidade de cadência.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(157,78,221,0.07); border-left: 3px solid var(--purple-long);"><strong>Ponto-chave Thibaux:</strong> Conte os segundos de glide por remada. O objetivo é que a canoa deslize ao menos 1 segundo em ritmo de treino técnico. Se não desliza, algo está errado.</div>
+                                        <div class="ref-comparison-note">
+                                            <i class="fa-solid fa-circle-check" style="color: var(--green-correct);"></i>
+                                            <span><strong>vs. Drill ✅ Alta Convergência:</strong> O Drill também lista "glide longo e silencioso" como o principal indicador de técnica correta. Esta é uma das maiores convergências entre todas as escolas.</span>
+                                        </div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?eED7G4Nw2N0" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Shell Va'a Glide Analysis — Análise do glide Shell Va'a</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item ref-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span><strong class="phase-num" style="background: var(--purple-long); color: #fff;">3</strong> Mentalidade Polinésia — Remada como Meditacão</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="accordion-content">
+                                <div class="ref-principle-body">
+                                    <div class="ref-principle-text">
+                                        <p><strong>Conceito central:</strong> Na cultura polinesia, o va'a é mais que um esporte — é uma prática espiritual e cultural. O estado mental do remador afeta diretamente a qualidade da remada. Tensão e ego criam rigidez; calma e intenção criam fluidade.</p>
+                                        <ul>
+                                            <li><strong>Respiração:</strong> Profunda e sincronizada com o stroke — expira na entrada, inspira na saída.</li>
+                                            <li><strong>Foco:</strong> Presente no momento, sentindo cada remada individualmente.</li>
+                                            <li><strong>Intenção:</strong> Cada remada é intencional e consciente — não automática no piloto automático.</li>
+                                            <li><strong>Conexão com o oceano:</strong> Ler as ondas, o vento, a corrente — e usar tudo a favor.</li>
+                                            <li><strong>Gratidão:</strong> O ato de remar é um privilégio. Essa mentalidade gera mais presença e melhor performance.</li>
+                                        </ul>
+                                        <div class="drill-tip" style="background: rgba(157,78,221,0.07); border-left: 3px solid var(--purple-long);"><strong>Ponto-chave Thibaux:</strong> "Quando você está tenso, a água sente. Quando você está calmo, a canoa voa. O oceano não mente."</div>
+                                    </div>
+                                    <div class="ref-youtube-link-card">
+                                        <a href="https://www.youtube.com/watch?NFoIwFx8LtI&t=60" target="_blank" class="youtube-btn">
+                                            <i class="fa-brands fa-youtube"></i> Assistir no YouTube
+                                        </a>
+                                        <p class="youtube-caption">Va'a Polynesian Mindset — mentalidade e fluidez</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                        <div class="card glass ref-drills-card" style="border-left-color: var(--purple-long);">
+                    <h3><i class="fa-solid fa-dumbbell" style="color: var(--purple-long);"></i> Drills Escola Polinesia — Fluidez e Conexão</h3>
+                    <div class="ref-drills-grid">
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🧘</div>
+                            <h4>Remada Mindful (Consciente)</h4>
+                            <p>Cada remada é consciente e intencional. Antes de cada entrada, uma micro-pausa mental para definir a intenção. Elimina o piloto automático e constroí preseneça plena no gesto técnico.</p>
+                            <span class="ref-drill-focus" style="background: rgba(157,78,221,0.12); border-color: rgba(157,78,221,0.3); color: var(--purple-long);">Foco: Preseneça e intenção</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🐧</div>
+                            <h4>Conte o Glide</h4>
+                            <p>Após cada remada, contar em voz baixa o tempo de glide ("um, dois, três..."). O objetivo é chegar a pelo menos 2-3 segundos de deslize em ritmo técnico. Diagnostica instantâneamente a qualidade da remada.</p>
+                            <span class="ref-drill-focus" style="background: rgba(157,78,221,0.12); border-color: rgba(157,78,221,0.3); color: var(--purple-long);">Foco: Qualidade do glide</span>
+                        </div>
+                        <div class="ref-drill-card">
+                            <div class="ref-drill-icon">🌪️</div>
+                            <h4>Leitura do Oceano</h4>
+                            <p>Remar sem olhar para o remo — apenas observar a água à frente, sentindo as correntes e usando-as a favor. Desenvolve a conexão intuitiva com o ambiente aquático.</p>
+                            <span class="ref-drill-focus" style="background: rgba(157,78,221,0.12); border-color: rgba(157,78,221,0.3); color: var(--purple-long);">Foco: Intuicão náutica</span>
+                        </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+
+
+                <!-- BLOCO COMPARATIVO GERAL DE TÉCNICAS     -->
+                <!-- ==========================================-->
+                <div class="card glass ref-radar-card" style="margin-top: 30px;">
+                    <h3><i class="fa-solid fa-chart-radar" style="color: var(--gold-accent);"></i> Comparativo Geral de Técnicas</h3>
+                    <p class="ref-radar-desc">Análise comparativa em 8 dimensões biomecânicas. Os valores refletem a ênfase de cada escola ou coach na remada, demonstrando as prioridades de cada estilo.</p>
+                    <div class="ref-radar-wrapper">
+                        <div class="chart-container" style="max-width: 520px; margin: 0 auto; height: 420px;">
+                            <canvas id="chart-referencial-radar"></canvas>
+                        </div>
+                        <div class="ref-radar-legend">
+                            <div class="ref-legend-item" style="--coach-color: rgba(255, 0, 60, 0.85);" onclick="toggleLegendDataset(0)">
+                                <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-0" style="--coach-color: rgba(255, 0, 60, 0.85);" onclick="event.stopPropagation()">
+                                <div>
+                                    <strong>Método Drill</strong>
+                                    <p>Técnica pessoal de trava progressiva e cadeia cinética — máxima potência via core + biela rígida.</p>
+                                </div>
+                            </div>
+                            <div class="ref-legend-item" style="--coach-color: rgba(240, 165, 0, 0.85);" onclick="toggleLegendDataset(1)">
+                                <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-1" style="--coach-color: rgba(240, 165, 0, 0.85);" onclick="event.stopPropagation()">
+                                <div>
+                                    <strong>Técnica Tepava (Shell Va'a)</strong>
+                                    <p>Motor centrado no ombro, catch profundo, leveza e fluidez — remada sustentável para longa distância.</p>
+                                </div>
+                            </div>
+                            <div class="ref-legend-item" style="--coach-color: rgba(6, 214, 160, 0.85);" onclick="toggleLegendDataset(2)">
+                                <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-2" style="--coach-color: rgba(6, 214, 160, 0.85);" onclick="event.stopPropagation()">
+                                <div>
+                                    <strong>Travis Grant (Escola Australiana)</strong>
+                                    <p>Alta cadência, catch extremamente agressivo (swing the axe) e uso explosivo dos ombros.</p>
+                                </div>
+                            </div>
+                            <div class="ref-legend-item" style="--coach-color: rgba(0, 180, 216, 0.85);" onclick="toggleLegendDataset(3)">
+                                <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-3" style="--coach-color: rgba(0, 180, 216, 0.85);" onclick="event.stopPropagation()">
+                                <div>
+                                    <strong>John Puakea (Técnica Taitiana Clássica)</strong>
+                                    <p>Ancoragem firme na água (Water Lock), motor concentrado na rotação do tronco e saída no joelho.</p>
+                                </div>
+                            </div>
+                            <div class="ref-legend-item" style="--coach-color: rgba(157, 78, 221, 0.85);" onclick="toggleLegendDataset(4)">
+                                <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-4" style="--coach-color: rgba(157, 78, 221, 0.85);" onclick="event.stopPropagation()">
+                                <div>
+                                    <strong>Raphael Thibaux (Escola Polinésia)</strong>
+                                    <p>Ênfase holística na fluidez, sintonia fina (feel the flow) e máxima valorização do glide longo.</p>
+                                </div>
+                            </div>
+                            <div class="ref-radar-axis-desc">
+                                <h5>Legenda dos Eixos</h5>
+                                <ul>
+                                    <li><strong>Rotação do Tronco:</strong> Amplitude e ênfase no giro torácico</li>
+                                    <li><strong>Uso dos Braços:</strong> Quanto os braços são os motores ativos</li>
+                                    <li><strong>Ativação do Core:</strong> Envolvimento de oblíquos e abdominais</li>
+                                    <li><strong>Profundidade do Catch:</strong> Entrada total da lâmina antes de puxar</li>
+                                    <li><strong>Cadência Recomendada:</strong> Frequência ideal de remadas por minuto</li>
+                                    <li><strong>Controle de Pitch:</strong> Minimização do movimento de oscilação vertical</li>
+                                    <li><strong>Glide / Deslize:</strong> Rendimento gerado entre os ciclos de remada</li>
+                                    <li><strong>Uso do Ombro:</strong> Amplitude e sustentação via rotação e elevação de ombros</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section><!-- /tab-referencial -->
+
+            <section id="tab-drills" class="tab-content">
+                <div class="section-header">
+                    <h1>Autoavaliação de Remada</h1>
+                    <p class="section-desc">Monitore e analise a biomecânica da sua remada. Registre sua autoavaliação pós-treino e correlacione com a velocidade média.</p>
+                </div>
+
+                <div class="layout-row">
+                    <!-- Formulário de Autoavaliação -->
+                    <div class="card flex-1 glass form-card">
+                        <h3>Registrar Autoavaliação Técnica</h3>
+                        
+                        <div class="form-group">
+                            <label for="eval-workout-select">Selecionar Treino:</label>
+                            <select id="eval-workout-select" class="form-control">
+                                <option value="">Selecione um treino...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mt-10">
+                            <label for="eval-technique-select">Técnica de Referência:</label>
+                            <select id="eval-technique-select" class="form-control">
+                                <option value="nula">Técnica Nula (Geral)</option>
+                                <option value="drill">Método Drill</option>
+                                <option value="tepava">Técnica Tepava</option>
+                                <option value="travis">Travis Grant</option>
+                                <option value="puakea">John Puakea</option>
+                                <option value="thibaux">Raphael Thibaux</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row mt-10">
+                            <div class="form-group">
+                                <label for="eval-boat-select">Tipo de Embarcação:</label>
+                                <select id="eval-boat-select" class="form-control">
+                                    <option value="OC1">OC1</option>
+                                    <option value="V1">V1</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="eval-boat-weight">Peso da Canoa (kg):</label>
+                                <input type="number" id="eval-boat-weight" class="form-control" placeholder="Ex: 14.5" step="0.1" min="1">
+                            </div>
+                        </div>
+
+                        <!-- Avaliação das 4 Fases (Sliders) -->
+                        <div class="form-section mt-15">
+                            <h4>Nível de Execução das Fases (0 a 100%)</h4>
+                            
+                            <div class="slider-group">
+                                <div class="slider-label">
+                                    <span id="lbl-phase-1">Fase 1: A Trava (Catch)</span>
+                                    <span id="val-phase-1">50%</span>
+                                </div>
+                                <input type="range" id="slider-phase-1" class="form-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-1').innerText = this.value + '%'" />
+                            </div>
+
+                            <div class="slider-group">
+                                <div class="slider-label">
+                                    <span id="lbl-phase-2">Fase 2: Pivô do Núcleo (Power Phase)</span>
+                                    <span id="val-phase-2">50%</span>
+                                </div>
+                                <input type="range" id="slider-phase-2" class="form-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-2').innerText = this.value + '%'" />
+                            </div>
+
+                            <div class="slider-group">
+                                <div class="slider-label">
+                                    <span id="lbl-phase-3">Fase 3: Binário Progressivo (Pitch)</span>
+                                    <span id="val-phase-3">50%</span>
+                                </div>
+                                <input type="range" id="slider-phase-3" class="form-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-3').innerText = this.value + '%'" />
+                            </div>
+
+                            <div class="slider-group">
+                                <div class="slider-label">
+                                    <span id="lbl-phase-4">Fase 4: Saída Limpa (Snap)</span>
+                                    <span id="val-phase-4">50%</span>
+                                </div>
+                                <input type="range" id="slider-phase-4" class="form-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-4').innerText = this.value + '%'" />
+                            </div>
+                        </div>
+
+                        <!-- Checklist de Erros -->
+                        <div class="form-section mt-15">
+                            <h4>Erros Identificados no Treino</h4>
+                            <div class="checkbox-grid" id="eval-errors-grid">
+                                <!-- Preenchido dinamicamente -->
+                            </div>
+                        </div>
+
+                        <!-- Checklist de Drills Feitos -->
+                        <div class="form-section mt-15">
+                            <h4>Drills Praticados no Treino</h4>
+                            <div class="checkbox-grid" id="eval-drills-grid">
+                                <!-- Preenchido dinamicamente -->
+                            </div>
+                        </div>
+
+                        <!-- Condições do Clima e do Mar -->
+                        <div class="form-section mt-15">
+                            <div class="form-section-header">
+                                <h4>Condições de Clima e Mar</h4>
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-fetch-weather" style="padding: 4px 8px; font-size: 11px; margin-bottom: 8px;">
+                                    <i class="fa-solid fa-cloud-sun"></i> Buscar Online
+                                </button>
+                            </div>
+                            <div class="layout-row gap-10">
+                                <div class="form-group flex-1">
+                                    <label for="eval-weather-temp">Temperatura (°C):</label>
+                                    <input type="number" id="eval-weather-temp" class="form-control" placeholder="Ex: 24" />
+                                </div>
+                                <div class="form-group flex-1">
+                                    <label for="eval-weather-wind">Vento:</label>
+                                    <input type="text" id="eval-weather-wind" class="form-control" placeholder="Ex: 10 kts SO" />
+                                </div>
+                            </div>
+                            <div class="layout-row gap-10 mt-10">
+                                <div class="form-group flex-1">
+                                    <label for="eval-weather-rain">Chuva:</label>
+                                    <select id="eval-weather-rain" class="form-control">
+                                        <option value="Sem Chuva">Sem Chuva</option>
+                                        <option value="Garoa/Leve">Garoa / Leve</option>
+                                        <option value="Chuva Forte">Chuva Forte</option>
+                                    </select>
+                                </div>
+                                <div class="form-group flex-1">
+                                    <label for="eval-weather-swell">Swell / Ondulação:</label>
+                                    <input type="text" id="eval-weather-swell" class="form-control" placeholder="Ex: 0.5m Leste" />
+                                </div>
+                            </div>
+                            <div class="form-group mt-10">
+                                <label for="eval-weather-tide">Maré:</label>
+                                <select id="eval-weather-tide" class="form-control">
+                                    <option value="">Selecione a maré...</option>
+                                    <option value="Seca">Seca</option>
+                                    <option value="Enchendo">Enchendo</option>
+                                    <option value="Cheia">Cheia</option>
+                                    <option value="Vazando">Vazando</option>
+                                </select>
+                            </div>
+                            <div class="form-group mt-10" id="worldtides-key-group" style="display:none;">
+                                <label for="eval-worldtides-key">Chave API World Tides (<a href="https://www.worldtides.info/register" target="_blank" style="color: var(--blue-info); text-decoration: underline; font-size: 11px;">Obter chave gratuita</a>):</label>
+                                <input type="password" id="eval-worldtides-key" class="form-control" placeholder="Insira sua chave API World Tides..." />
+                            </div>
+                            <div class="form-group mt-10" style="font-size: 11px; color: var(--text-muted); display:flex; align-items:center; gap:6px;">
+                                <i class="fa-solid fa-circle-check" style="color: #06d6a0; font-size: 12px;"></i>
+                                Maré via World Tides API — chave configurada automaticamente.
+                            </div>
+                        </div>
+
+                        <!-- Comentários adicionais -->
+                        <div class="form-group mt-15">
+                            <label for="eval-notes">Notas / Observações Pessoais:</label>
+                            <textarea id="eval-notes" class="form-control" rows="3" placeholder="Sinta a remada... o vento... a resposta da canoa."></textarea>
+                        </div>
+
+                        <button class="btn btn-primary mt-15 btn-full" id="btn-save-evaluation">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar Autoavaliação
+                        </button>
+                    </div>
+
+                    <!-- Gráfico de Correlação -->
+                    <div class="card glass flex-1">
+                        <h3>Correlação: Nível Técnico vs. Velocidade Média</h3>
+                        <p class="section-desc">Mapeamento visual entre a pontuação média de proficiência da remada (sliders) e a velocidade alcançada nos treinos correspondentes.</p>
+                        
+                        <div class="chart-container" style="height: 350px; margin-top: 20px;">
+                            <canvas id="chart-correlation"></canvas>
+                        </div>
+
+                        <div class="card bg-dark mt-25 border-red">
+                            <h4>Equilíbrio Dinâmico & Desempenho</h4>
+                            <p style="font-size: 12px; line-height: 1.6; color: var(--text-secondary);" class="mt-5">
+                                A correlação acima mostra a eficácia biomecânica direta: remadas com maior índice de acerto técnico tendem a gerar velocidades sustentadas significativamente mais elevadas com menor fadiga metabólica.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                        </section>
+
+            <section id="tab-planning" class="tab-content">
+                <div class="section-header">
+                    <h1>Planejamento e Recomendações</h1>
+                    <p class="section-desc">Acompanhe as metas estruturadas de treinos e receba orientações inteligentes baseadas nas suas autoavaliações.</p>
+                </div>
+
+                <div class="layout-row">
+                    <!-- Estrutura Semanal e Metas Físicas -->
+                    <div class="card flex-1 glass">
+                        <h3>Plano de Treinos Semanal (Estrutura de 4 Sessões)</h3>
+                        <p class="mb-15">Para um volume de 40 km semanais (média de 10 km por remada), a estrutura de sessões deve equilibrar intensidade, técnica e volume aeróbico:</p>
+                        
+                        <div class="planning-session-box">
+                            <div class="session-badge badge-red">Treino 1</div>
+                            <div class="session-body">
+                                <h4>Intervalado de Alta Intensidade (VO2 Máx) - 10km</h4>
+                                <p><strong>Foco:</strong> Velocidade de pico e capacidade anaeróbica.</p>
+                                <p class="session-desc">Aquecimento 2km + 10x 500m forte (acima de 11.5 km/h) com 1 min de descanso ativo + 3km solto. Ideal para OC1.</p>
+                            </div>
+                        </div>
+
+                        <div class="planning-session-box mt-15">
+                            <div class="session-badge badge-orange">Treino 2</div>
+                            <div class="session-body">
+                                <h4>Sessão Regenerativa & Foco em Drills - 8km a 10km</h4>
+                                <p><strong>Foco:</strong> Correção mecânica e consolidação do padrão motor.</p>
+                                <p class="session-desc">Fazer remadas em baixa cadência (45-50 ppm). Dedicar 15 min a cada um dos Drills recomendados abaixo.</p>
+                            </div>
+                        </div>
+
+                        <div class="planning-session-box mt-15">
+                            <div class="session-badge badge-blue">Treino 3</div>
+                            <div class="session-body">
+                                <h4>Tempo Run (Limiar de Lactato) - 10km</h4>
+                                <p><strong>Foco:</strong> Sustentar velocidade média elevada.</p>
+                                <p class="session-desc">Aquecimento 2km + 6km no ritmo de prova (alvo: 10 a 10.5 km/h constantes) + 2km solto. Preferencial na V1 para estabilidade.</p>
+                            </div>
+                        </div>
+
+                        <div class="planning-session-box mt-15">
+                            <div class="session-badge badge-purple">Treino 4</div>
+                            <div class="session-body">
+                                <h4>Longo Aeróbico de Base - 12km a 14km</h4>
+                                <p><strong>Foco:</strong> Endurance cardiovascular e eficiência no glide.</p>
+                                <p class="session-desc">Paddling contínuo em ritmo moderado (Z2 de frequência cardíaca). Cadência estável entre 55-60 ppm. Foco no glide longo.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sistema Inteligente de Diagnóstico e Recomendações -->
+                    <div class="card flex-1 glass border-red">
+                        <h3>Recomendações Inteligentes do Coach Virtual</h3>
+                        <p class="mb-15">Com base nas suas últimas autoavaliações técnicas, identificamos os seguintes pontos de atenção e Drills corretivos:</p>
+                        
+                        <div id="coach-loading-msg" class="text-center p-20">
+                            <i class="fa-solid fa-spinner fa-spin coach-spinner"></i>
+                            <p>Analisando histórico de erros e drills...</p>
+                        </div>
+
+                        <div id="coach-recommendations" style="display: none;">
+                            <!-- Top Erro -->
+                            <div class="coach-alert-box warning-box">
+                                <div class="box-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                                <div class="box-content">
+                                    <h4>Seu principal erro recorrente:</h4>
+                                    <strong id="coach-top-error">Colapso da Biela (dobrar braço inferior)</strong>
+                                    <p class="mt-5" id="coach-error-description">Isso reduz a transferência de força do tronco (braço de alavanca de 300N cai para 150N) e sobrecarrega os bíceps.</p>
+                                </div>
+                            </div>
+
+                            <!-- Lista de Recomendação de Drills -->
+                            <h4 class="mt-20">Drills corretivos priorizados para seu próximo Treino Técnico:</h4>
+                            
+                            <div id="coach-drills-list">
+                                <!-- Recomendação Dinâmica -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Histórico de Erros / Frequência -->
+                <div class="card glass mt-20">
+                    <h3>Frequência de Erros Identificados</h3>
+                    <p class="section-desc">Mapeamento visual dos desvios técnicos mais cometidos. Elimine estes erros para alcançar os 11 km/h de média.</p>
+                    <div class="chart-container" style="height: 250px;">
+                        <canvas id="chart-errors-frequency"></canvas>
+                    </div>
+                </div>
+                        </section>
+
+            <section id="tab-thibaux" class="tab-content">
+                <div class="section-header">
+                    <div class="ref-source-badge" style="background: rgba(157,78,221,0.12); border-color: rgba(157,78,221,0.3); color: var(--purple-long);">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Simulador</span>
+                    </div>
+                    <h1>Simulador de Remada</h1>
+                    <p class="section-desc">Simule biomecânica, hidrodinâmica e condições climáticas para descobrir a velocidade resultante ideal da sua remada.</p>
+                </div>
+
+                <div class="thibaux-grid">
+                    <!-- Simulador de Fluxo (Canvas) -->
+                    <div class="card glass thibaux-card">
+                        <div class="card-header-with-badge">
+                            <h3><i class="fa-solid fa-wind" style="color: var(--purple-long);"></i> Simulador Hidrodinâmico: Feel the Flow</h3>
+                            <span class="badge badge-purple" id="flow-status-badge" style="background: var(--purple-long); color:#000;">Laminar</span>
+                        </div>
+                        <p class="card-desc-muted">O remador polinésio lê a resistência da água na lâmina. Ajuste o ângulo de ataque (pitch) e a força para manter o fluxo laminar (verde) e evitar turbulência e arrasto (vermelho).</p>
+                        
+                        <div class="canvas-container">
+                            <canvas id="flow-canvas" width="560" height="300"></canvas>
+                        </div>
+                        
+                        <div class="control-group mt-15">
+                            <label>
+                                <span>Ângulo de Ataque (Pitch): <strong id="val-flow-angle">0°</strong></span>
+                                <input type="range" id="slider-flow-angle" min="-45" max="45" value="0" class="premium-slider">
+                            </label>
+                            <label class="mt-10">
+                                <span>Força da Puxada (Power): <strong id="val-flow-power">50%</strong></span>
+                                <input type="range" id="slider-flow-power" min="10" max="100" value="50" class="premium-slider">
+                            </label>
+                        </div>
+                        <div class="flow-feedback-box mt-15" id="flow-feedback-text">
+                            <strong>Fluxo Laminar Ideal:</strong> Lâmina perfeitamente alinhada. Arrasto mínimo e máxima eficiência propulsiva.
+                        </div>
+                    </div>
+
+                    <!-- Canoa & Cadência -->
+                    <div class="card glass thibaux-card">
+                        <h3><i class="fa-solid fa-anchor" style="color: var(--purple-long);"></i> Canoa & Cadência</h3>
+                        <p class="card-desc-muted">Defina as especificações da embarcação, os dados do remador/remo e a cadência de remada. Estes parâmetros determinam a inércia e a força aplicada.</p>
+                        
+                        <div class="control-group mt-15">
+                            <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); width: 100%;">
+                                <span style="font-weight: 500; margin-bottom: 5px;">Tipo de Canoa:</span>
+                                <select id="sim-canoe-type" class="form-control" style="font-size:13px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: 6px;">
+                                    <option value="V1" selected>V1 (Sem leme - Direcional)</option>
+                                    <option value="OC1">OC1 (Com leme/leme ativo)</option>
+                                </select>
+                            </label>
+                            
+                            <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); width: 100%; margin-top: 15px;">
+                                <span style="display: flex; justify-content: space-between; font-weight: 500;">
+                                    Peso da Canoa: <strong id="val-canoe-weight" style="color: var(--purple-long);">13.5 kg</strong>
+                                </span>
+                                <input type="range" id="slider-canoe-weight" min="8" max="25" step="0.5" value="13.5" class="premium-slider" style="margin-top: 8px;">
+                            </label>
+
+                            <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); width: 100%; margin-top: 15px;">
+                                <span style="display: flex; justify-content: space-between; font-weight: 500;">
+                                    Cadência da Remada: <strong id="val-calc-cadence" style="color: var(--purple-long);">55 ppm</strong>
+                                </span>
+                                <input type="range" id="slider-calc-cadence" min="40" max="90" value="55" class="premium-slider" style="margin-top: 8px;">
+                            </label>
+
+                            <!-- Dados de Ajuste Fino do Remador -->
+                            <div class="layout-row gap-10 mt-15">
+                                <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); flex: 1;">
+                                    <span style="display: flex; justify-content: space-between; font-weight: 500;">
+                                        Peso Remador: <strong id="val-sim-ath-weight" style="color: var(--purple-long);">78 kg</strong>
+                                    </span>
+                                    <input type="range" id="slider-sim-ath-weight" min="50" max="120" value="78" class="premium-slider" style="margin-top: 8px;">
+                                </label>
+                                <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); flex: 1;">
+                                    <span style="display: flex; justify-content: space-between; font-weight: 500;">
+                                        Altura Remador: <strong id="val-sim-ath-height" style="color: var(--purple-long);">1.80 m</strong>
+                                    </span>
+                                    <input type="range" id="slider-sim-ath-height" min="1.50" max="2.10" step="0.01" value="1.80" class="premium-slider" style="margin-top: 8px;">
+                                </label>
+                            </div>
+
+                            <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); width: 100%; margin-top: 15px;">
+                                <span style="display: flex; justify-content: space-between; font-weight: 500;">
+                                    Área da Pá (Blade Area): <strong id="val-sim-blade-area" style="color: var(--purple-long);">95 sq in</strong>
+                                </span>
+                                <input type="range" id="slider-sim-blade-area" min="80" max="115" value="95" class="premium-slider" style="margin-top: 8px;">
+                            </label>
+                        </div>
+                        
+                        <div class="flow-feedback-box mt-15" style="font-size:12px; line-height:1.4; background: rgba(157,78,221,0.05); border-left: 3px solid var(--purple-long); padding: 10px; border-radius: 4px;">
+                            <i class="fa-solid fa-circle-info" style="color: var(--purple-long);"></i> O peso e altura do remador são preenchidos por padrão a partir do seu perfil, mas podem ser ajustados livremente nesta aba.
+                        </div>
+                    </div>
+
+                    <!-- Simulador de Rotação e Torque (Top-down) -->
+                    <div class="card glass thibaux-card">
+                        <h3><i class="fa-solid fa-rotate" style="color: var(--purple-long);"></i> Rotação & Transferência de Torque</h3>
+                        <p class="card-desc-muted">A remada eficiente exige rotação de tronco com o quadril bloqueado. Ajuste os controles para simular a potência efetiva transmitida ao casco.</p>
+                        
+                        <div class="rotation-simulator-layout">
+                            <div class="svg-container-rotation">
+                                <svg id="rotation-svg" viewBox="0 0 300 200" width="100%" height="180">
+                                    <!-- Water lines/waves -->
+                                    <path d="M 10 20 Q 80 15, 150 20 T 290 20" fill="none" stroke="rgba(6,214,160,0.1)" stroke-width="1.5" />
+                                    <path d="M 10 180 Q 80 175, 150 180 T 290 180" fill="none" stroke="rgba(6,214,160,0.1)" stroke-width="1.5" />
+                                    
+                                    <!-- Canoe Hull -->
+                                    <path d="M 20 100 C 50 85, 250 85, 280 100 C 250 115, 50 115, 20 100 Z" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2" />
+                                    
+                                    <!-- Outrigger Ama (left side) -->
+                                    <path d="M 50 35 C 70 30, 210 30, 230 35 C 210 40, 70 40, 50 35 Z" fill="rgba(255, 0, 60, 0.15)" stroke="rgba(255, 0, 60, 0.3)" stroke-width="1.5" />
+                                    <line x1="100" y1="90" x2="100" y2="35" stroke="rgba(255, 255, 255, 0.3)" stroke-width="2.5" stroke-linecap="round" />
+                                    <line x1="200" y1="90" x2="200" y2="35" stroke="rgba(255, 255, 255, 0.3)" stroke-width="2.5" stroke-linecap="round" />
+                                    
+                                    <!-- Center of body marker -->
+                                    <circle cx="150" cy="100" r="2" fill="rgba(255, 255, 255, 0.3)" />
+
+                                    <!-- Hip Group -->
+                                    <g id="sim-hip-group" transform="rotate(0, 150, 100)">
+                                        <line x1="135" y1="88" x2="135" y2="112" stroke="rgba(255,255,255,0.4)" stroke-width="5" stroke-linecap="round" />
+                                        <line x1="135" y1="88" x2="155" y2="92" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round" />
+                                        <line x1="135" y1="112" x2="155" y2="108" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round" />
+                                    </g>
+
+                                    <!-- Torso Group -->
+                                    <g id="sim-torso-group" transform="rotate(0, 150, 100)">
+                                        <!-- Spine -->
+                                        <line x1="135" y1="100" x2="150" y2="100" stroke="#fff" stroke-width="4" stroke-linecap="round" />
+                                        <!-- Shoulder line -->
+                                        <line x1="150" y1="82" x2="150" y2="118" stroke="#fff" stroke-width="5" stroke-linecap="round" />
+                                        <!-- Head -->
+                                        <circle cx="145" cy="100" r="8" fill="#fff" />
+                                        <!-- Right arm (top hand) reaching to paddle -->
+                                        <path d="M 150 82 Q 170 85, 175 113" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round" />
+                                        <!-- Left arm (bottom hand) reaching to paddle -->
+                                        <line x1="150" y1="118" x2="175" y2="123" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round" />
+                                        <!-- Paddle shaft -->
+                                        <line x1="175" y1="113" x2="175" y2="140" stroke="var(--purple-long)" stroke-width="3.5" stroke-linecap="round" />
+                                        <!-- Paddle blade (in water) -->
+                                        <ellipse cx="175" cy="143" rx="4" ry="8" fill="var(--green-correct)" />
+                                    </g>
+                                </svg>
+                            </div>
+                            
+                            <!-- Seleção de Condição Climática de Treinos Anteriores -->
+                            <div class="form-group mb-15" style="width: 100%; margin-top: 15px;">
+                                <label style="font-size:13px; color: var(--text-secondary); font-weight:500;">
+                                    <i class="fa-solid fa-cloud-sun-rain" style="color:var(--purple-long);"></i> Condição Climática da Sessão:
+                                </label>
+                                <select id="sim-weather-select" class="form-control mt-5" style="font-size:13px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: 6px; width: 100%;">
+                                    <option value="">— Nenhuma condição selecionada —</option>
+                                </select>
+                                <p id="sim-weather-info" class="text-muted" style="font-size:12px; margin-top:6px; min-height:16px;"></p>
+
+                                <div class="layout-row gap-10 mt-10">
+                                    <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); flex: 1;">
+                                        <span style="font-weight: 500; margin-bottom: 5px;">Direção do Vento:</span>
+                                        <select id="sim-wind-dir" class="form-control" style="font-size:13px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: 6px;">
+                                            <option value="contra" selected>Contra (Headwind)</option>
+                                            <option value="favor">A Favor (Tailwind)</option>
+                                            <option value="lateral">Lateral (Crosswind)</option>
+                                        </select>
+                                    </label>
+                                    <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); flex: 1;">
+                                        <span style="font-weight: 500; margin-bottom: 5px;">Direção das Ondas:</span>
+                                        <select id="sim-swell-dir" class="form-control" style="font-size:13px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: 6px;">
+                                            <option value="contra" selected>Contra (Head wave)</option>
+                                            <option value="favor">A Favor / Surf (Downwind)</option>
+                                            <option value="lateral">Lateral</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="rotation-controls mt-10" style="width: 100%;">
+                                <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); width: 100%;">
+                                    <span style="display: flex; justify-content: space-between; font-weight: 500;">Rotação do Tronco: <strong id="val-rot-angle" style="color: var(--purple-long);">0°</strong></span>
+                                    <input type="range" id="slider-rot-angle" min="0" max="90" value="0" class="premium-slider" style="margin-top: 8px;">
+                                </label>
+                                <label style="display: flex; flex-direction: column; font-size: 13px; color: var(--text-secondary); width: 100%; margin-top: 15px;">
+                                    <span style="display: flex; justify-content: space-between; font-weight: 500;">Estabilização do Quadril (Hip Lock): <strong id="val-hip-lock" style="color: var(--purple-long);">0%</strong></span>
+                                    <input type="range" id="slider-hip-lock" min="0" max="100" value="0" class="premium-slider" style="margin-top: 8px;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Métricas Biomecânicas Secundárias (Locais) -->
+                        <div class="torque-results-grid mt-15">
+                            <div class="torque-metric">
+                                <span class="lbl">Torque Gerado</span>
+                                <span class="val" id="res-torque-val">0.0 <span class="unit">N.m</span></span>
+                            </div>
+                            <div class="torque-metric">
+                                <span class="lbl">Potência Bruta</span>
+                                <span class="val" id="res-power-raw">0 <span class="unit">W</span></span>
+                            </div>
+                            <div class="torque-metric">
+                                <span class="lbl">Eficiência de Transmissão</span>
+                                <span class="val" id="res-torque-eff" style="color: var(--accent-neon);">0%</span>
+                            </div>
+                            <div class="torque-metric">
+                                <span class="lbl">Potência Efetiva (Casco)</span>
+                                <span class="val" id="res-power-eff" style="color: var(--green-correct);">0 <span class="unit">W</span></span>
+                            </div>
+                        </div>
+
+                        <div class="torque-feedback-box mt-15" id="torque-feedback-text">
+                            <strong>Torque Neutro:</strong> Gire o tronco para engajar os grandes grupos musculares das costas.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RESULTADO FINAL DA SIMULAÇÃO & MEMÓRIA DE CÁLCULO -->
+                <div class="card glass thibaux-card mt-25">
+                    <div style="text-align: center; padding: 10px 0;">
+                        <h3 style="font-size:18px; font-weight:700;"><i class="fa-solid fa-square-poll-vertical" style="color: var(--purple-long);"></i> Resultado da Performance Estimada</h3>
+                        <p class="card-desc-muted">Métricas finais obtidas a partir da unificação dos parâmetros hidrodinâmicos, biomecânicos, peso total e clima.</p>
+                    </div>
+
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+                        <!-- Coluna 1: Glide -->
+                        <div class="torque-speed-kpi" style="flex: 1; min-width: 250px; background: rgba(157,78,221,0.08); border: 1px solid rgba(157,78,221,0.25); border-radius: 12px; padding: 20px; text-align: center;">
+                            <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 5px;">Comprimento do Deslize (Glide)</div>
+                            <div id="final-res-glide" style="font-size: 2.6rem; font-weight: 800; color: var(--purple-long); font-family: 'Outfit', sans-serif;">0.00 <span style="font-size:1.2rem; font-weight: 400;">metros</span></div>
+                            <div id="final-glide-desc" style="font-size:12px; color: var(--text-muted); margin-top: 8px;">A canoa desliza a cada ciclo.</div>
+                        </div>
+
+                        <!-- Coluna 2: Velocidade Resultante -->
+                        <div class="torque-speed-kpi" style="flex: 1; min-width: 250px; background: rgba(6,214,160,0.08); border: 1px solid rgba(6,214,160,0.25); border-radius: 12px; padding: 20px; text-align: center;">
+                            <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 5px;">Velocidade Resultante Estimada</div>
+                            <div id="final-res-speed" style="font-size: 2.6rem; font-weight: 800; color: var(--green-correct); font-family: 'Outfit', sans-serif;">0.0 <span style="font-size:1.2rem; font-weight: 400;">km/h</span></div>
+                            <div id="final-speed-desc" style="font-size:12px; color: var(--text-muted); margin-top: 8px;">Velocidade no trilho hidrodinâmico.</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco Acordeão/Painel: Memória de Cálculo -->
+                    <div class="calculation-memory-box mt-25" style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 20px;">
+                        <h4 style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-weight: 600;">
+                            <span><i class="fa-solid fa-brain" style="color: var(--purple-long);"></i> Memória de Cálculo Biomecânica & Hidrodinâmica</span>
+                            <span style="font-size: 11px; color: var(--text-muted); font-weight: 400; text-transform: uppercase; letter-spacing: 0.5px;">Atualizado em Tempo Real</span>
+                        </h4>
+
+                        <div class="calculation-step-list" style="display: grid; grid-template-columns: 1fr; gap: 20px; font-size: 13px; line-height: 1.6;">
+                            <!-- Passo 1: Potência Remador -->
+                            <div class="step-item" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px;">
+                                <strong style="color: var(--purple-long);">1. Potência Muscular Gerada (Bruta)</strong>
+                                <div style="margin-top:4px; color: var(--text-secondary);">
+                                    Atleta: <span id="calc-athlete-weight">—</span> kg | Altura: <span id="calc-athlete-height">—</span> m | Exp: <span id="calc-athlete-exp">—</span> anos
+                                </div>
+                                <div style="font-family: monospace; font-size:12px; color: var(--text-muted); margin-top:4px;">
+                                    P_base = 120 + W_atleta + (Y_exp * 4) = <span id="calc-pbase-val">—</span> W
+                                </div>
+                                <div style="font-family: monospace; font-size:12px; color: var(--text-muted);">
+                                    P_bruta = P_base * (Força / 100) * (1 + (Rot / 90) * 0.2) = <strong id="calc-pbruta-val" style="color: var(--purple-long);">— W</strong>
+                                </div>
+                            </div>
+
+                            <!-- Passo 2: Eficiências aplicadas -->
+                            <div class="step-item" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px;">
+                                <strong style="color: var(--purple-long);">2. Transmissão e Eficiência da Remada</strong>
+                                <div style="margin-top:4px; color: var(--text-secondary);">
+                                    Eficiência Lâmina (Pitch <span id="calc-pitch-deg">—</span>°): <span id="calc-blade-eff">—</span>% (ideal a 0°)<br>
+                                    Transmissão do Quadril (Hip Lock <span id="calc-hiplock-val">—</span>%): <span id="calc-trans-eff">—</span>%
+                                </div>
+                                <div style="font-family: monospace; font-size:12px; color: var(--text-muted); margin-top:4px;">
+                                    P_efetiva = P_bruta * η_trans * η_blade = <strong id="calc-peff-val" style="color: var(--green-correct);">— W</strong>
+                                </div>
+                            </div>
+
+                            <!-- Passo 3: Resistência Hidrodinâmica -->
+                            <div class="step-item" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px;">
+                                <strong style="color: var(--purple-long);">3. Coeficiente de Atrito e Arrasto</strong>
+                                <div style="margin-top:4px; color: var(--text-secondary);">
+                                    Canoa <span id="calc-canoe-type">—</span> (<span id="calc-canoe-weight-lbl">—</span> kg) | Peso Total Sistema: <span id="calc-mtotal">—</span> kg.<br>
+                                    Arrasto de Massa (R_massa): <span id="calc-rmass-val">—</span> | Arrasto Climático (Vento + Ondas): <span id="calc-renv-val">—</span>
+                                </div>
+                                <div style="font-family: monospace; font-size:12px; color: var(--text-muted); margin-top:4px;">
+                                    Arrasto Total = R_massa + R_env = <strong id="calc-rtotal-val" style="color: var(--orange-warn);">—</strong>
+                                </div>
+                            </div>
+
+                            <!-- Passo 4: Glide e Velocidade -->
+                            <div class="step-item">
+                                <strong style="color: var(--purple-long);">4. Divisão do Glide e Velocidade Resultante</strong>
+                                <div style="margin-top:4px; color: var(--text-secondary);">
+                                    Glide Ativo (Na água): <span id="calc-gactive-val">—</span> m | Glide Passivo (Inércia): <span id="calc-gpassive-val">—</span> m
+                                </div>
+                                <div style="font-family: monospace; font-size:12px; color: var(--text-muted); margin-top:4px;">
+                                    Glide Total (Deslize por Ciclo) = G_ativo + G_passivo = <strong id="calc-gtotal-val" style="color: var(--purple-long);">— m</strong>
+                                </div>
+                                <div style="font-family: monospace; font-size:12px; color: var(--text-muted);">
+                                    Velocidade = (Glide * Cadência * 60) / 1000 = <strong id="calc-speed-val" style="color: var(--green-correct);">— km/h</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pilares Conceituais -->
+                <div class="thibaux-pillars-grid mt-25">
+                    <div class="card glass pillar-card">
+                        <div class="pillar-icon" style="background: rgba(157,78,221,0.12); color: var(--purple-long);"><i class="fa-solid fa-water"></i></div>
+                        <h4>Mana (Conexão)</h4>
+                        <p>A força interna e o respeito sagrado à canoa e ao mar. A remada não é uma luta física; é uma comunhão espiritual de harmonia com o fluido.</p>
+                    </div>
+                    <div class="card glass pillar-card">
+                        <div class="pillar-icon" style="background: rgba(157,78,221,0.12); color: var(--purple-long);"><i class="fa-solid fa-feather"></i></div>
+                        <h4>Hoe (O Remo)</h4>
+                        <p>A alavanca que conecta o remador à água. O remo deve ser inserido limpo, sem barulho e sem bolhas, agindo como um ponto fixo no fluido.</p>
+                    </div>
+                    <div class="card glass pillar-card">
+                        <div class="pillar-icon" style="background: rgba(157,78,221,0.12); color: var(--purple-long);"><i class="fa-solid fa-compass"></i></div>
+                        <h4>Va'a (A Canoa)</h4>
+                        <p>O templo de madeira e fibra que desliza. A canoa deve ser honrada mantendo-se estável, limpa, rápida e com o menor movimento de pitch possível.</p>
+                    </div>
+                </div>
+                        </section><!-- /tab-thibaux -->
+
+            <section id="tab-gamification" class="tab-content">
+                <!-- Header com XP e Nível -->
+                <div class="game-header">
+                    <div class="game-title-block">
+                        <h1><i class="fa-solid fa-map-location-dot"></i> Jornada do Remador</h1>
+                        <p class="section-desc">Seu progresso real virou um RPG. Conquiste ilhas, equipe itens e evolua seu avatar.</p>
+                    </div>
+                    <div class="game-level-block">
+                        <div class="level-title-badge" id="g-level-title">Aprendiz das Águas</div>
+                        <div class="level-num-row">
+                            <span class="level-num-label">Nível</span>
+                            <span class="level-num" id="g-level-num">1</span>
+                        </div>
+                        <div class="xp-bar-wrap">
+                            <div class="xp-bar-fill" id="g-xp-bar"></div>
+                        </div>
+                        <div class="xp-label-row">
+                            <span id="g-xp-current">0 XP</span>
+                            <span id="g-xp-next">/ 500 XP</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layout Principal -->
+                <div class="game-main-layout">
+
+                    <!-- COLUNA ESQUERDA: Mapa Náutico -->
+                    <div class="game-map-column">
+                        <div class="nautical-map-card card glass">
+                            <div class="nautical-map-header">
+                                <h3><i class="fa-solid fa-compass"></i> Mapa Náutico</h3>
+                                <span class="nautical-map-subtitle">Desbloqueie ilhas com seus dados de treino</span>
+                            </div>
+                            <div class="nautical-map-container">
+                                <canvas id="nautical-map-canvas"></canvas>
+                                <!-- Tooltip de ilha -->
+                                <div class="island-tooltip" id="island-tooltip">
+                                    <div class="island-tooltip-name" id="island-tooltip-name"></div>
+                                    <div class="island-tooltip-desc" id="island-tooltip-desc"></div>
+                                    <div class="island-tooltip-req" id="island-tooltip-req"></div>
+                                </div>
+                            </div>
+                            <!-- Legenda das ilhas -->
+                            <div class="island-legend">
+                                <span class="legend-item"><span class="legend-dot unlocked"></span>Desbloqueada</span>
+                                <span class="legend-item"><span class="legend-dot locked"></span>Bloqueada</span>
+                                <span class="legend-item"><span class="legend-dot current"></span>Você está aqui</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUNA DIREITA: Avatar + Inventário + Conquistas -->
+                    <div class="game-side-column">
+
+                        <!-- Card do Avatar -->
+                        <div class="avatar-game-card card glass">
+                            <div class="avatar-game-inner">
+                                <!-- Canvas pixel art -->
+                                <div class="avatar-canvas-wrap">
+                                    <canvas id="avatar-canvas" width="256" height="384"></canvas>
+                                    <div class="avatar-mood-indicator" id="avatar-mood-indicator">
+                                        <span id="avatar-mood-emoji">😊</span>
+                                    </div>
+                                </div>
+                                <!-- Info do avatar -->
+                                <div class="avatar-info-block">
+                                    <div class="avatar-name">Remador</div>
+                                    <div class="avatar-subtitle" id="g-player-title">Aprendiz das Águas</div>
+                                    <div class="avatar-island-status">
+                                        <i class="fa-solid fa-map-pin"></i>
+                                        <span id="avatar-island-name">Enseada dos Primeiros Golpes</span>
+                                    </div>
+                                    <!-- Speech bubble -->
+                                    <div class="avatar-speech-bubble" id="avatar-speech">
+                                        <span>Pronto para remar hoje?</span>
+                                    </div>
+                                    <!-- Stats de jogo -->
+                                    <div class="avatar-stats-grid">
+                                        <div class="avatar-stat">
+                                            <span class="avatar-stat-label">Velocidade</span>
+                                            <span class="avatar-stat-value" id="g-stat-speed">9.0</span>
+                                        </div>
+                                        <div class="avatar-stat">
+                                            <span class="avatar-stat-label">Técnica</span>
+                                            <span class="avatar-stat-value" id="g-stat-drill">0%</span>
+                                        </div>
+                                        <div class="avatar-stat">
+                                            <span class="avatar-stat-label">Volume</span>
+                                            <span class="avatar-stat-value" id="g-stat-km">0 km</span>
+                                        </div>
+                                        <div class="avatar-stat">
+                                            <span class="avatar-stat-label">XP Total</span>
+                                            <span class="avatar-stat-value" id="g-stat-xp">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card de Conquistas -->
+                        <div class="achievements-card card glass">
+                            <h3><i class="fa-solid fa-trophy"></i> Conquistas</h3>
+                            <div class="achievements-grid" id="achievements-grid">
+                                <!-- Badges carregados pelo JS -->
+                            </div>
+                        </div>
+
+                        <!-- Card de Provas/Competições -->
+                        <div class="competitions-card card glass">
+                            <h3><i class="fa-solid fa-medal"></i> Registrar Resultado de Prova</h3>
+                            <div class="comp-form">
+                                <div class="comp-form-row">
+                                    <input type="text" id="comp-name" class="form-control" placeholder="Nome da prova (ex: Volta à Ilha)" />
+                                    <input type="date" id="comp-date" class="form-control" />
+                                </div>
+                                <div class="comp-form-row">
+                                    <input type="number" id="comp-place" class="form-control" placeholder="Colocação (ex: 4)" min="1" />
+                                    <input type="number" id="comp-total" class="form-control" placeholder="Total de atletas" min="1" />
+                                </div>
+                                <button class="btn btn-primary btn-full" id="btn-save-competition">
+                                    <i class="fa-solid fa-plus"></i> Adicionar Prova
+                                </button>
+                            </div>
+                            <div class="comp-list" id="comp-list"></div>
+                        </div>
+
+                    </div>
+                </div>
+                        </section>
+
+            <section id="tab-profile" class="tab-content">
+                <div class="section-header">
+                    <div class="ref-source-badge" style="background: rgba(255,0,60,0.08); border-color: rgba(255,0,60,0.2); color: var(--accent-neon);">
+                        <i class="fa-solid fa-user-gear"></i>
+                        <span>Configurações</span>
+                    </div>
+                    <h1>Meu Perfil do Atleta</h1>
+                    <p class="section-desc">Gerencie suas informações físicas, seus equipamentos e configure seus objetivos de desempenho na remada.</p>
+                </div>
+
+                <div class="profile-grid">
+                    <!-- Painel de Visualização (Visualização do Perfil) -->
+                    <div class="card glass profile-view-card">
+                        <div class="avatar-upload-container">
+                            <div class="profile-avatar-wrapper" onclick="document.getElementById('input-profile-photo').click()">
+                                <img id="profile-large-img" src="" alt="Avatar do Atleta" style="display: none;">
+                                <i class="fa-solid fa-circle-user avatar-placeholder-icon" id="profile-large-fallback"></i>
+                                <div class="avatar-hover-overlay">
+                                    <i class="fa-solid fa-camera"></i>
+                                    <span>Alterar Foto</span>
+                                </div>
+                            </div>
+                            <input type="file" id="input-profile-photo" accept="image/*" style="display: none;">
+                        </div>
+
+                        <div class="profile-view-details mt-20">
+                            <h2 id="view-profile-name" class="text-center">Remador</h2>
+                            <p id="view-profile-status" style="display:none;"></p>
+                            
+                            <hr class="profile-divider">
+
+                            <div class="profile-stats-grid">
+                                <div class="p-stat-item">
+                                    <span class="lbl">Altura</span>
+                                    <strong id="view-profile-height">1,80 m</strong>
+                                </div>
+                                <div class="p-stat-item">
+                                    <span class="lbl">Peso</span>
+                                    <strong id="view-profile-weight">78 kg</strong>
+                                </div>
+                                <div class="p-stat-item">
+                                    <span class="lbl">Idade</span>
+                                    <strong id="view-profile-age">47 anos</strong>
+                                </div>
+                                <div class="p-stat-item">
+                                    <span class="lbl">Remador Desde</span>
+                                    <strong id="view-profile-since">2022</strong>
+                                </div>
+                            </div>
+
+                            <hr class="profile-divider">
+
+                            <div class="equipments-list">
+                                <div class="equip-item">
+                                    <i class="fa-solid fa-clock text-muted"></i>
+                                    <div>
+                                        <span class="lbl">Dispositivo GPS</span>
+                                        <strong id="view-profile-watch">Garmin 165 Music</strong>
+                                    </div>
+                                </div>
+                                <div class="equip-item mt-10">
+                                    <i class="fa-solid fa-square-envelope text-muted"></i>
+                                    <div>
+                                        <span class="lbl">Remo Utilizado</span>
+                                        <strong id="view-profile-paddle">Remo Crespo C118</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="profile-divider">
+
+                            <!-- Visualização do Progresso da Meta -->
+                            <div class="profile-goal-box">
+                                <h4 class="mb-10"><i class="fa-solid fa-bullseye" style="color: var(--accent-neon);"></i> Meta de Desempenho</h4>
+                                <div class="goal-info-display">
+                                    <span class="lbl" id="profile-goal-title">Objetivo: Velocidade Média de 11,0 km/h</span>
+                                    <div class="progress-bar-wrapper mt-10">
+                                        <div class="progress-bar" id="profile-goal-progress-bar" style="width: 0%;"></div>
+                                    </div>
+                                    <div class="flex-between mt-5">
+                                        <span class="sub-val" id="profile-goal-progress-text">0% do objetivo alcançado</span>
+                                        <span class="badge" id="profile-goal-remaining-badge">Calculando...</span>
+                                    </div>
+                                    <p class="sub-val text-muted mt-10" id="profile-goal-desc">Baseline: 9.0 km/h | Meta: 11.0 km/h</p>
+                                    <p class="sub-val text-muted mt-5" id="profile-goal-current-val">Atual: 0.0 km/h</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formulário de Edição (Editar Perfil) -->
+                    <div class="card glass profile-edit-card">
+                        <h3><i class="fa-solid fa-pen-to-square" style="color: var(--gold-accent);"></i> Editar Dados do Perfil</h3>
+                        <p class="card-desc-muted">Atualize suas métricas físicas, equipamentos e parametrize sua meta de evolução.</p>
+
+                        <div class="form-group mt-15">
+                            <label for="edit-profile-name">Nome do Atleta:</label>
+                            <input type="text" id="edit-profile-name" class="form-control" placeholder="Ex: Remador Silva">
+                        </div>
+
+                        <div class="form-row mt-15">
+                            <div class="form-group">
+                                <label for="edit-profile-height">Altura (m):</label>
+                                <input type="number" id="edit-profile-height" class="form-control" step="0.01" min="0.5" max="3" placeholder="Ex: 1.80">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-profile-weight">Peso do Atleta (kg):</label>
+                                <input type="number" id="edit-profile-weight" class="form-control" step="0.1" min="20" max="250" placeholder="Ex: 78.5">
+                            </div>
+                        </div>
+
+                        <div class="form-row mt-15">
+                            <div class="form-group">
+                                <label for="edit-profile-age">Idade (anos):</label>
+                                <input type="number" id="edit-profile-age" class="form-control" min="1" max="120" placeholder="Ex: 47">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-profile-since">Remador Desde (ano):</label>
+                                <input type="number" id="edit-profile-since" class="form-control" min="1900" max="2026" placeholder="Ex: 2022">
+                            </div>
+                        </div>
+
+                        <div class="form-group mt-15">
+                            <label for="edit-profile-watch">Modelo do Dispositivo / Relógio:</label>
+                            <input type="text" id="edit-profile-watch" class="form-control" placeholder="Ex: Garmin 165 Music">
+                        </div>
+
+                        <div class="form-group mt-15">
+                            <label for="edit-profile-paddle">Modelo do Remo:</label>
+                            <input type="text" id="edit-profile-paddle" class="form-control" placeholder="Ex: Remo Crespo C118">
+                        </div>
+
+                        <h4 class="mt-20"><i class="fa-solid fa-chart-line" style="color: var(--accent-neon);"></i> Meta de Desempenho Semanal</h4>
+                        
+                        <input type="hidden" id="edit-goal-type" value="distance">
+                        <input type="hidden" id="edit-goal-baseline" value="0">
+                        
+                        <div class="form-group mt-15">
+                            <label for="edit-goal-target">Meta de Quilometragem Semanal (km):</label>
+                            <input type="number" id="edit-goal-target" class="form-control" step="1" min="1" placeholder="Ex: 30">
+                        </div>
+
+                        <div class="btn-group mt-25">
+                            <button class="btn btn-primary btn-full" id="btn-save-profile">
+                                <i class="fa-solid fa-save"></i> Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                        </section><!-- /tab-profile -->
+
+</main>
+    </div>
+
+    <!-- Leaflet JS para Mapas -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Chart.js para Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Hammer.js e Plugin de Zoom para Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <!-- Dados locais consolidados -->
+    <script src="dados_remada.js"></script>
+    <!-- Script de Aplicação -->
+    <script src="app.js"></script>
+    <!-- Gamificação -->
+    <script src="gamification.js?v=1.3"></script>
+</body>
+</html>
