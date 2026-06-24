@@ -16,6 +16,106 @@ let chartSpeed = null;
 let chartCadence = null;
 let chartHR = null;
 let chartRadar = null;
+let chartCorrelation = null;
+let chartErrorsFrequency = null;
+
+// Constant settings
+const DEFAULT_WORLDTIDES_KEY = "ec08afb8-eaef-4adb-8a83-f8313f86912f";
+
+const TECHNIQUE_METADATA = {
+    nula: {
+        name: "Técnica Nula (Geral)",
+        phases: [
+            "Fase 1: Catch (Entrada)",
+            "Fase 2: Puxada (Drive)",
+            "Fase 3: Saída (Exit)",
+            "Fase 4: Recuperação (Recovery)"
+        ],
+        isDrill: false
+    },
+    drill: {
+        name: "Método Drill",
+        phases: [
+            "Fase 1: A Trava (Catch)",
+            "Fase 2: Pivô do Núcleo (Power)",
+            "Fase 3: Binário Progressivo (Pitch)",
+            "Fase 4: Saída Limpa (Snap)"
+        ],
+        isDrill: true
+    },
+    tepava: {
+        name: "Técnica Tepava",
+        phases: [
+            "Fase 1: Postura e Alinhamento",
+            "Fase 2: Ombro como Motor",
+            "Fase 3: Catch Profundo",
+            "Fase 4: Leveza e Conexão"
+        ],
+        isDrill: false
+    },
+    travis: {
+        name: "Técnica Travis Grant",
+        phases: [
+            "Fase 1: Engrenagem Corporal",
+            "Fase 2: Lançamento do Machado",
+            "Fase 3: Cadência Agressiva",
+            "Fase 4: Saída Antecipada"
+        ],
+        isDrill: false
+    },
+    puakea: {
+        name: "Técnica John Puakea",
+        phases: [
+            "Fase 1: Trava de Água",
+            "Fase 2: Alavanca do Tronco",
+            "Fase 3: Janela do Joelho",
+            "Fase 4: Saída sem Freio"
+        ],
+        isDrill: false
+    },
+    thibaux: {
+        name: "Técnica Raphael Thibaux",
+        phases: [
+            "Fase 1: Feel the Flow",
+            "Fase 2: O Glide Sagrado",
+            "Fase 3: Respiração Sincronizada",
+            "Fase 4: Calma e Intenção"
+        ],
+        isDrill: false
+    }
+};
+
+const DRILL_ERRORS = [
+    { value: "Falsa Trava na Entrada", label: "Falsa Trava (entrada batendo/plana)" },
+    { value: "Colapso da Biela", label: "Colapso da Biela (dobrar braço inferior)" },
+    { value: "Rotação de Quadril em Bloco", label: "Girar Quadril (falta tensão oblíquos)" },
+    { value: "Binário Brusco/Tardio", label: "Binário Brusco ou Tardio" },
+    { value: "Saída com Levantamento de Água", label: "Saída com Levantamento de Água" }
+];
+
+const DRILL_DRILLS = [
+    { value: "Catch e Congela", label: "Drill 'Catch e Congela' (Fase 1)" },
+    { value: "Biela de Aço", label: "Drill 'Biela de Aço' (Fase 2)" },
+    { value: "Acelerador de Moto", label: "Drill 'Acelerador de Moto' (Fase 3)" },
+    { value: "A Espada na Bainha", label: "Drill 'A Espada na Bainha' (Fase 4)" },
+    { value: "Escada de Cadência", label: "Drill 'Escada de Cadência' (Integração)" }
+];
+
+const GENERAL_ERRORS = [
+    { value: "Entrada Lenta / Atrasada", label: "Entrada Lenta / Atrasada (perda de curso)" },
+    { value: "Puxada Curta / Sem Core", label: "Puxada Curta (remar só com braço)" },
+    { value: "Saída com Arrasto / Freio", label: "Saída com Arrasto / Freio (remo na água)" },
+    { value: "Oscilação Lateral Excessiva", label: "Oscilação Lateral Excessiva (desvio de rumo)" },
+    { value: "Falta de Glide / Deslize", label: "Falta de Glide / Deslize (ritmo apressado)" }
+];
+
+const GENERAL_DRILLS = [
+    { value: "Pausa no Catch", label: "Drill 'Pausa no Catch' (Foco no mergulho)" },
+    { value: "Olho no Horizonte", label: "Drill 'Olho no Horizonte' (Foco na postura)" },
+    { value: "Remada sem Mãos", label: "Drill 'Remada sem Mãos' (Foco no core)" },
+    { value: "Fatia da Lâmina", label: "Drill 'Fatia da Lâmina' (Foco na saída limpa)" },
+    { value: "Pirâmide de Frequência", label: "Drill 'Pirâmide de Frequência' (Foco no ritmo)" }
+];
 
 // DOM Elements loaded
 document.addEventListener("DOMContentLoaded", () => {
@@ -79,6 +179,17 @@ function initApp() {
             }
         } else {
             generateMockData();
+        }
+    }
+
+    // World Tides API Key loading
+    const savedKey = localStorage.getItem("vaa_worldtides_key");
+    const effectiveKey = savedKey || DEFAULT_WORLDTIDES_KEY;
+    const keyInput = document.getElementById("eval-worldtides-key");
+    if (keyInput) {
+        keyInput.value = effectiveKey;
+        if (!savedKey) {
+            localStorage.setItem("vaa_worldtides_key", DEFAULT_WORLDTIDES_KEY);
         }
     }
 }
@@ -369,6 +480,21 @@ function updateProfileUI() {
         if (headerProfileFallback) headerProfileFallback.style.display = "block";
     }
 
+    // Large Photo update (Meu Perfil)
+    const largeImg = document.getElementById("profile-large-img");
+    const largeFallback = document.getElementById("profile-large-fallback");
+    if (largeImg && largeFallback) {
+        if (athleteProfile.photo) {
+            largeImg.src = athleteProfile.photo;
+            largeImg.style.display = "block";
+            largeFallback.style.display = "none";
+        } else {
+            largeImg.src = "";
+            largeImg.style.display = "none";
+            largeFallback.style.display = "block";
+        }
+    }
+
     // Populate profile edit form fields
     const fields = {
         "edit-athlete-name": athleteProfile.name,
@@ -397,11 +523,10 @@ function updateGoalProgress() {
     
     // Filter workouts inside current week
     const now = new Date();
+    const currentWeekRange = getWeekRange(now);
     const currentWeekWorkouts = workouts.filter(w => {
-        const wDate = new Date(w.date);
-        const diffTime = Math.abs(now - wDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays <= 7; // simplified weekly check
+        const d = new Date(w.date + "T12:00:00");
+        return d >= currentWeekRange.monday && d <= currentWeekRange.sunday;
     });
 
     const totalDist = currentWeekWorkouts.reduce((sum, w) => sum + w.distance, 0);
@@ -532,6 +657,10 @@ function openTab(tabId) {
         if (typeof initGamification === "function") {
             setTimeout(initGamification, 50);
         }
+    } else if (tabId === "tab-drills") {
+        setTimeout(renderDrillsTab, 50);
+    } else if (tabId === "tab-planning") {
+        setTimeout(renderPlanningTab, 50);
     }
 }
 
@@ -601,34 +730,48 @@ function showWorkoutDetail(workoutId) {
     document.getElementById("workout-detail-avg-speed").innerHTML = `${w.avgSpeed.toFixed(1)} <span class="unit">km/h</span>`;
     document.getElementById("workout-detail-max-speed").innerHTML = `${w.maxSpeed.toFixed(1)} <span class="unit">km/h</span>`;
     document.getElementById("workout-detail-avg-cadence").innerHTML = `${w.avgCadence} <span class="unit">ppm</span>`;
-    document.getElementById("workout-detail-avg-hr").innerHTML = w.avgHR > 0 ? `${w.avgHR} <span class="unit">bpm</span>` : `-`;
-
-    // Technical Evaluation
+    document.getElementById("workout-detail-avg-hr").in    // Technical Evaluation
     const evalData = evaluations[workoutId] || { phase1: 0, phase2: 0, phase3: 0, phase4: 0, comments: "Sem avaliação gravada para este treino.", errors: [] };
     
-    document.getElementById("eval-score-p1").innerText = evalData.phase1 > 0 ? `${evalData.phase1.toFixed(1)} / 5.0` : "-";
-    document.getElementById("eval-score-p2").innerText = evalData.phase2 > 0 ? `${evalData.phase2.toFixed(1)} / 5.0` : "-";
-    document.getElementById("eval-score-p3").innerText = evalData.phase3 > 0 ? `${evalData.phase3.toFixed(1)} / 5.0` : "-";
-    document.getElementById("eval-score-p4").innerText = evalData.phase4 > 0 ? `${evalData.phase4.toFixed(1)} / 5.0` : "-";
-    document.getElementById("eval-comments").innerText = evalData.comments;
+    let p1 = evalData.phase1;
+    let p2 = evalData.phase2;
+    let p3 = evalData.phase3;
+    let p4 = evalData.phase4;
+    // Handle mock data out of 5 vs actual input out of 100
+    const displayP1 = p1 <= 5 ? `${(p1 * 20).toFixed(0)}%` : `${p1.toFixed(0)}%`;
+    const displayP2 = p2 <= 5 ? `${(p2 * 20).toFixed(0)}%` : `${p2.toFixed(0)}%`;
+    const displayP3 = p3 <= 5 ? `${(p3 * 20).toFixed(0)}%` : `${p3.toFixed(0)}%`;
+    const displayP4 = p4 <= 5 ? `${(p4 * 20).toFixed(0)}%` : `${p4.toFixed(0)}%`;
+
+    document.getElementById("eval-score-p1").innerText = p1 > 0 ? displayP1 : "-";
+    document.getElementById("eval-score-p2").innerText = p2 > 0 ? displayP2 : "-";
+    document.getElementById("eval-score-p3").innerText = p3 > 0 ? displayP3 : "-";
+    document.getElementById("eval-score-p4").innerText = p4 > 0 ? displayP4 : "-";
+    document.getElementById("eval-comments").innerText = evalData.comments || evalData.notes || "Sem observações.";
 
     // Badge status score average
-    const avgScore = (evalData.phase1 + evalData.phase2 + evalData.phase3 + evalData.phase4) / 4;
+    let normP1 = p1 <= 5 ? p1 * 20 : p1;
+    let normP2 = p2 <= 5 ? p2 * 20 : p2;
+    let normP3 = p3 <= 5 ? p3 * 20 : p3;
+    let normP4 = p4 <= 5 ? p4 * 20 : p4;
+    const avgScore = (normP1 + normP2 + normP3 + normP4) / 4;
     const badge = document.getElementById("eval-status-badge");
     if (badge) {
         badge.className = "eval-badge";
-        if (avgScore >= 4.2) {
+        if (avgScore >= 85) {
             badge.innerText = "Excelente";
             badge.classList.add("excelente");
-        } else if (avgScore >= 3.5) {
+        } else if (avgScore >= 70) {
             badge.innerText = "Bom";
             badge.classList.add("bom");
-        } else if (avgScore >= 2.5) {
+        } else if (avgScore >= 50) {
             badge.innerText = "Regular";
             badge.classList.add("regular");
-        } else {
+        } else if (avgScore > 0) {
             badge.innerText = "Atenção";
             badge.classList.add("atencao");
+        } else {
+            badge.innerText = "-";
         }
     }
 
@@ -1228,6 +1371,68 @@ function setupEventListeners() {
             updateUnifiedSimulation();
         });
     }
+
+    // Profile photo upload input change listener
+    const profilePhotoInput = document.getElementById("input-profile-photo");
+    if (profilePhotoInput) {
+        profilePhotoInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    alert("A imagem é muito grande! Escolha uma foto menor que 2MB.");
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    athleteProfile.photo = evt.target.result;
+                    localStorage.setItem("vaa_athlete_profile", JSON.stringify(athleteProfile));
+                    updateProfileUI();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Autoavaliação Form listeners
+    const evalWorkoutSelect = document.getElementById("eval-workout-select");
+    if (evalWorkoutSelect) {
+        evalWorkoutSelect.addEventListener("change", (e) => {
+            loadEvaluationForm(e.target.value);
+        });
+    }
+
+    const evalTechniqueSelect = document.getElementById("eval-technique-select");
+    if (evalTechniqueSelect) {
+        evalTechniqueSelect.addEventListener("change", (e) => {
+            updateEvaluationLabels(e.target.value);
+        });
+    }
+
+    const btnSaveEval = document.getElementById("btn-save-evaluation");
+    if (btnSaveEval) {
+        btnSaveEval.addEventListener("click", () => {
+            saveEvaluation();
+        });
+    }
+
+    const btnFetchWeather = document.getElementById("btn-fetch-weather");
+    if (btnFetchWeather) {
+        btnFetchWeather.addEventListener("click", () => {
+            const workoutId = document.getElementById("eval-workout-select").value;
+            if (!workoutId) {
+                alert("Selecione um treino primeiro para buscar as condições climáticas online!");
+                return;
+            }
+            fetchOnlineWeatherForWorkout(workoutId, true);
+        });
+    }
+
+    const savedKeyChange = document.getElementById("eval-worldtides-key");
+    if (savedKeyChange) {
+        savedKeyChange.addEventListener("change", (e) => {
+            localStorage.setItem("vaa_worldtides_key", e.target.value.trim());
+        });
+    }
 }
 
 // Bottom Sheet animations helper
@@ -1274,4 +1479,760 @@ function handleGarminUpload(files) {
         }
     };
     reader.readAsText(file);
+}
+
+// ==========================================
+// AUTOAVALIAÇÃO & PLANEJAMENTO LOGIC
+// ==========================================
+
+function renderDrillsTab() {
+    const select = document.getElementById("eval-workout-select");
+    if (!select) return;
+    select.innerHTML = '<option value="">Selecione um treino...</option>';
+    
+    const unassessed = workouts.filter(w => !w.hasEval);
+    const assessed = workouts.filter(w => w.hasEval);
+
+    if (unassessed.length > 0) {
+        const group = document.createElement("optgroup");
+        group.label = "Não avaliados";
+        unassessed.forEach(w => {
+            const opt = document.createElement("option");
+            opt.value = w.id;
+            opt.innerText = `${w.date.split("T")[0].split("-").reverse().join("/")} - ${w.name}`;
+            group.appendChild(opt);
+        });
+        select.appendChild(group);
+    }
+
+    if (assessed.length > 0) {
+        const group = document.createElement("optgroup");
+        group.label = "Já avaliados";
+        assessed.forEach(w => {
+            const opt = document.createElement("option");
+            opt.value = w.id;
+            opt.innerText = `${w.date.split("T")[0].split("-").reverse().join("/")} - ${w.name}`;
+            group.appendChild(opt);
+        });
+        select.appendChild(group);
+    }
+
+    // Load form with active workout or clear
+    const activeId = select.value;
+    if (activeId) {
+        loadEvaluationForm(activeId);
+    } else {
+        clearEvaluationForm();
+    }
+
+    renderCorrelationChart();
+}
+
+function loadEvaluationForm(workoutId) {
+    if (!workoutId) {
+        clearEvaluationForm();
+        return;
+    }
+
+    const selectTech = document.getElementById("eval-technique-select");
+    const ev = evaluations[workoutId];
+    if (ev) {
+        const technique = ev.technique || "nula";
+        if (selectTech) selectTech.value = technique;
+        
+        updateEvaluationLabels(technique);
+
+        document.getElementById("slider-phase-1").value = ev.phase1;
+        document.getElementById("slider-phase-2").value = ev.phase2;
+        document.getElementById("slider-phase-3").value = ev.phase3;
+        document.getElementById("slider-phase-4").value = ev.phase4;
+
+        document.getElementById("val-phase-1").innerText = `${ev.phase1}%`;
+        document.getElementById("val-phase-2").innerText = `${ev.phase2}%`;
+        document.getElementById("val-phase-3").innerText = `${ev.phase3}%`;
+        document.getElementById("val-phase-4").innerText = `${ev.phase4}%`;
+
+        for (let i = 1; i <= 5; i++) {
+            const el = document.getElementById(`err-${i}`);
+            if (el) el.checked = ev.errors.includes(el.value);
+        }
+
+        for (let i = 1; i <= 5; i++) {
+            const el = document.getElementById(`drill-${i}`);
+            if (el) el.checked = ev.drills.includes(el.value);
+        }
+
+        document.getElementById("eval-boat-select").value = ev.boat || "OC1";
+        document.getElementById("eval-boat-weight").value = ev.boatWeight || "";
+
+        const wth = ev.weather || {};
+        document.getElementById("eval-weather-temp").value = wth.temp || "";
+        document.getElementById("eval-weather-wind").value = wth.wind || "";
+        document.getElementById("eval-weather-rain").value = wth.rain || "Sem Chuva";
+        document.getElementById("eval-weather-swell").value = wth.swell || "";
+        document.getElementById("eval-weather-tide").value = wth.tide || "";
+
+        document.getElementById("eval-notes").value = ev.notes || "";
+
+        const hasWeatherInfo = wth.temp || wth.wind || wth.swell || (wth.rain && wth.rain !== "Sem Chuva") || wth.tide;
+        if (!hasWeatherInfo) {
+            fetchOnlineWeatherForWorkout(workoutId, false);
+        }
+    } else {
+        clearEvaluationForm();
+        const w = workouts.find(x => x.id === workoutId);
+        if (w) {
+            document.getElementById("eval-boat-select").value = w.boatType || w.boat || "OC1";
+            document.getElementById("eval-boat-weight").value = w.boatWeight || "";
+        }
+        fetchOnlineWeatherForWorkout(workoutId, false);
+    }
+}
+
+function clearEvaluationForm() {
+    const selectTech = document.getElementById("eval-technique-select");
+    if (selectTech) selectTech.value = "nula";
+    updateEvaluationLabels("nula");
+
+    for (let i = 1; i <= 4; i++) {
+        document.getElementById(`slider-phase-${i}`).value = 50;
+        document.getElementById(`val-phase-${i}`).innerText = "50%";
+    }
+    
+    for (let i = 1; i <= 5; i++) {
+        const elErr = document.getElementById(`err-${i}`);
+        if (elErr) elErr.checked = false;
+        
+        const elDrill = document.getElementById(`drill-${i}`);
+        if (elDrill) elDrill.checked = false;
+    }
+
+    document.getElementById("eval-boat-select").value = "OC1";
+    document.getElementById("eval-boat-weight").value = "";
+    document.getElementById("eval-weather-temp").value = "";
+    document.getElementById("eval-weather-wind").value = "";
+    document.getElementById("eval-weather-rain").value = "Sem Chuva";
+    document.getElementById("eval-weather-swell").value = "";
+    document.getElementById("eval-weather-tide").value = "";
+    document.getElementById("eval-notes").value = "";
+}
+
+function updateEvaluationLabels(technique) {
+    const meta = TECHNIQUE_METADATA[technique] || TECHNIQUE_METADATA.nula;
+    
+    for (let i = 1; i <= 4; i++) {
+        const lbl = document.getElementById(`lbl-phase-${i}`);
+        if (lbl) {
+            lbl.innerText = meta.phases[i - 1];
+        }
+    }
+    
+    renderChecklists(meta.isDrill);
+}
+
+function renderChecklists(isDrill) {
+    const errorsGrid = document.getElementById("eval-errors-grid");
+    const drillsGrid = document.getElementById("eval-drills-grid");
+    
+    if (!errorsGrid || !drillsGrid) return;
+    
+    const errorsList = isDrill ? DRILL_ERRORS : GENERAL_ERRORS;
+    const drillsList = isDrill ? DRILL_DRILLS : GENERAL_DRILLS;
+    
+    errorsGrid.innerHTML = errorsList.map((err, i) => `
+        <label class="checkbox-container">
+            <input type="checkbox" id="err-${i+1}" value="${err.value}" />
+            <span class="checkmark"></span>
+            ${err.label}
+        </label>
+    `).join("");
+    
+    drillsGrid.innerHTML = drillsList.map((dr, i) => `
+        <label class="checkbox-container">
+            <input type="checkbox" id="drill-${i+1}" value="${dr.value}" />
+            <span class="checkmark"></span>
+            ${dr.label}
+        </label>
+    `).join("");
+}
+
+function saveEvaluation() {
+    const workoutId = document.getElementById("eval-workout-select").value;
+    if (!workoutId) {
+        alert("Por favor, selecione um treino primeiro!");
+        return;
+    }
+
+    const p1 = parseInt(document.getElementById("slider-phase-1").value);
+    const p2 = parseInt(document.getElementById("slider-phase-2").value);
+    const p3 = parseInt(document.getElementById("slider-phase-3").value);
+    const p4 = parseInt(document.getElementById("slider-phase-4").value);
+
+    const errors = [];
+    for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById(`err-${i}`);
+        if (el && el.checked) errors.push(el.value);
+    }
+
+    const drills = [];
+    for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById(`drill-${i}`);
+        if (el && el.checked) drills.push(el.value);
+    }
+
+    const boat = document.getElementById("eval-boat-select").value;
+    const boatWeightVal = document.getElementById("eval-boat-weight").value;
+    const tempVal = document.getElementById("eval-weather-temp").value;
+    const windVal = document.getElementById("eval-weather-wind").value;
+    const rainVal = document.getElementById("eval-weather-rain").value;
+    const swellVal = document.getElementById("eval-weather-swell").value;
+    const tideVal = document.getElementById("eval-weather-tide").value;
+    const technique = document.getElementById("eval-technique-select").value || "nula";
+    const notes = document.getElementById("eval-notes").value;
+
+    evaluations[workoutId] = {
+        phase1: p1,
+        phase2: p2,
+        phase3: p3,
+        phase4: p4,
+        errors: errors,
+        drills: drills,
+        boat: boat,
+        boatWeight: boatWeightVal ? parseFloat(boatWeightVal) : null,
+        weather: {
+            temp: tempVal ? parseInt(tempVal) : null,
+            wind: windVal,
+            rain: rainVal,
+            swell: swellVal,
+            tide: tideVal
+        },
+        notes: notes,
+        technique: technique
+    };
+
+    const w = workouts.find(x => x.id === workoutId);
+    if (w) {
+        w.hasEval = true;
+        w.boatType = boat;
+        w.boatWeight = boatWeightVal ? parseFloat(boatWeightVal) : null;
+    }
+
+    saveToLocalStorage();
+    renderDrillsTab();
+    alert("Autoavaliação salva com sucesso!");
+}
+
+function renderCorrelationChart() {
+    const canvas = document.getElementById("chart-correlation");
+    if (!canvas) return;
+
+    if (chartCorrelation) {
+        chartCorrelation.destroy();
+    }
+
+    const dataPoints = [];
+    workouts.forEach(w => {
+        const ev = evaluations[w.id];
+        if (ev) {
+            const score = (ev.phase1 + ev.phase2 + ev.phase3 + ev.phase4) / 4;
+            dataPoints.push({
+                x: score,
+                y: w.avgSpeed,
+                boat: w.boatType || w.boat || "OC1",
+                date: w.date
+            });
+        }
+    });
+
+    const oc1Points = dataPoints.filter(p => p.boat === "OC1");
+    const v1Points = dataPoints.filter(p => p.boat === "V1");
+
+    chartCorrelation = new Chart(canvas.getContext("2d"), {
+        type: "scatter",
+        data: {
+            datasets: [
+                {
+                    label: "OC1",
+                    data: oc1Points,
+                    backgroundColor: "#ff003c",
+                    borderColor: "#ff003c",
+                    pointRadius: 7,
+                    pointHoverRadius: 9
+                },
+                {
+                    label: "V1",
+                    data: v1Points,
+                    backgroundColor: "#9d4edd",
+                    borderColor: "#9d4edd",
+                    pointRadius: 7,
+                    pointHoverRadius: 9
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: "#a0aec0", font: { family: "Outfit", weight: "500" } }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function() { return 'Treino'; },
+                        label: function(context) {
+                            const p = context.raw;
+                            return [
+                                `Data: ${p.date.split('T')[0].split('-').reverse().join('/')}`,
+                                `Proficiência Técnica: ${Math.round(p.x)}%`,
+                                `Velocidade Média: ${p.y.toFixed(1)} km/h`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: "Pontuação Média (%)", color: "#a0aec0" },
+                    grid: { color: "rgba(255,255,255,0.05)" },
+                    ticks: { color: "#a0aec0" },
+                    min: 0,
+                    max: 100
+                },
+                y: {
+                    title: { display: true, text: "Velocidade Média (km/h)", color: "#a0aec0" },
+                    grid: { color: "rgba(255,255,255,0.05)" },
+                    ticks: { color: "#a0aec0" },
+                    min: 8.0,
+                    max: 12.0
+                }
+            }
+        }
+    });
+}
+
+function renderPlanningTab() {
+    const loading = document.getElementById("coach-loading-msg");
+    const recs = document.getElementById("coach-recommendations");
+
+    if (loading) loading.style.display = "block";
+    if (recs) recs.style.display = "none";
+
+    setTimeout(() => {
+        analyzeErrorsAndRecommend();
+        renderErrorsFrequencyChart();
+        if (loading) loading.style.display = "none";
+        if (recs) recs.style.display = "block";
+    }, 400);
+}
+
+function analyzeErrorsAndRecommend() {
+    const errorCounts = {};
+    let totalErrors = 0;
+
+    Object.values(evaluations).forEach(ev => {
+        if (ev.errors && ev.errors.length > 0) {
+            ev.errors.forEach(err => {
+                errorCounts[err] = (errorCounts[err] || 0) + 1;
+                totalErrors++;
+            });
+        }
+    });
+
+    const errorListEl = document.getElementById("coach-drills-list");
+    if (!errorListEl) return;
+    errorListEl.innerHTML = "";
+
+    const topErrorEl = document.getElementById("coach-top-error");
+    const errDescEl = document.getElementById("coach-error-description");
+
+    if (totalErrors === 0) {
+        if (topErrorEl) topErrorEl.innerText = "Nenhum desvio detectado";
+        if (errDescEl) errDescEl.innerText = "Parabéns! Suas autoavaliações mostram excelente adaptação. Continue praticando o deslize.";
+        
+        errorListEl.innerHTML = `
+            <div class="coach-drill-item">
+                <div class="coach-drill-item-header">
+                    <span class="coach-drill-title">Drill "Escada de Cadência" (Integração)</span>
+                    <span class="coach-drill-badge">Sessão Geral</span>
+                </div>
+                <p>Consiste em blocos de 5 minutos subindo cadência (50 ppm -> 60 ppm -> 70+ ppm) mantendo a estrutura cinemática perfeitamente acoplada.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let topError = "";
+    let maxCount = 0;
+    Object.entries(errorCounts).forEach(([err, count]) => {
+        if (count > maxCount) {
+            maxCount = count;
+            topError = err;
+        }
+    });
+
+    if (topErrorEl) topErrorEl.innerText = `${topError} (incidência: ${maxCount}x)`;
+
+    const errorDatabase = {
+        "Falsa Trava na Entrada": {
+            desc: "Lâmina entra plana ou batendo sem rotação inicial do tronco. Desperdiça parte do curso propulsivo e gera turbulência.",
+            drills: [
+                { title: "Drill 'Catch e Congela'", badge: "Fase 1: A Trava", instruction: "Gire o tronco em 45°, insira a lâmina vertical na água e congele por 2 a 3 segundos antes da puxada." }
+            ]
+        },
+        "Colapso da Biela": {
+            desc: "Dobrar o braço inferior muito cedo na fase propulsiva. Transfere a força do core/tronco para o bíceps/ombro, causando cansaço precoce.",
+            drills: [
+                { title: "Drill 'Biela de Aço'", badge: "Fase 2: Pivô do Núcleo", instruction: "Mantenha o braço inferior estendido e rígido. A puxada deve ser executada rotacionando o tronco e empurrando o quadril." }
+            ]
+        },
+        "Rotação de Quadril em Bloco": {
+            desc: "Girar o quadril junto com o tórax elimina a tensão elástica do abdômen oblíquo (arco tensionado). O quadril deve permanecer firme.",
+            drills: [
+                { title: "Drill 'Biela de Aço' com Bloqueio", badge: "Fase 2: Pivô", instruction: "Mantenha a bacia fixa apontando diretamente para a proa. Foque na rotação torácica isolada." }
+            ]
+        },
+        "Binário Brusco/Tardio": {
+            desc: "Rotacionar os punhos com violência ou atrasar o giro da lâmina. Causa turbulência e instabilidade lateral na canoa.",
+            drills: [
+                { title: "Drill 'Acelerador de Moto'", badge: "Fase 3: Binário Progressivo", instruction: "Rotacione os punhos progressivamente a partir do joelho de forma contínua até a saída." }
+            ]
+        },
+        "Saída com Levantamento de Água": {
+            desc: "Puxar a lâmina para cima ou arrastar o remo atrás do quadril. Freia a canoa e destrói o glide entre remadas.",
+            drills: [
+                { title: "Drill 'A Espada na Bainha'", badge: "Fase 4: Saída Limpa", instruction: "No final da remada, empurre a mão superior para a frente e para fora. A lâmina deve fatiar o ar paralela ao mar." }
+            ]
+        },
+        "Entrada Lenta / Atrasada": {
+            desc: "Inserir a pá na água tardiamente. Reduz a distância propulsiva efetiva.",
+            drills: [
+                { title: "Drill 'Pausa no Catch'", badge: "Fase 1: Entrada", instruction: "Pause por 1 segundo na máxima extensão do alcance antes de furar a água com firmeza." }
+            ]
+        },
+        "Puxada Curta / Sem Core": {
+            desc: "Remar flexionando os braços sem rotação ativa do tronco, limitando o trabalho muscular a grupos menores.",
+            drills: [
+                { title: "Drill 'Remada sem Mãos'", badge: "Fase 2: Conexão", instruction: "Simule segurar a canoa apenas com a rotação dos ombros e oblíquos (braços esticados)." }
+            ]
+        },
+        "Saída com Arrasto / Freio": {
+            desc: "Deixar a lâmina na água após o quadril, atuando como freio hidrodinâmico na canoa.",
+            drills: [
+                { title: "Drill 'Fatia da Lâmina'", badge: "Fase 3: Saída", instruction: "Fatie a lâmina para fora lateralmente quando ela atingir o joelho, gerando zero respingos." }
+            ]
+        },
+        "Oscilação Lateral Excessiva": {
+            desc: "Mover o tronco para as laterais durante a puxada, gerando perda de energia e instabilidade.",
+            drills: [
+                { title: "Drill 'Olho no Horizonte'", badge: "Postura", instruction: "Mantenha o peito voltado para a frente e os olhos fixos em um ponto no horizonte." }
+            ]
+        },
+        "Falta de Glide / Deslize": {
+            desc: "Iniciar a próxima remada sem permitir que a canoa aproveite a inércia e deslize livremente.",
+            drills: [
+                { title: "Drill 'Pirâmide de Frequência'", badge: "Cadência", instruction: "Ajuste a cadência para 45-50 ppm e conte pelo menos 1.5 segundos de deslize após cada remada." }
+            ]
+        }
+    };
+
+    const config = errorDatabase[topError] || { desc: "Desvio técnico geral", drills: [] };
+    if (errDescEl) errDescEl.innerText = config.desc;
+
+    config.drills.forEach(dr => {
+        errorListEl.innerHTML += `
+            <div class="coach-drill-item">
+                <div class="coach-drill-item-header">
+                    <span class="coach-drill-title">${dr.title}</span>
+                    <span class="coach-drill-badge">${dr.badge}</span>
+                </div>
+                <p>${dr.instruction}</p>
+            </div>
+        `;
+    });
+
+    errorListEl.innerHTML += `
+        <div class="coach-drill-item">
+            <div class="coach-drill-item-header">
+                <span class="coach-drill-title">Drill "Escada de Cadência" (Integração)</span>
+                <span class="coach-drill-badge">Sessão Geral</span>
+            </div>
+            <p>5 min a 50 ppm + 5 min a 60 ppm + 5 min a 70+ ppm + 5 min focado na sensação de glide silencioso.</p>
+        </div>
+    `;
+}
+
+function renderErrorsFrequencyChart() {
+    const canvas = document.getElementById("chart-errors-frequency");
+    if (!canvas) return;
+
+    if (chartErrorsFrequency) {
+        chartErrorsFrequency.destroy();
+    }
+
+    const errorTypes = [
+        "Falsa Trava na Entrada",
+        "Colapso da Biela",
+        "Rotação de Quadril em Bloco",
+        "Binário Brusco/Tardio",
+        "Saída com Levantamento de Água",
+        "Entrada Lenta / Atrasada",
+        "Puxada Curta / Sem Core",
+        "Saída com Arrasto / Freio",
+        "Oscilação Lateral Excessiva",
+        "Falta de Glide / Deslize"
+    ];
+
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    Object.values(evaluations).forEach(ev => {
+        if (ev.errors && ev.errors.length > 0) {
+            ev.errors.forEach(err => {
+                const idx = errorTypes.indexOf(err);
+                if (idx !== -1) counts[idx]++;
+            });
+        }
+    });
+
+    chartErrorsFrequency = new Chart(canvas.getContext("2d"), {
+        type: "bar",
+        data: {
+            labels: ["Falsa Trava", "Colapso Biela", "Quadril Bloco", "Binário Ruim", "Saída Suja", "Entrada Lenta", "Puxada Curta", "Saída Arrasto", "Oscilação Lat", "Falta Glide"],
+            datasets: [{
+                label: "Incidência (vezes)",
+                data: counts,
+                backgroundColor: "rgba(255, 0, 60, 0.4)",
+                borderColor: "#ff003c",
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: function(items) { return items[0]?.label || ''; },
+                        label: function(context) {
+                            return `Incidência: ${context.parsed.y} vez${context.parsed.y !== 1 ? 'es' : ''}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    grid: { color: "rgba(255, 255, 255, 0.05)" },
+                    ticks: { color: "#a0aec0", stepSize: 1 },
+                    min: 0
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: "#a0aec0" }
+                }
+            }
+        }
+    });
+}
+
+async function fetchOnlineWeatherForWorkout(workoutId, force = false) {
+    if (!workoutId) return;
+
+    const w = workouts.find(x => x.id === workoutId);
+    if (!w) return;
+
+    const existingEval = evaluations[workoutId];
+    if (!force && existingEval && existingEval.weather && 
+        (existingEval.weather.temp || existingEval.weather.wind || existingEval.weather.swell || existingEval.weather.tide)) {
+        return;
+    }
+
+    if (!w.trackpoints || w.trackpoints.length === 0) {
+        if (force) alert("Este treino não possui dados de geolocalização.");
+        return;
+    }
+
+    const startPt = w.trackpoints[0];
+    const lat = startPt.lat;
+    const lon = startPt.lon;
+    const date = w.date.split("T")[0];
+    const startTimestamp = startPt.time;
+
+    const tempInput = document.getElementById("eval-weather-temp");
+    const windInput = document.getElementById("eval-weather-wind");
+    const rainInput = document.getElementById("eval-weather-rain");
+    const swellInput = document.getElementById("eval-weather-swell");
+    const tideInput = document.getElementById("eval-weather-tide");
+    const fetchBtn = document.getElementById("btn-fetch-weather");
+
+    const inputs = [tempInput, windInput, rainInput, swellInput, tideInput];
+    inputs.forEach(input => {
+        if (input) {
+            input.disabled = true;
+        }
+    });
+
+    if (fetchBtn) {
+        fetchBtn.disabled = true;
+        fetchBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>...`;
+    }
+
+    try {
+        const workoutDate = new Date(date + "T00:00:00");
+        const today = new Date();
+        const diffTime = Math.abs(today - workoutDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        let weatherUrl;
+        if (diffDays > 85) {
+            weatherUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m&timezone=auto`;
+        } else {
+            weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m&timezone=auto`;
+        }
+
+        const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=swell_wave_height,swell_wave_direction&timezone=auto`;
+
+        const [weatherRes, marineRes] = await Promise.all([
+            fetch(weatherUrl).then(r => r.ok ? r.json() : Promise.reject("Erro no clima")),
+            fetch(marineUrl).then(r => r.ok ? r.json() : null).catch(() => null)
+        ]);
+
+        const dateObj = new Date(startTimestamp);
+        const hour = dateObj.getHours();
+        const idx = Math.min(23, Math.max(0, hour));
+
+        if (weatherRes && weatherRes.hourly) {
+            const tempVal = weatherRes.hourly.temperature_2m[idx];
+            if (tempVal !== undefined && tempVal !== null) {
+                if (tempInput) tempInput.value = Math.round(tempVal);
+            }
+
+            const windSpeedKmh = weatherRes.hourly.wind_speed_10m[idx];
+            const windDirDeg = weatherRes.hourly.wind_direction_10m[idx];
+            if (windSpeedKmh !== undefined && windDirDeg !== undefined) {
+                const windSpeedKts = Math.round(windSpeedKmh / 1.852);
+                const windDirStr = getCardinalDirection(windDirDeg);
+                if (windInput) windInput.value = `${windSpeedKts} kts ${windDirStr}`;
+            }
+
+            const precip = weatherRes.hourly.precipitation[idx];
+            if (precip !== undefined && precip !== null) {
+                let rainVal = "Sem Chuva";
+                if (precip > 0 && precip <= 2.0) rainVal = "Garoa/Leve";
+                else if (precip > 2.0) rainVal = "Chuva Forte";
+                if (rainInput) rainInput.value = rainVal;
+            }
+        }
+
+        if (marineRes && marineRes.hourly) {
+            const swellHeight = marineRes.hourly.swell_wave_height[idx];
+            const swellDirDeg = marineRes.hourly.swell_wave_direction[idx];
+            if (swellHeight !== undefined && swellHeight !== null && swellDirDeg !== undefined && swellDirDeg !== null) {
+                const swellDirStr = getCardinalDirection(swellDirDeg);
+                if (swellInput) swellInput.value = `${swellHeight.toFixed(1)}m ${swellDirStr}`;
+            }
+        }
+
+        const tidesApiKey = localStorage.getItem("vaa_worldtides_key") || DEFAULT_WORLDTIDES_KEY;
+        if (tidesApiKey) {
+            try {
+                const tidesUrl = `https://www.worldtides.info/api/v3?heights&lat=${lat}&lon=${lon}&date=${date}&key=${tidesApiKey}`;
+                const tidesRes = await fetch(tidesUrl).then(r => r.ok ? r.json() : Promise.reject("Erro World Tides"));
+                
+                if (tidesRes && tidesRes.heights) {
+                    const workoutTimeMs = new Date(startTimestamp).getTime();
+                    let closestHeight = null;
+                    let minDiff = Infinity;
+
+                    tidesRes.heights.forEach(h => {
+                        const hTimeMs = new Date(h.date).getTime();
+                        const diff = Math.abs(workoutTimeMs - hTimeMs);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closestHeight = h;
+                        }
+                    });
+
+                    if (closestHeight) {
+                        const closestIdx = tidesRes.heights.indexOf(closestHeight);
+                        const heights = tidesRes.heights.map(h => h.height);
+                        const minVal = Math.min(...heights);
+                        const maxVal = Math.max(...heights);
+                        const range = maxVal - minVal;
+                        const currentVal = closestHeight.height;
+                        
+                        if (range > 0.05) {
+                            const threshold = range * 0.15;
+                            if (currentVal >= maxVal - threshold) {
+                                if (tideInput) tideInput.value = "Cheia";
+                            } else if (currentVal <= minVal + threshold) {
+                                if (tideInput) tideInput.value = "Seca";
+                            } else {
+                                let nextVal = currentVal;
+                                if (closestIdx < tidesRes.heights.length - 1) {
+                                    nextVal = tidesRes.heights[closestIdx + 1].height;
+                                }
+                                if (tideInput) {
+                                    tideInput.value = nextVal > currentVal ? "Enchendo" : "Vazando";
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (tideErr) {
+                console.error(tideErr);
+            }
+        }
+
+    } catch (err) {
+        console.error(err);
+    } finally {
+        inputs.forEach(input => {
+            if (input) {
+                input.disabled = false;
+            }
+        });
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
+            fetchBtn.innerHTML = `<i class="fa-solid fa-cloud-sun"></i> Buscar Clima`;
+        }
+    }
+}
+
+function getCardinalDirection(degrees) {
+    const directions = ["N", "NNE", "NE", "ENE", "L", "LSE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+    const val = Math.floor((degrees / 22.5) + 0.5);
+    return directions[val % 16];
+}
+
+function getWeekRange(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    
+    return { monday, sunday };
+}
+
+function formatDateLocal(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
+function formatDuration(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hrs > 0) {
+        return `${hrs}h ${mins}m`;
+    }
+    return `${mins}m ${secs}s`;
 }

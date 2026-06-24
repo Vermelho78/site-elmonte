@@ -46,7 +46,7 @@
                 <div class="sheet-icon"><i class="fa-solid fa-calendar-days"></i></div>
                 <span>Planejamento</span>
             </button>
-            <button class="sheet-item" data-tab="tab-gamification">
+            <button class="sheet-item" data-tab="tab-gamification" id="btn-gamification">
                 <div class="sheet-icon"><i class="fa-solid fa-map"></i></div>
                 <span>Jornada</span>
             </button>
@@ -616,22 +616,168 @@
                         <div>• <strong>Velocidade Média (v):</strong> <span id="calc-speed-formula-val">-</span> (Resultando em <span id="calc-speed-val">-</span> km/h).</div>
                         <div>• <strong>Deslize Ativo (Pull):</strong> <span id="calc-gactive-val">-</span>m.</div>
                         <div>• <strong>Deslize Passivo (Glide):</strong> <span id="calc-gpassive-val">-</span>m.</div>
-                        <div>• <strong>Glide Total por Ciclo:</strong> <span id="calc-gtotal-val">-</span>m.</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-
-        <!-- 5. AUTOAVALIAÇÃO TAB -->
+                        <div>• <strong>Glide Total por Ciclo        <!-- 5. AUTOAVALIAÇÃO TAB -->
         <section id="tab-drills" class="tab-content">
             <div class="tab-header">
-                <h2>Autoavaliação e Drills</h2>
+                <h2>Autoavaliação de Remada</h2>
                 <p>Avalie as fases da sua remada com base nos treinos práticos e receba feedbacks automatizados.</p>
             </div>
-            <!-- Dynamic assessment form or values shared from localstorage -->
+
+            <!-- Form Card -->
             <div class="card glass">
-                <p style="text-align: center; color: var(--text-muted); font-size: 14px;">As avaliações e relatórios técnicos são carregados automaticamente a partir dos treinos do Garmin. Use a aba "Meu Perfil" e "Remadas" para gerenciar as suas remadas.</p>
+                <h3>Registrar Autoavaliação Técnica</h3>
+                
+                <div class="form-group mb-15">
+                    <label for="eval-workout-select" class="input-label">Selecionar Treino:</label>
+                    <select id="eval-workout-select" class="premium-select">
+                        <option value="">Selecione um treino...</option>
+                    </select>
+                </div>
+
+                <div class="form-group mb-15">
+                    <label for="eval-technique-select" class="input-label">Técnica de Referência:</label>
+                    <select id="eval-technique-select" class="premium-select">
+                        <option value="nula">Técnica Nula (Geral)</option>
+                        <option value="drill">Método Drill</option>
+                        <option value="tepava">Técnica Tepava</option>
+                        <option value="travis">Travis Grant</option>
+                        <option value="puakea">John Puakea</option>
+                        <option value="thibaux">Raphael Thibaux</option>
+                    </select>
+                </div>
+
+                <div class="flex-row-gap-10 mb-15">
+                    <div class="form-group flex-1">
+                        <label for="eval-boat-select" class="input-label">Embarcação:</label>
+                        <select id="eval-boat-select" class="premium-select">
+                            <option value="OC1">OC1</option>
+                            <option value="V1">V1</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="eval-boat-weight" class="input-label">Peso Canoa (kg):</label>
+                        <input type="number" id="eval-boat-weight" class="premium-input" placeholder="Ex: 14.5" step="0.1" min="1">
+                    </div>
+                </div>
+
+                <!-- Sliders Fases -->
+                <div class="form-section-divider"></div>
+                <h4 class="form-section-title">Nível de Execução das Fases</h4>
+                
+                <div class="slider-control mb-15">
+                    <div class="slider-lbl">
+                        <span id="lbl-phase-1">Fase 1: A Trava (Catch)</span>
+                        <strong id="val-phase-1">50%</strong>
+                    </div>
+                    <input type="range" id="slider-phase-1" class="premium-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-1').innerText = this.value + '%'" />
+                </div>
+
+                <div class="slider-control mb-15">
+                    <div class="slider-lbl">
+                        <span id="lbl-phase-2">Fase 2: Pivô do Núcleo (Power)</span>
+                        <strong id="val-phase-2">50%</strong>
+                    </div>
+                    <input type="range" id="slider-phase-2" class="premium-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-2').innerText = this.value + '%'" />
+                </div>
+
+                <div class="slider-control mb-15">
+                    <div class="slider-lbl">
+                        <span id="lbl-phase-3">Fase 3: Binário Progressivo (Pitch)</span>
+                        <strong id="val-phase-3">50%</strong>
+                    </div>
+                    <input type="range" id="slider-phase-3" class="premium-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-3').innerText = this.value + '%'" />
+                </div>
+
+                <div class="slider-control mb-15">
+                    <div class="slider-lbl">
+                        <span id="lbl-phase-4">Fase 4: Saída Limpa (Snap)</span>
+                        <strong id="val-phase-4">50%</strong>
+                    </div>
+                    <input type="range" id="slider-phase-4" class="premium-slider" min="0" max="100" value="50" oninput="document.getElementById('val-phase-4').innerText = this.value + '%'" />
+                </div>
+
+                <!-- Checkboxes de Erros -->
+                <div class="form-section-divider"></div>
+                <h4 class="form-section-title">Erros Identificados no Treino</h4>
+                <div class="checkbox-grid-mobile mb-15" id="eval-errors-grid">
+                    <!-- Preenchido via JS -->
+                </div>
+
+                <!-- Checkboxes de Drills -->
+                <div class="form-section-divider"></div>
+                <h4 class="form-section-title">Drills Praticados no Treino</h4>
+                <div class="checkbox-grid-mobile mb-15" id="eval-drills-grid">
+                    <!-- Preenchido via JS -->
+                </div>
+
+                <!-- Clima e Maré -->
+                <div class="form-section-divider"></div>
+                <div class="flex-row-space-between mb-10">
+                    <h4 class="form-section-title" style="margin: 0;">Condições de Clima & Mar</h4>
+                    <button type="button" class="btn btn-secondary btn-xs" id="btn-fetch-weather">
+                        <i class="fa-solid fa-cloud-sun"></i> Buscar Clima
+                    </button>
+                </div>
+
+                <div class="flex-row-gap-10 mb-10">
+                    <div class="form-group flex-1">
+                        <label for="eval-weather-temp" class="input-label">Temp (°C):</label>
+                        <input type="number" id="eval-weather-temp" class="premium-input" placeholder="Ex: 24" />
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="eval-weather-wind" class="input-label">Vento:</label>
+                        <input type="text" id="eval-weather-wind" class="premium-input" placeholder="Ex: 10 kts SO" />
+                    </div>
+                </div>
+
+                <div class="flex-row-gap-10 mb-10">
+                    <div class="form-group flex-1">
+                        <label for="eval-weather-rain" class="input-label">Chuva:</label>
+                        <select id="eval-weather-rain" class="premium-select">
+                            <option value="Sem Chuva">Sem Chuva</option>
+                            <option value="Garoa/Leve">Garoa / Leve</option>
+                            <option value="Chuva Forte">Chuva Forte</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="eval-weather-swell" class="input-label">Swell/Onda:</label>
+                        <input type="text" id="eval-weather-swell" class="premium-input" placeholder="Ex: 0.5m Leste" />
+                    </div>
+                </div>
+
+                <div class="form-group mb-15">
+                    <label for="eval-weather-tide" class="input-label">Maré:</label>
+                    <select id="eval-weather-tide" class="premium-select">
+                        <option value="">Selecione a maré...</option>
+                        <option value="Seca">Seca</option>
+                        <option value="Enchendo">Enchendo</option>
+                        <option value="Cheia">Cheia</option>
+                        <option value="Vazando">Vazando</option>
+                    </select>
+                </div>
+
+                <div class="form-group mb-15" id="worldtides-key-group" style="display:none;">
+                    <label for="eval-worldtides-key" class="input-label">Chave API World Tides:</label>
+                    <input type="password" id="eval-worldtides-key" class="premium-input" placeholder="Chave World Tides API..." />
+                </div>
+
+                <div class="form-group mb-15">
+                    <label for="eval-notes" class="input-label">Notas / Observações:</label>
+                    <textarea id="eval-notes" class="premium-textarea" rows="3" placeholder="Sinta a remada... o vento... a resposta da canoa."></textarea>
+                </div>
+
+                <button class="btn btn-primary btn-full" id="btn-save-evaluation">
+                    <i class="fa-solid fa-floppy-disk"></i> Salvar Autoavaliação
+                </button>
+            </div>
+
+            <!-- Correlation Chart Card -->
+            <div class="card glass">
+                <h3>Técnica vs. Velocidade Média</h3>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px; line-height: 1.4;">
+                    Correlação direta entre a proficiência técnica média das suas remadas e a velocidade média alcançada.
+                </p>
+                <div style="height: 250px;"><canvas id="chart-correlation"></canvas></div>
             </div>
         </section>
 
@@ -642,22 +788,202 @@
                 <h2>Planejamento Semanal</h2>
                 <p>Monitore suas metas e planeje o volume de treinos futuros.</p>
             </div>
+
+            <!-- Plano de Sessões -->
             <div class="card glass">
-                <p style="text-align: center; color: var(--text-muted); font-size: 14px;">As estatísticas semanais e gráficos de planejamento são sincronizados com o seu Garmin.</p>
+                <h3>Estrutura de Sessões Semanais</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">Para atingir a quilometragem recomendada com qualidade, equilibre seus treinos em quatro sessões:</p>
+                
+                <div class="planning-session-box-mobile border-red">
+                    <div class="session-badge-mobile badge-red">Sessão 1</div>
+                    <div class="session-body-mobile">
+                        <h4>Intervalado Forte (VO2 Máx) - 10km</h4>
+                        <p>Aquecimento 2km + 10x 500m forte com 1 min de descanso ativo + 3km solto. Ideal para OC1.</p>
+                    </div>
+                </div>
+
+                <div class="planning-session-box-mobile border-orange mt-10">
+                    <div class="session-badge-mobile badge-orange">Sessão 2</div>
+                    <div class="session-body-mobile">
+                        <h4>Sessão Regenerativa & Drills - 8 a 10km</h4>
+                        <p>Fazer remadas em baixa cadência (45-50 ppm). Dedicar 15 min a treinos de postura e core.</p>
+                    </div>
+                </div>
+
+                <div class="planning-session-box-mobile border-blue mt-10">
+                    <div class="session-badge-mobile badge-blue">Sessão 3</div>
+                    <div class="session-body-mobile">
+                        <h4>Tempo Run (Limiar de Lactato) - 10km</h4>
+                        <p>Aquecimento 2km + 6km no ritmo de prova (10 a 10.5 km/h constantes) + 2km solto. Preferencial na V1.</p>
+                    </div>
+                </div>
+
+                <div class="planning-session-box-mobile border-purple mt-10">
+                    <div class="session-badge-mobile badge-purple">Sessão 4</div>
+                    <div class="session-body-mobile">
+                        <h4>Longo Aeróbico de Base - 12 a 14km</h4>
+                        <p>Paddling contínuo em Z2 cardíaca. Cadência estável entre 55-60 ppm focando no glide.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coach Virtual Card -->
+            <div class="card glass border-red">
+                <h3>Recomendações do Coach Virtual</h3>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Orientações automatizadas baseadas no histórico técnico de suas autoavaliações.</p>
+                
+                <div id="coach-loading-msg" style="text-align: center; padding: 20px;">
+                    <i class="fa-solid fa-spinner fa-spin coach-spinner" style="font-size: 20px; color: var(--accent-red); margin-bottom: 8px;"></i>
+                    <p style="font-size: 12px; color: var(--text-muted);">Analisando erros e drills...</p>
+                </div>
+
+                <div id="coach-recommendations" style="display: none;">
+                    <div class="coach-alert-box warning-box mb-15">
+                        <div class="box-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                        <div class="box-content">
+                            <h4>Principal desvio recorrente:</h4>
+                            <strong id="coach-top-error" style="font-size: 14px; color: #fff; display: block; margin: 4px 0;">-</strong>
+                            <p id="coach-error-description" style="font-size: 11px; color: var(--text-secondary); line-height: 1.3;">-</p>
+                        </div>
+                    </div>
+                    
+                    <h4 style="font-size: 12px; color: var(--text-primary); text-transform: uppercase; margin-bottom: 10px;">Exercícios de Correção Prioritários:</h4>
+                    <div id="coach-drills-list">
+                        <!-- Dynamic list of recommendations -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Frequência de Erros -->
+            <div class="card glass">
+                <h3>Frequência de Erros Registrados</h3>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 15px;">Incidência dos desvios técnicos em suas autoavaliações.</p>
+                <div style="height: 220px;"><canvas id="chart-errors-frequency"></canvas></div>
             </div>
         </section>
 
 
         <!-- 7. JORNADA TAB -->
         <section id="tab-gamification" class="tab-content">
-            <div class="tab-header">
-                <h2>Sua Jornada</h2>
-                <p>Veja seu avanço semanal representado em marcos geográficos no mapa virtual.</p>
-            </div>
-            <div class="card glass">
-                <div class="nautical-map-container" style="position: relative; width: 100%; height: 350px; background: #0c0f13; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
-                    <canvas id="nautical-map-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+            <!-- Header com XP e Nível -->
+            <div class="game-header-mobile mb-20">
+                <div class="game-title-block">
+                    <h2>Jornada do Remador</h2>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Acompanhe seu avanço real semanal no mapa náutico virtual.</p>
                 </div>
+                <div class="game-level-block-mobile">
+                    <div class="level-title-badge" id="g-level-title">Aprendiz das Águas</div>
+                    <div class="level-num-row-mobile">
+                        <span class="level-num-label">Nível</span>
+                        <span class="level-num" id="g-level-num">1</span>
+                    </div>
+                    <div class="xp-bar-wrap">
+                        <div class="xp-bar-fill" id="g-xp-bar"></div>
+                    </div>
+                    <div class="xp-label-row">
+                        <span id="g-xp-current">0 XP</span>
+                        <span id="g-xp-next">/ 500 XP</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mapa Náutico -->
+            <div class="card glass" style="padding: 0; overflow: hidden; border: 1px solid rgba(0, 180, 216, 0.25);">
+                <div class="nautical-map-header" style="padding: 12px 16px; border-bottom: 1px solid rgba(0, 180, 216, 0.15);">
+                    <h3 style="margin: 0; font-size: 14px; color: var(--blue-info);"><i class="fa-solid fa-compass"></i> Mapa Náutico</h3>
+                    <span style="font-size: 10px; color: var(--text-muted);">Weekly Journey Map</span>
+                </div>
+                <div class="nautical-map-container" style="position: relative; width: 100%; height: 320px; background: #020d1e;">
+                    <canvas id="nautical-map-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+                    
+                    <!-- Tooltip de ilha -->
+                    <div class="island-tooltip" id="island-tooltip" style="position: absolute; background: rgba(10, 15, 28, 0.95); border: 1px solid var(--blue-info); border-radius: 8px; padding: 8px 10px; pointer-events: none; opacity: 0; transition: opacity 0.2s, transform 0.2s; max-width: 180px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                        <div class="island-tooltip-name" id="island-tooltip-name" style="font-weight: 700; font-size: 11px; color: #fff; margin-bottom: 2px;"></div>
+                        <div class="island-tooltip-desc" id="island-tooltip-desc" style="font-size: 9px; color: var(--text-secondary); line-height: 1.2; margin-bottom: 4px;"></div>
+                        <div class="island-tooltip-req" id="island-tooltip-req" style="font-size: 9px; color: var(--accent-neon); font-weight: 600;"></div>
+                    </div>
+                </div>
+                <!-- Legenda do mapa -->
+                <div class="island-legend" style="padding: 10px 16px; display: flex; gap: 12px; background: rgba(3, 10, 22, 0.5); font-size: 9px; border-top: 1px solid rgba(0,180,216,0.1);">
+                    <span class="legend-item"><span class="legend-dot unlocked" style="width:8px; height:8px; display:inline-block; border-radius:50%; background:var(--green-correct); margin-right:4px;"></span>Desbloqueado</span>
+                    <span class="legend-item"><span class="legend-dot locked" style="width:8px; height:8px; display:inline-block; border-radius:50%; background:rgba(255,255,255,0.15); margin-right:4px;"></span>Bloqueado</span>
+                    <span class="legend-item"><span class="legend-dot current" style="width:8px; height:8px; display:inline-block; border-radius:50%; background:var(--accent-neon); margin-right:4px; box-shadow: 0 0 5px var(--accent-neon);"></span>Você está aqui</span>
+                </div>
+            </div>
+
+            <!-- Avatar Card -->
+            <div class="card glass border-red mt-15">
+                <div class="avatar-game-inner-mobile" style="display: flex; gap: 15px;">
+                    <!-- Canvas pixel art e indicador de humor -->
+                    <div class="avatar-canvas-wrap-mobile" style="position: relative; flex-shrink: 0;">
+                        <canvas id="avatar-canvas" width="128" height="192" style="width: 100px; height: 150px; border-radius: 8px; border: 1.5px solid rgba(255,0,60,0.25); background: linear-gradient(180deg, #071526 0%, #030a14 100%);"></canvas>
+                        <div class="avatar-mood-indicator" id="avatar-mood-indicator" style="position: absolute; bottom: -5px; right: -5px; background: #0f1c30; border: 1.5px solid rgba(255,0,60,0.35); border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 14px;">
+                            <span id="avatar-mood-emoji">😊</span>
+                        </div>
+                    </div>
+                    <!-- Info e estatísticas -->
+                    <div class="avatar-info-block-mobile" style="flex: 1; min-width: 0;">
+                        <h4 class="avatar-name" style="margin: 0; font-size: 16px; color: #fff;">Remador</h4>
+                        <div class="avatar-subtitle" id="g-player-title" style="font-size: 10px; color: var(--accent-neon); font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Aprendiz das Águas</div>
+                        <div class="avatar-island-status" style="font-size: 11px; color: var(--blue-info); display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+                            <i class="fa-solid fa-map-pin" style="font-size: 9px;"></i>
+                            <span id="avatar-island-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">Enseada dos Primeiros Golpes</span>
+                        </div>
+                        <div class="avatar-speech-bubble" id="avatar-speech" style="font-size: 11px; font-style: italic; color: var(--text-secondary); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 6px 10px; border-radius: 8px; margin-bottom: 8px;">
+                            <span>Pronto para remar hoje?</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="avatar-stats-grid mt-10">
+                    <div class="avatar-stat" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01);">
+                        <span class="avatar-stat-label" style="font-size: 9px; display: block; color: var(--text-muted);">Velocidade</span>
+                        <span class="avatar-stat-value" id="g-stat-speed" style="font-size: 12px; font-weight: 700; color: #fff;">9.0 km/h</span>
+                    </div>
+                    <div class="avatar-stat" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01);">
+                        <span class="avatar-stat-label" style="font-size: 9px; display: block; color: var(--text-muted);">Técnica</span>
+                        <span class="avatar-stat-value" id="g-stat-drill" style="font-size: 12px; font-weight: 700; color: #fff;">0%</span>
+                    </div>
+                    <div class="avatar-stat" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01);">
+                        <span class="avatar-stat-label" style="font-size: 9px; display: block; color: var(--text-muted);">Volume</span>
+                        <span class="avatar-stat-value" id="g-stat-km" style="font-size: 12px; font-weight: 700; color: #fff;">0 km</span>
+                    </div>
+                    <div class="avatar-stat" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01);">
+                        <span class="avatar-stat-label" style="font-size: 9px; display: block; color: var(--text-muted);">XP Total</span>
+                        <span class="avatar-stat-value" id="g-stat-xp" style="font-size: 12px; font-weight: 700; color: #fff;">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conquistas -->
+            <div class="card glass border-orange mt-15">
+                <h3 style="color:#ffd700; font-size: 14px;"><i class="fa-solid fa-trophy"></i> Conquistas</h3>
+                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Badges conquistados com seu suor.</p>
+                <div class="achievements-grid-mobile" id="achievements-grid">
+                    <!-- Badges carregados pelo JS -->
+                </div>
+            </div>
+
+            <!-- Registrar Resultados de Prova -->
+            <div class="card glass mt-15">
+                <h3><i class="fa-solid fa-medal"></i> Registrar Resultado de Prova</h3>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">Adicione seus resultados oficiais e ganhe bônus de XP.</p>
+                <div class="comp-form">
+                    <div class="form-group mb-10">
+                        <input type="text" id="comp-name" class="premium-input" placeholder="Nome da prova (ex: Volta à Ilha)" />
+                    </div>
+                    <div class="form-group mb-10">
+                        <input type="date" id="comp-date" class="premium-input" />
+                    </div>
+                    <div class="flex-row-gap-10 mb-10">
+                        <input type="number" id="comp-place" class="premium-input flex-1" placeholder="Colocação" min="1" />
+                        <input type="number" id="comp-total" class="premium-input flex-1" placeholder="Total de Atletas" min="1" />
+                    </div>
+                    <button class="btn btn-primary btn-full" id="btn-save-competition">
+                        <i class="fa-solid fa-plus"></i> Adicionar Prova
+                    </button>
+                </div>
+                <div class="comp-list mt-15" id="comp-list"></div>
             </div>
         </section>
 
@@ -669,15 +995,29 @@
                 <p>Edite suas informações físicas, equipamento e metas de treinamento.</p>
             </div>
 
-            <!-- Profile Form -->
+            <!-- Profile Form Card -->
             <div class="card glass">
                 <div class="profile-edit-form">
-                    <label class="input-control">
+                    
+                    <!-- Profile avatar upload inside the card -->
+                    <div class="avatar-upload-container-mobile mb-20" style="text-align: center;">
+                        <div class="profile-avatar-wrapper-mobile" onclick="document.getElementById('input-profile-photo').click()" style="width: 90px; height: 90px; margin: 0 auto; position: relative; border-radius: 50%; overflow: hidden; border: 2px solid var(--accent-neon); cursor: pointer; background: rgba(255,255,255,0.02); display: flex; align-items: center; justify-content: center;">
+                            <img id="profile-large-img" src="" alt="Avatar do Atleta" style="display: none; width: 100%; height: 100%; object-fit: cover;">
+                            <i class="fa-solid fa-circle-user avatar-placeholder-icon" id="profile-large-fallback" style="font-size: 72px; color: var(--text-secondary);"></i>
+                            <div class="avatar-hover-overlay" style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.65); color: #fff; font-size: 9px; padding: 3px 0; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-camera"></i>
+                                <span>Alterar</span>
+                            </div>
+                        </div>
+                        <input type="file" id="input-profile-photo" accept="image/*" style="display: none;">
+                    </div>
+
+                    <label class="input-control mb-10">
                         <span>Nome Completo</span>
                         <input type="text" id="edit-athlete-name" class="premium-input">
                     </label>
 
-                    <div class="flex-row-gap-10">
+                    <div class="flex-row-gap-10 mb-10">
                         <label class="input-control flex-1">
                             <span>Peso (kg)</span>
                             <input type="number" id="edit-athlete-weight" class="premium-input">
@@ -688,7 +1028,7 @@
                         </label>
                     </div>
 
-                    <div class="flex-row-gap-10">
+                    <div class="flex-row-gap-10 mb-10">
                         <label class="input-control flex-1">
                             <span>Idade (anos)</span>
                             <input type="number" id="edit-athlete-age" class="premium-input">
@@ -699,22 +1039,22 @@
                         </label>
                     </div>
 
-                    <label class="input-control">
+                    <label class="input-control mb-10">
                         <span>Relógio / GPS</span>
                         <input type="text" id="edit-athlete-watch" class="premium-input">
                     </label>
 
-                    <label class="input-control">
+                    <label class="input-control mb-15">
                         <span>Remo / Lâmina</span>
                         <input type="text" id="edit-athlete-paddle" class="premium-input">
                     </label>
 
-                    <label class="input-control">
+                    <label class="input-control mb-20">
                         <span>Meta Semanal de Distância (km)</span>
                         <input type="number" id="edit-goal-target" class="premium-input">
                     </label>
 
-                    <button class="btn btn-secondary btn-full mt-15" onclick="saveMobileProfile()">
+                    <button class="btn btn-secondary btn-full" onclick="saveMobileProfile()">
                         <i class="fa-solid fa-floppy-disk"></i> Salvar Perfil
                     </button>
                 </div>
