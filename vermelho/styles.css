@@ -3893,4 +3893,234 @@ select.form-control option {
     margin: 0;
 }
 
+/* ========================================== */
+/* MOBILE HEADER & OVERLAY SIDEBAR DRAWER CSS */
+/* ========================================== */
+
+/* Mobile Header (Hidden on Desktop) */
+.mobile-header {
+    display: none;
+}
+
+/* Close Button (Hidden on Desktop) */
+.sidebar-close-btn {
+    display: none;
+}
+
+/* Sidebar Overlay */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 999;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1024px) {
+    /* Hide desktop fixed logo */
+    .fixed-top-right-logo {
+        display: none;
+    }
+
+    /* Set container column direction */
+    .app-container {
+        flex-direction: column;
+    }
+
+    /* Fixed mobile top header bar */
+    .mobile-header {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(18, 22, 27, 0.95);
+        border-bottom: 1px solid var(--border-color);
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .mobile-menu-toggle {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        font-size: 18px;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+    }
+
+    .mobile-menu-toggle:active {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .mobile-logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .logo-img-mobile {
+        height: 28px;
+        width: auto;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 0, 60, 0.35);
+    }
+
+    /* Adapt Sidebar into Drawer Overlay */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        width: 290px;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+        background-color: var(--bg-secondary);
+        overflow-y: auto;
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* Show Mobile Close Button */
+    .sidebar-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 18px;
+        right: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        color: var(--text-muted);
+        font-size: 18px;
+        cursor: pointer;
+        transition: var(--transition-fast);
+        z-index: 1010;
+    }
+
+    .sidebar-close-btn:hover {
+        color: var(--accent-neon);
+        background: rgba(255, 0, 60, 0.1);
+        border-color: rgba(255, 0, 60, 0.2);
+    }
+
+    /* Adjust main content for mobile header */
+    .main-content {
+        padding: 20px 14px;
+        margin-top: 60px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+    }
+
+    /* Mobile header section font sizes */
+    .section-header h1 {
+        font-size: 24px;
+    }
+
+    .section-desc {
+        font-size: 13px;
+    }
+
+    /* Adjust stats grid on mobile */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px;
+    }
+    
+    .stats-grid .stat-card {
+        padding: 14px;
+    }
+    
+    .stats-grid .stat-card:nth-child(5) {
+        grid-column: span 2;
+    }
+
+    .stat-value {
+        font-size: 20px !important;
+    }
+
+    .stat-label {
+        font-size: 11px !important;
+    }
+
+    /* Make radar chart responsive on small devices */
+    .ref-radar-card {
+        padding: 16px !important;
+    }
+
+    .chart-container {
+        height: 320px !important;
+    }
+
+    /* Leaflet Map responsiveness */
+    #map {
+        height: 260px !important;
+    }
+
+    /* Nautical Map (Jornada) */
+    .nautical-map-container {
+        height: 380px !important;
+    }
+
+    /* Simulator Tab */
+    .svg-container-rotation {
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    .stats-grid .stat-card:nth-child(5) {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .stats-grid .stat-card:nth-child(5) {
+        grid-column: span 1;
+    }
+}
+
+
 

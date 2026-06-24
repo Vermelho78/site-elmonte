@@ -392,9 +392,37 @@ function saveToLocalStorage() {
 
 // Configura os ouvintes de eventos da interface
 function setupEventListeners() {
+    // Toggles do Menu Mobile (Hamburger / Fechar / Overlay)
+    const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+    const sidebarCloseBtn = document.getElementById("sidebar-close-btn");
+    const sidebarOverlay = document.getElementById("sidebar-overlay");
+    const appSidebar = document.getElementById("app-sidebar");
+
+    const closeMobileSidebar = () => {
+        if (appSidebar) appSidebar.classList.remove("active");
+        if (sidebarOverlay) sidebarOverlay.classList.remove("active");
+    };
+
+    if (mobileMenuBtn && appSidebar && sidebarOverlay) {
+        mobileMenuBtn.addEventListener("click", () => {
+            appSidebar.classList.add("active");
+            sidebarOverlay.classList.add("active");
+        });
+    }
+
+    if (sidebarCloseBtn) {
+        sidebarCloseBtn.addEventListener("click", closeMobileSidebar);
+    }
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener("click", closeMobileSidebar);
+    }
+
     // Alternância de Abas da Sidebar
     document.querySelectorAll(".nav-item").forEach(button => {
         button.addEventListener("click", () => {
+            // Fecha a barra lateral no mobile após mudar de aba
+            closeMobileSidebar();
+
             document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
             

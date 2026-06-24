@@ -16,14 +16,22 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Logo Estético Fixo no Canto Superior Direito -->
+    <!-- Logo Estético Fixo no Canto Superior Direito (Visível no desktop) -->
     <div class="fixed-top-right-logo">
         <img src="logo_vaa.png" alt="Logo Fixo Vaa Vermelho">
     </div>
 
+    <!-- Overlay de fundo para o menu lateral no mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     <div class="app-container">
         <!-- Sidebar lateral -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="app-sidebar">
+            <!-- Botão de Fechar no Mobile -->
+            <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Fechar menu">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
             <div class="sidebar-header">
                 <div class="logo">
                     <img src="logo_vaa.png" alt="Logo Vaa Vermelho" class="logo-img">
@@ -97,6 +105,18 @@
                 </div>
             </div>
         </aside>
+
+        <!-- Header Mobile (visível apenas em telas menores) -->
+        <header class="mobile-header">
+            <button class="mobile-menu-toggle" id="mobile-menu-btn" aria-label="Abrir menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="mobile-logo">
+                <img src="logo_vaa.png" alt="Logo Vaa" class="logo-img-mobile">
+                <span>Vaa <span class="highlight">Vermelho</span></span>
+            </div>
+            <div style="width: 40px;"></div> <!-- Espaçador para equilibrar o flexbox -->
+        </header>
 
         <!-- Área de Conteúdo Principal -->
         <main class="main-content">
