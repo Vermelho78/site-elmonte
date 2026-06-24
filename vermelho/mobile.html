@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vaa Vermelho Mobile - Dashboard de Remada</title>
+    <!-- Google Fonts: Outfit e Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Leaflet CSS para Mapas -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- CSS Mobile Customizado -->
+    <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+    <!-- Top Mobile Header -->
+    <header class="app-header">
+        <div class="header-logo">
+            <img src="logo_vaa.png" alt="Logo Vaa" class="header-logo-img">
+            <span>Vaa <span class="highlight">Vermelho</span></span>
+        </div>
+        <div class="header-profile" onclick="openTab('tab-profile')">
+            <div class="header-avatar-circle">
+                <img id="header-profile-img" src="" alt="" style="display: none;">
+                <i class="fa-solid fa-circle-user" id="header-profile-fallback"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- Bottom Sheet Modal (Menu "Mais") -->
+    <div class="bottom-sheet-overlay" id="bottom-sheet-overlay"></div>
+    <div class="bottom-sheet" id="bottom-sheet">
+        <div class="bottom-sheet-drag-handle"></div>
+        <div class="bottom-sheet-header">
+            <h3>Mais Opções</h3>
+        </div>
+        <div class="bottom-sheet-grid">
+            <button class="sheet-item" data-tab="tab-drills">
+                <div class="sheet-icon"><i class="fa-solid fa-square-poll-horizontal"></i></div>
+                <span>Autoavaliação</span>
+            </button>
+            <button class="sheet-item" data-tab="tab-planning">
+                <div class="sheet-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                <span>Planejamento</span>
+            </button>
+            <button class="sheet-item" data-tab="tab-gamification">
+                <div class="sheet-icon"><i class="fa-solid fa-map"></i></div>
+                <span>Jornada</span>
+            </button>
+            <button class="sheet-item" data-tab="tab-profile">
+                <div class="sheet-icon"><i class="fa-solid fa-user-gear"></i></div>
+                <span>Meu Perfil</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Tab Bar -->
+    <nav class="mobile-tab-bar">
+        <button class="tab-item active" data-tab="tab-dashboard" id="tab-btn-dashboard">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Base</span>
+        </button>
+        <button class="tab-item" data-tab="tab-workouts" id="tab-btn-workouts">
+            <i class="fa-solid fa-circle-play"></i>
+            <span>Remadas</span>
+        </button>
+        <button class="tab-item" data-tab="tab-referencial" id="tab-btn-referencial">
+            <i class="fa-solid fa-book-open-reader"></i>
+            <span>Técnica</span>
+        </button>
+        <button class="tab-item" data-tab="tab-thibaux" id="tab-btn-thibaux">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Simulador</span>
+        </button>
+        <button class="tab-item" id="tab-btn-more">
+            <i class="fa-solid fa-ellipsis"></i>
+            <span>Mais</span>
+        </button>
+    </nav>
+
+    <!-- Main Content Viewport -->
+    <main class="main-viewport">
+
+        <!-- 1. BASE (DASHBOARD) TAB -->
+        <section id="tab-dashboard" class="tab-content active">
+            <div class="tab-header">
+                <h2>Base de Controle Semanal</h2>
+                <p>Monitore seu volume semanal, tempo acumulado e metas de distância.</p>
+            </div>
+
+            <!-- Goal progress bar -->
+            <div class="card glass progress-card">
+                <div class="goal-header-row">
+                    <h3>Progresso da Semana</h3>
+                    <span id="goal-progress-percent" class="progress-percent">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="goal-progress-bar" class="progress-bar" style="width: 0%;"></div>
+                </div>
+                <div class="goal-footer-row">
+                    <span id="goal-progress-status" class="progress-status">Meta semanal não iniciada</span>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon dist-icon"><i class="fa-solid fa-road"></i></div>
+                    <div class="stat-value" id="dash-weekly-dist">0.0 km</div>
+                    <div class="stat-label">Distância Semanal</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon speed-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                    <div class="stat-value" id="dash-weekly-speed">0.0 km/h</div>
+                    <div class="stat-label">Velocidade Média</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon cadence-icon"><i class="fa-solid fa-wave-square"></i></div>
+                    <div class="stat-value" id="dash-weekly-cadence">0 ppm</div>
+                    <div class="stat-label">Cadência Média</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon count-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                    <div class="stat-value" id="dash-weekly-count">0</div>
+                    <div class="stat-label">Remadas Feitas</div>
+                </div>
+                <div class="stat-card time-card-span">
+                    <div class="stat-icon time-icon"><i class="fa-solid fa-clock"></i></div>
+                    <div class="stat-value" id="dash-weekly-time">0h 00m</div>
+                    <div class="stat-label">Tempo Total Semanal</div>
+                </div>
+            </div>
+
+            <!-- Recent Workouts -->
+            <div class="card glass">
+                <div class="card-header-row">
+                    <h3>Remadas Recentes</h3>
+                </div>
+                <div id="recent-workouts-list" class="recent-workouts-list">
+                    <div class="no-data-placeholder">Nenhum treino carregado nesta semana.</div>
+                </div>
+            </div>
+
+            <!-- Garmin Upload Box (Floating or card at the bottom) -->
+            <div class="card glass drop-zone-card" id="drop-zone">
+                <div class="drop-zone-content">
+                    <div class="drop-zone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <h4>Enviar Arquivo Garmin</h4>
+                    <p>Toque para selecionar um arquivo GPX/TCX</p>
+                    <input type="file" id="input-garmin-file" accept=".gpx,.tcx" style="display: none;" />
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 2. REMADAS TAB (LIST-DETAIL FLOW) -->
+        <section id="tab-workouts" class="tab-content">
+            <!-- View 1: List of Workouts -->
+            <div id="workout-list-view" class="workout-view active">
+                <div class="tab-header">
+                    <h2>Histórico de Remadas</h2>
+                    <p>Selecione um treino abaixo para analisar a rota, velocidade e técnica.</p>
+                </div>
+                <div class="workouts-filter-card card glass">
+                    <div class="workout-selector-container" id="workout-select-container">
+                        <!-- Dynamic list of workouts -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 2: Detailed Workout view -->
+            <div id="workout-detail-view" class="workout-view">
+                <div class="detail-back-header">
+                    <button class="btn btn-secondary btn-sm" id="btn-back-to-list">
+                        <i class="fa-solid fa-arrow-left"></i> Voltar para Lista
+                    </button>
+                    <h3 id="workout-detail-name">Nome do Treino</h3>
+                </div>
+
+                <!-- Info pill block -->
+                <div class="detail-info-pills">
+                    <span class="info-pill"><i class="fa-solid fa-calendar-days"></i> <span id="workout-detail-date">-</span></span>
+                    <span class="info-pill"><i class="fa-solid fa-road"></i> <span id="workout-detail-dist">-</span></span>
+                    <span class="info-pill"><i class="fa-solid fa-clock"></i> <span id="workout-detail-duration">-</span></span>
+                </div>
+
+                <!-- Interactive map card -->
+                <div class="card glass map-card">
+                    <div id="map" style="width: 100%; height: 260px; border-radius: 8px; z-index: 1;"></div>
+                </div>
+
+                <!-- Charts tabs navigation -->
+                <div class="detail-charts-tabs">
+                    <button class="details-tab-btn active" data-detail-chart="chart-speed-wrapper">Velocidade</button>
+                    <button class="details-tab-btn" data-detail-chart="chart-cadence-wrapper">Cadência</button>
+                    <button class="details-tab-btn" data-detail-chart="chart-hr-wrapper">FC</button>
+                </div>
+
+                <!-- Chart boxes -->
+                <div class="card glass chart-details-card">
+                    <div id="chart-speed-wrapper" class="detail-chart-wrapper active">
+                        <div style="height: 180px;"><canvas id="chart-detail-speed"></canvas></div>
+                    </div>
+                    <div id="chart-cadence-wrapper" class="detail-chart-wrapper">
+                        <div style="height: 180px;"><canvas id="chart-detail-cadence"></canvas></div>
+                    </div>
+                    <div id="chart-hr-wrapper" class="detail-chart-wrapper">
+                        <div style="height: 180px;"><canvas id="chart-detail-hr"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Workout Metrics Details Card -->
+                <div class="card glass detail-metrics-card">
+                    <h3>Resumo de Performance</h3>
+                    <div class="metrics-grid-2col">
+                        <div class="metric-item">
+                            <span class="lbl">Velocidade Média</span>
+                            <span class="val" id="workout-detail-avg-speed">-</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="lbl">Velocidade Máxima</span>
+                            <span class="val" id="workout-detail-max-speed">-</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="lbl">Cadência Média</span>
+                            <span class="val" id="workout-detail-avg-cadence">-</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="lbl">Frequência Cardíaca Média</span>
+                            <span class="val" id="workout-detail-avg-hr">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Evaluation Panel -->
+                <div class="card glass eval-card border-red">
+                    <div class="eval-header">
+                        <h3>Avaliação Técnica do Treino</h3>
+                        <span id="eval-status-badge" class="eval-badge">-</span>
+                    </div>
+                    <div class="eval-metrics-list">
+                        <div class="eval-metric-row">
+                            <span>Fase 1: Trava (Catch)</span>
+                            <strong id="eval-score-p1">-</strong>
+                        </div>
+                        <div class="eval-metric-row">
+                            <span>Fase 2: Pivô do Núcleo</span>
+                            <strong id="eval-score-p2">-</strong>
+                        </div>
+                        <div class="eval-metric-row">
+                            <span>Fase 3: Binário Progressivo</span>
+                            <strong id="eval-score-p3">-</strong>
+                        </div>
+                        <div class="eval-metric-row">
+                            <span>Fase 4: Saída Limpa (Snap)</span>
+                            <strong id="eval-score-p4">-</strong>
+                        </div>
+                    </div>
+                    <div class="eval-comments-box mt-10">
+                        <strong>Comentários do Treinador:</strong>
+                        <p id="eval-comments" style="font-size: 13px; color: var(--text-secondary); margin-top: 5px;">-</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 3. TÉCNICA REFERENCIAL TAB -->
+        <section id="tab-referencial" class="tab-content">
+            <div class="tab-header">
+                <h2>Técnica Referencial</h2>
+                <p>Estude os fundamentos do Método Drill e compare com outras escolas renomadas do Va'a.</p>
+            </div>
+
+            <!-- Radar chart card -->
+            <div class="card glass ref-radar-card">
+                <h3>Radar Comparativo de Escolas</h3>
+                <div class="chart-container" style="height: 280px; margin-top: 15px;">
+                    <canvas id="chart-referencial-radar"></canvas>
+                </div>
+                <div class="ref-radar-legend">
+                    <div class="ref-legend-item" style="--coach-color: var(--accent-red);" onclick="toggleLegendDataset(0)">
+                        <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-0" style="--coach-color: var(--accent-red);" onclick="event.stopPropagation()">
+                        <span>Drill</span>
+                    </div>
+                    <div class="ref-legend-item" style="--coach-color: var(--gold-accent);" onclick="toggleLegendDataset(1)">
+                        <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-1" style="--coach-color: var(--gold-accent);" onclick="event.stopPropagation()">
+                        <span>Tepava</span>
+                    </div>
+                    <div class="ref-legend-item" style="--coach-color: var(--green-correct);" onclick="toggleLegendDataset(2)">
+                        <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-2" style="--coach-color: var(--green-correct);" onclick="event.stopPropagation()">
+                        <span>Travis</span>
+                    </div>
+                    <div class="ref-legend-item" style="--coach-color: var(--blue-info);" onclick="toggleLegendDataset(3)">
+                        <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-3" style="--coach-color: var(--blue-info);" onclick="event.stopPropagation()">
+                        <span>Puakea</span>
+                    </div>
+                    <div class="ref-legend-item" style="--coach-color: var(--purple-long);" onclick="toggleLegendDataset(4)">
+                        <input type="checkbox" class="ref-legend-checkbox" checked id="toggle-ds-4" style="--coach-color: var(--purple-long);" onclick="event.stopPropagation()">
+                        <span>Thibaux</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Collapsible Controls -->
+            <div class="ref-controls" style="margin-bottom: 20px;">
+                <button class="btn btn-secondary btn-sm" onclick="expandAllTechniques()"><i class="fa-solid fa-expand"></i> Expandir Todas</button>
+                <button class="btn btn-secondary btn-sm" onclick="collapseAllTechniques()"><i class="fa-solid fa-compress"></i> Colapsar Todas</button>
+            </div>
+
+            <!-- Accordion cards -->
+            <div id="techniques-accordion-container">
+                <!-- Drill Card -->
+                <div class="ref-technique-card collapsed" id="ref-card-drill">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <span class="ref-source-badge drill-badge">Estilo Base</span>
+                            <h2>Método Drill</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">O método Drill foca na trava progressiva, alinhamento vertical e uso do tronco como biela rígida para máxima transmissão de torque.</p>
+                        <!-- Phases list -->
+                        <div class="mobile-phases-list">
+                            <div class="phase-item"><strong>1. A Trava:</strong> Ancorar a lâmina verticalmente antes da puxada.</div>
+                            <div class="phase-item"><strong>2. Pivô do Núcleo:</strong> Girar o tronco (biela de aço) mantendo braço rígido.</div>
+                            <div class="phase-item"><strong>3. Binário (Pitch):</strong> Rotacionar os punhos no final da remada.</div>
+                            <div class="phase-item"><strong>4. Saída (Snap):</strong> Retirada lateral seca, sem levantar respingos.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tepava Card -->
+                <div class="ref-technique-card collapsed" id="ref-card-tepava">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <span class="ref-source-badge tepava-badge">Fonte Principal</span>
+                            <h2>David Tepava (Shell Va'a)</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Foca em leveza, verticalidade e uso fluido do ombro como motor primário. Prioriza o glide longo e a cadência moderada.</p>
+                        <div class="mobile-phases-list">
+                            <div class="phase-item"><strong>Remada de Um Braço:</strong> Isolar a bacia e remar ativando ombro.</div>
+                            <div class="phase-item"><strong>Pausa no Catch:</strong> Pausar 2-3s após a entrada para alinhar o corpo.</div>
+                            <div class="phase-item"><strong>Remada Silenciosa:</strong> Zero barulho na entrada e na saída da água.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Travis Card -->
+                <div class="ref-technique-card collapsed" id="ref-card-travis">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <span class="ref-source-badge travis-badge">Coach Referencial</span>
+                            <h2>Travis Grant</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Estilo marcado por alta cadência (sprint), catch agressivo ("swing the axe") e saída precoce para recuperação rápida.</p>
+                        <div class="mobile-phases-list">
+                            <div class="phase-item"><strong>Swing the Axe:</strong> Lançar o remo ativamente na água para travar rápido.</div>
+                            <div class="phase-item"><strong>Gear Shifts:</strong> Alternar cadências em "engrenagens" (Gear 1 a 4).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Puakea Card -->
+                <div class="ref-technique-card collapsed" id="ref-card-puakea">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <span class="ref-source-badge puakea-badge">Coach Referencial</span>
+                            <h2>John Puakea</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Enfatiza a "trava de água" (water lock) e a propulsão do corpo (puxar a canoa sobre a pá imobilizada na água).</p>
+                        <div class="mobile-phases-list">
+                            <div class="phase-item"><strong>Pedra no Fundo:</strong> Imaginar o remo fixo e puxar o quadril à frente.</div>
+                            <div class="phase-item"><strong>Exit Zone:</strong> Retirar a pá na altura do joelho para evitar frear.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thibaux Card -->
+                <div class="ref-technique-card collapsed" id="ref-card-thibaux">
+                    <div class="ref-technique-header" onclick="toggleTechnique(this)">
+                        <div class="ref-technique-header-left">
+                            <span class="ref-source-badge thibaux-badge">Coach Referencial</span>
+                            <h2>Raphael Thibaux</h2>
+                        </div>
+                        <i class="fa-solid fa-chevron-down ref-toggle-icon"></i>
+                    </div>
+                    <div class="ref-technique-content">
+                        <p class="ref-block-desc">Combina a sensibilidade e conexão holística com a água da escola polinésia com foco absoluto em glide longo e eficiente.</p>
+                        <div class="mobile-phases-list">
+                            <div class="phase-item"><strong>Contar o Glide:</strong> Contar 2-3s após a saída antes da próxima remada.</div>
+                            <div class="phase-item"><strong>Feel the Flow:</strong> Ler a água e adaptar a pressão da lâmina.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 4. SIMULADOR TAB (ACORDIONS + STICKY RESULTS) -->
+        <section id="tab-thibaux" class="tab-content">
+            <div class="tab-header">
+                <h2>Simulador Biomecânico</h2>
+                <p>Simule a velocidade e o glide resultantes com base nas características da canoa, remador e técnica.</p>
+            </div>
+
+            <!-- Sticky/Floating Results Panel -->
+            <div class="sticky-results-panel card glass border-red">
+                <div class="result-mini-grid">
+                    <div class="res-item">
+                        <span class="res-lbl">Velocidade Média</span>
+                        <h2 id="final-speed">10.0 <span class="unit">km/h</span></h2>
+                    </div>
+                    <div class="res-item">
+                        <span class="res-lbl">Comprimento do Glide</span>
+                        <h2 id="final-glide">2.12 <span class="unit">m</span></h2>
+                    </div>
+                </div>
+                <div class="results-feedback-row">
+                    <span id="final-speed-desc" class="badge-feedback green">-</span>
+                    <span id="final-glide-desc" class="badge-feedback blue">-</span>
+                </div>
+            </div>
+
+            <!-- Accordeon 1: Configuração da Canoa & Atleta -->
+            <div class="sim-accordion-card card glass">
+                <div class="sim-accordion-header" onclick="toggleSimAccordion(this)">
+                    <h3><i class="fa-solid fa-ship"></i> 1. Canoa & Remador</h3>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="sim-accordion-content active">
+                    <label class="slider-control">
+                        <span class="slider-lbl">Tipo de Canoa
+                            <select id="select-canoe-type" class="premium-select">
+                                <option value="V1" selected>V1 (Direcional / Sem Leme)</option>
+                                <option value="OC1">OC1 (Com Leme)</option>
+                            </select>
+                        </span>
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Peso da Canoa: <strong id="val-canoe-weight">13.5 kg</strong></span>
+                        <input type="range" id="slider-canoe-weight" min="8" max="25" step="0.5" value="13.5" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Peso do Remador: <strong id="val-sim-ath-weight">78 kg</strong></span>
+                        <input type="range" id="slider-sim-ath-weight" min="50" max="120" value="78" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Altura do Remador: <strong id="val-sim-ath-height">1.80 m</strong></span>
+                        <input type="range" id="slider-sim-ath-height" min="1.50" max="2.10" step="0.01" value="1.80" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Área da Pá (Lâmina): <strong id="val-sim-blade-area">95 sq in</strong></span>
+                        <input type="range" id="slider-sim-blade-area" min="80" max="115" value="95" class="premium-slider">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Accordeon 2: Biomecânica da Remada & Clima -->
+            <div class="sim-accordion-card card glass">
+                <div class="sim-accordion-header" onclick="toggleSimAccordion(this)">
+                    <h3><i class="fa-solid fa-wave-square"></i> 2. Técnica & Ambiente</h3>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="sim-accordion-content">
+                    <label class="slider-control">
+                        <span class="slider-lbl">Cadência da Remada: <strong id="val-calc-cadence">55 ppm</strong></span>
+                        <input type="range" id="slider-calc-cadence" min="40" max="90" value="55" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Ângulo do Remo (Pitch): <strong id="val-flow-angle">0°</strong></span>
+                        <input type="range" id="slider-flow-angle" min="-15" max="15" value="0" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Força da Puxada: <strong id="val-flow-power">100%</strong></span>
+                        <input type="range" id="slider-flow-power" min="50" max="100" value="100" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Rotação do Tronco: <strong id="val-rot-angle">45°</strong></span>
+                        <input type="range" id="slider-rot-angle" min="0" max="90" value="45" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Bloqueio de Quadril: <strong id="val-hip-lock">100%</strong></span>
+                        <input type="range" id="slider-hip-lock" min="0" max="100" value="100" class="premium-slider">
+                    </label>
+
+                    <label class="slider-control">
+                        <span class="slider-lbl">Simular Clima de Treino
+                            <select id="sim-weather-select" class="premium-select">
+                                <option value="" selected>Clima Manual (Sem Treino)</option>
+                            </select>
+                        </span>
+                    </label>
+
+                    <div class="flex-row-gap-10">
+                        <label class="slider-control flex-1">
+                            <span class="slider-lbl">Vento
+                                <select id="select-wind-dir" class="premium-select">
+                                    <option value="contra" selected>De Frente (Contra)</option>
+                                    <option value="favor">De Trás (A Favor)</option>
+                                    <option value="lateral">De Lado (Lateral)</option>
+                                </select>
+                            </span>
+                        </label>
+                        <label class="slider-control flex-1">
+                            <span class="slider-lbl">Ondas (Swell)
+                                <select id="select-swell-dir" class="premium-select">
+                                    <option value="contra" selected>De Frente (Contra)</option>
+                                    <option value="favor">A Favor / Surf</option>
+                                    <option value="lateral">De Lado (Lateral)</option>
+                                </select>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accordeon 3: Top-Down Visual e Diagnóstico -->
+            <div class="sim-accordion-card card glass">
+                <div class="sim-accordion-header" onclick="toggleSimAccordion(this)">
+                    <h3><i class="fa-solid fa-rotate"></i> 3. Diagnóstico e Visualização</h3>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="sim-accordion-content">
+                    <div class="rotation-simulator-layout">
+                        <div class="svg-container-rotation">
+                            <svg id="rotation-svg" viewBox="0 0 300 200" width="100%" height="160">
+                                <path d="M 10 20 Q 80 15, 150 20 T 290 20" fill="none" stroke="rgba(6,214,160,0.1)" stroke-width="1.5" />
+                                <path d="M 10 180 Q 80 175, 150 180 T 290 180" fill="none" stroke="rgba(6,214,160,0.1)" stroke-width="1.5" />
+                                <path d="M 20 100 C 50 85, 250 85, 280 100 C 250 115, 50 115, 20 100 Z" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2" />
+                                <path d="M 50 35 C 70 30, 210 30, 230 35 C 210 40, 70 40, 50 35 Z" fill="rgba(255, 0, 60, 0.15)" stroke="rgba(255, 0, 60, 0.3)" stroke-width="1.5" />
+                                <line x1="100" y1="90" x2="100" y2="35" stroke="rgba(255, 255, 255, 0.3)" stroke-width="2.5" stroke-linecap="round" />
+                                <line x1="200" y1="90" x2="200" y2="35" stroke="rgba(255, 255, 255, 0.3)" stroke-width="2.5" stroke-linecap="round" />
+                                <circle cx="150" cy="100" r="2" fill="rgba(255, 255, 255, 0.3)" />
+                                <g id="sim-hip-group" transform="rotate(0, 150, 100)">
+                                    <line x1="135" y1="88" x2="135" y2="112" stroke="rgba(255,255,255,0.4)" stroke-width="5" stroke-linecap="round" />
+                                    <line x1="135" y1="88" x2="155" y2="92" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round" />
+                                    <line x1="135" y1="112" x2="155" y2="108" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round" />
+                                </g>
+                                <g id="sim-torso-group" transform="rotate(0, 150, 100)">
+                                    <line x1="135" y1="100" x2="150" y2="100" stroke="#fff" stroke-width="4" stroke-linecap="round" />
+                                    <line x1="150" y1="82" x2="150" y2="118" stroke="#fff" stroke-width="5" stroke-linecap="round" />
+                                    <circle cx="150" cy="100" r="10" fill="#2a323a" stroke="#fff" stroke-width="2" />
+                                    <line x1="150" y1="82" x2="175" y2="70" stroke="#ff003c" stroke-width="4" stroke-linecap="round" />
+                                    <line x1="150" y1="118" x2="185" y2="110" stroke="#fff" stroke-width="3.5" stroke-linecap="round" />
+                                    <line x1="175" y1="70" x2="185" y2="110" stroke="#fff" stroke-width="3.5" stroke-linecap="round" />
+                                    <line x1="175" y1="70" x2="165" y2="40" stroke="#ff003c" stroke-width="5" stroke-linecap="round" />
+                                    <line x1="165" y1="40" x2="190" y2="40" stroke="#ff003c" stroke-width="4" stroke-linecap="round" />
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid-2col mt-15">
+                        <div class="metric-item">
+                            <span class="lbl">Torque Máximo</span>
+                            <strong id="res-torque-val">0.0 <span class="unit">N.m</span></strong>
+                        </div>
+                        <div class="metric-item">
+                            <span class="lbl">Potência Muscular</span>
+                            <strong id="res-power-raw">0 <span class="unit">W</span></strong>
+                        </div>
+                        <div class="metric-item">
+                            <span class="lbl">Eficiência de Envio</span>
+                            <strong id="res-torque-eff">0%</strong>
+                        </div>
+                        <div class="metric-item">
+                            <span class="lbl">Potência Efetiva</span>
+                            <strong id="res-power-eff">0 <span class="unit">W</span></strong>
+                        </div>
+                    </div>
+
+                    <div class="flow-feedback-box mt-10" id="torque-feedback">
+                        -
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accordeon 4: Memória de Cálculo -->
+            <div class="sim-accordion-card card glass">
+                <div class="sim-accordion-header" onclick="toggleSimAccordion(this)">
+                    <h3><i class="fa-solid fa-calculator"></i> 4. Memória de Cálculo</h3>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="sim-accordion-content">
+                    <div class="math-memory-list" style="font-size: 12px; line-height: 1.6; color: var(--text-secondary);">
+                        <div>• <strong>Parâmetros do Atleta:</strong> <span id="calc-ath-weight">-</span>kg / <span id="calc-ath-height">-</span>m | Experiência: <span id="calc-ath-exp">-</span> anos.</div>
+                        <div>• <strong>Potência Muscular Base (P_base):</strong> <span id="calc-pbase-val">-</span> W.</div>
+                        <div>• <strong>Potência Bruta Estimada (P_bruta):</strong> <span id="calc-pbruta-val">-</span>.</div>
+                        <div>• <strong>Filtro Lâmina (Pitch <span id="calc-pitch-deg">-</span>°):</strong> <span id="calc-blade-eff">-</span>% eficiência.</div>
+                        <div>• <strong>Transmissão no Quadril (<span id="calc-hiplock-val">-</span>%):</strong> <span id="calc-trans-eff">-</span>% de envio.</div>
+                        <div>• <strong>Potência Efetiva Resultante (P_efetiva):</strong> <span id="calc-peff-val">-</span>.</div>
+                        <div>• <strong>Arrasto Físico (<span id="calc-canoe-type">-</span> / <span id="calc-canoe-weight-lbl">-</span>kg):</strong> Arrasto Hidrodinâmico (K_massa) calibrado em <span id="calc-rtotal-val">-</span> para peso de <span id="calc-mtotal">-</span>kg.</div>
+                        <div>• <strong>Arrasto Ambiental (Vento/Swell):</strong> Resistência adicional (R_env) em <span id="calc-renv-val">-</span> (K_total: <span id="calc-ktotal-val">-</span>).</div>
+                        <div>• <strong>Velocidade Média (v):</strong> <span id="calc-speed-formula-val">-</span> (Resultando em <span id="calc-speed-val">-</span> km/h).</div>
+                        <div>• <strong>Deslize Ativo (Pull):</strong> <span id="calc-gactive-val">-</span>m.</div>
+                        <div>• <strong>Deslize Passivo (Glide):</strong> <span id="calc-gpassive-val">-</span>m.</div>
+                        <div>• <strong>Glide Total por Ciclo:</strong> <span id="calc-gtotal-val">-</span>m.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 5. AUTOAVALIAÇÃO TAB -->
+        <section id="tab-drills" class="tab-content">
+            <div class="tab-header">
+                <h2>Autoavaliação e Drills</h2>
+                <p>Avalie as fases da sua remada com base nos treinos práticos e receba feedbacks automatizados.</p>
+            </div>
+            <!-- Dynamic assessment form or values shared from localstorage -->
+            <div class="card glass">
+                <p style="text-align: center; color: var(--text-muted); font-size: 14px;">As avaliações e relatórios técnicos são carregados automaticamente a partir dos treinos do Garmin. Use a aba "Meu Perfil" e "Remadas" para gerenciar as suas remadas.</p>
+            </div>
+        </section>
+
+
+        <!-- 6. PLANEJAMENTO TAB -->
+        <section id="tab-planning" class="tab-content">
+            <div class="tab-header">
+                <h2>Planejamento Semanal</h2>
+                <p>Monitore suas metas e planeje o volume de treinos futuros.</p>
+            </div>
+            <div class="card glass">
+                <p style="text-align: center; color: var(--text-muted); font-size: 14px;">As estatísticas semanais e gráficos de planejamento são sincronizados com o seu Garmin.</p>
+            </div>
+        </section>
+
+
+        <!-- 7. JORNADA TAB -->
+        <section id="tab-gamification" class="tab-content">
+            <div class="tab-header">
+                <h2>Sua Jornada</h2>
+                <p>Veja seu avanço semanal representado em marcos geográficos no mapa virtual.</p>
+            </div>
+            <div class="card glass">
+                <div class="nautical-map-container" style="position: relative; width: 100%; height: 350px; background: #0c0f13; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <canvas id="nautical-map-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 8. MEU PERFIL TAB -->
+        <section id="tab-profile" class="tab-content">
+            <div class="tab-header">
+                <h2>Meu Perfil de Atleta</h2>
+                <p>Edite suas informações físicas, equipamento e metas de treinamento.</p>
+            </div>
+
+            <!-- Profile Form -->
+            <div class="card glass">
+                <div class="profile-edit-form">
+                    <label class="input-control">
+                        <span>Nome Completo</span>
+                        <input type="text" id="edit-athlete-name" class="premium-input">
+                    </label>
+
+                    <div class="flex-row-gap-10">
+                        <label class="input-control flex-1">
+                            <span>Peso (kg)</span>
+                            <input type="number" id="edit-athlete-weight" class="premium-input">
+                        </label>
+                        <label class="input-control flex-1">
+                            <span>Altura (m)</span>
+                            <input type="number" id="edit-athlete-height" step="0.01" class="premium-input">
+                        </label>
+                    </div>
+
+                    <div class="flex-row-gap-10">
+                        <label class="input-control flex-1">
+                            <span>Idade (anos)</span>
+                            <input type="number" id="edit-athlete-age" class="premium-input">
+                        </label>
+                        <label class="input-control flex-1">
+                            <span>Remando Desde</span>
+                            <input type="number" id="edit-athlete-since" class="premium-input">
+                        </label>
+                    </div>
+
+                    <label class="input-control">
+                        <span>Relógio / GPS</span>
+                        <input type="text" id="edit-athlete-watch" class="premium-input">
+                    </label>
+
+                    <label class="input-control">
+                        <span>Remo / Lâmina</span>
+                        <input type="text" id="edit-athlete-paddle" class="premium-input">
+                    </label>
+
+                    <label class="input-control">
+                        <span>Meta Semanal de Distância (km)</span>
+                        <input type="number" id="edit-goal-target" class="premium-input">
+                    </label>
+
+                    <button class="btn btn-secondary btn-full mt-15" onclick="saveMobileProfile()">
+                        <i class="fa-solid fa-floppy-disk"></i> Salvar Perfil
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Libs -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <!-- Local database GPX compilation -->
+    <script src="dados_remada.js"></script>
+    <!-- Shared gamification map logic -->
+    <script src="gamification.js?v=1.3"></script>
+    <!-- Dedicated Mobile JS -->
+    <script src="mobile.js"></script>
+</body>
+</html>
