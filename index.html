@@ -54,6 +54,8 @@
         <div class="nav-container">
             <div class="nav-links">
                 <a href="#hero">Início</a>
+                <a href="#calculadora">Calculadora</a>
+                <a href="#suites">Suítes</a>
                 <a href="#case">Cases</a>
                 <a href="#contato">Contato</a>
             </div>
@@ -68,14 +70,14 @@
                 <div class="badge-container">
                     <img src="assets/logo.png" alt="EL MONTE HUD" class="hero-logo">
                 </div>
-                <h1 class="glitch" data-text="ENGENHARIA DE PRECISÃO">ENGENHARIA DE PRECISÃO</h1>
-                <h2 class="subtitle">Desenvolvimento de Plugins Avançados para Softwares BIM e CAD</h2>
+                <h1 class="glitch" data-text="ELIMINE O RETRABALHO BIM">ELIMINE O RETRABALHO BIM</h1>
+                <h2 class="subtitle">Recupere até 15 horas de projeto por mês com automação de elite</h2>
                 <p class="description">
-                    Automatização de processos, inteligência de dados e exatidão analítica. Elevamos o BIM ao mais alto nível técnico.
+                    Nós não vendemos apenas plugins. Desenvolvemos soluções que devolvem o controle sobre seus modelos e eliminam as tarefas repetitivas que drenam seu tempo.
                 </p>
                 <div class="cta-group">
-                    <a href="#contato" class="btn-primary">
-                        <span class="btn-text">Iniciar Projeto</span>
+                    <a href="#calculadora" class="btn-primary">
+                        <span class="btn-text">Calcular Meu Ganho</span>
                         <div class="btn-glow"></div>
                     </a>
                     <a href="#case" class="btn-secondary">Explorar Case</a>
@@ -83,24 +85,127 @@
             </div>
         </section>
 
-        <!-- Target Audience Section -->
-        <section id="solucoes" class="target-section">
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- ROI Calculator Section (FIRST after Hero)          -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section id="calculadora" class="calculator-section">
+            <div class="container">
+                <div class="calculator-card">
+                    <div class="calculator-header">
+                        <span class="section-badge">SYS.ROI.CALCULATOR</span>
+                        <h2>SISTEMA PLANETÁRIO DE PRODUTIVIDADE</h2>
+                        <p>Selecione as dores que drenam suas horas no Revit. Quanto maior a bolha, maior o peso do problema. Ao clicar, ela será atraída para o centro do seu universo de dores.</p>
+                    </div>
+
+                    <!-- Category Legend -->
+                    <div class="category-legend" id="categoryLegend">
+                        <!-- Generated via JS -->
+                    </div>
+                    
+                    <!-- Physics Solar System Cloud -->
+                    <div class="pain-cloud" id="painCloud">
+                        <!-- Generated via JS -->
+                    </div>
+
+                    <!-- Generate Plan Button -->
+                    <div class="generate-plan-wrap" id="generatePlanWrap" style="display:none;">
+                        <div class="selection-summary" id="selectionSummary">
+                            <span id="selectedCount">0</span> dores selecionadas · <span id="totalHoursPreview">0</span>h/mês de impacto
+                        </div>
+                        <button class="btn-generate" id="btnGeneratePlan">
+                            <span class="btn-generate-icon">⚡</span>
+                            <span class="btn-generate-text">GERAR PLANO PERSONALIZADO</span>
+                            <div class="btn-generate-glow"></div>
+                        </button>
+                    </div>
+
+                    <!-- Custom Plan Result (shown after generate) -->
+                    <div class="custom-plan-result" id="customPlanResult" style="display:none;">
+                        <h3>SUA SUÍTE PERSONALIZADA</h3>
+                        <div class="custom-plan-body" id="customPlanBody">
+                            <!-- Generated via JS -->
+                        </div>
+                    </div>
+
+                    <div class="calculator-cta" id="calculatorCta" style="display:none;">
+                        <p>Com as Suítes EL MONTE, você recupera <strong id="roiPercent">0%</strong> da sua produtividade mensal.</p>
+                        <a href="#contato" class="btn-primary">Solicitar Orçamento Personalizado</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- Product Suites Section (SECOND)                    -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section id="suites" class="suites-section">
             <div class="container">
                 <div class="section-header center">
-                    <span class="section-badge">SYS.TARGET.AUDIENCE</span>
-                    <h2>FOCO DE ATUAÇÃO</h2>
-                    <p>Engenharia de software aplicada aos dois principais eixos do ecossistema BIM.</p>
+                    <span class="section-badge">SYS.PRODUCT.SUITES</span>
+                    <h2>NOSSAS SUÍTES DE PRODUTIVIDADE</h2>
+                    <p>Ferramentas focadas na dor de cada profissional do ecossistema BIM.</p>
                     <div class="divider center"></div>
                 </div>
                 
-                <div class="target-grid">
-                    <div class="target-item">
-                        <h3>Para Fabricantes</h3>
-                        <p>Desenvolva um plugin que insere seus produtos no fluxo central da metodologia BIM. Facilite o uso de suas famílias paramétricas e assegure que seu material seja a escolha natural na especificação dos escritórios.</p>
+                <div class="suites-grid">
+                    <!-- Suite Projetista -->
+                    <div class="suite-card" data-suite="projetista">
+                        <div class="suite-color-bar" style="background: #ff4444;"></div>
+                        <div class="suite-header">
+                            <h3>Suite Projetista</h3>
+                            <span class="suite-target">Arquitetos & Engenheiros</span>
+                        </div>
+                        <p class="suite-description">Fim dos cliques infinitos. Automatize a inserção, posicionamento e conexão de elementos no Revit.</p>
+                        <ul class="suite-features">
+                            <li>Inserção Inteligente</li>
+                            <li>Conectores Automáticos</li>
+                            <li>Posicionamento de Precisão</li>
+                        </ul>
+                        <div class="suite-pricing">
+                            <span class="price-label">A partir de</span>
+                            <span class="price-value">R$ 99<small>/mês</small></span>
+                        </div>
+                        <a href="#calculadora" class="btn-suite">Simular Ganho</a>
                     </div>
-                    <div class="target-item">
-                        <h3>Para Escritórios de Projeto</h3>
-                        <p>Multiplique sua eficiência produtiva e elimine gargalos técnicos. Construímos ferramentas sob medida para elevar a performance do seu time de projetistas e garantir consistência na entrega dos modelos BIM e CAD.</p>
+
+                    <!-- Suite BIM Manager -->
+                    <div class="suite-card featured" data-suite="bim_manager">
+                        <div class="suite-color-bar" style="background: #f0c040;"></div>
+                        <div class="suite-header">
+                            <h3>Suite BIM Manager</h3>
+                            <span class="suite-target">Gestores & Coordenadores</span>
+                        </div>
+                        <p class="suite-description">Governança sem esforço. Padronize bibliotecas, limpe warnings e execute tarefas em lote.</p>
+                        <ul class="suite-features">
+                            <li>Gestão de Bibliotecas</li>
+                            <li>Processamento em Lote</li>
+                            <li>Auditoria de Parâmetros</li>
+                        </ul>
+                        <div class="suite-pricing">
+                            <span class="price-label">A partir de</span>
+                            <span class="price-value">R$ 149<small>/mês</small></span>
+                        </div>
+                        <a href="#calculadora" class="btn-suite active">Simular Ganho</a>
+                    </div>
+
+                    <!-- Suite Libmaker -->
+                    <div class="suite-card" data-suite="libmaker">
+                        <div class="suite-color-bar" style="background: #44cc88;"></div>
+                        <div class="suite-header">
+                            <h3>Suite Libmaker</h3>
+                            <span class="suite-target">Fabricantes & Especialistas</span>
+                        </div>
+                        <p class="suite-description">Da geometria bruta à família inteligente em minutos. Automatize a criação e validação de conteúdo.</p>
+                        <ul class="suite-features">
+                            <li>Criação Paramétrica</li>
+                            <li>Conversor de Geometria</li>
+                            <li>Validação de Conectores</li>
+                        </ul>
+                        <div class="suite-pricing">
+                            <span class="price-label">A partir de</span>
+                            <span class="price-value">R$ 129<small>/mês</small></span>
+                        </div>
+                        <a href="#calculadora" class="btn-suite">Simular Ganho</a>
                     </div>
                 </div>
             </div>
