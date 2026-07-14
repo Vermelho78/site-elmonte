@@ -958,19 +958,24 @@
 
     .mobile-tab {
       display: none !important;
-      flex-direction: column !important;
-      height: 100% !important;
       width: 100% !important;
-      overflow-y: auto !important;
+      height: 100% !important;
     }
 
     .mobile-tab.active {
-      display: flex !important;
+      display: block !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch !important;
     }
 
     /* Aba mapa ocupa tela cheia com controls no pé */
     #view-map {
       overflow: hidden !important;
+    }
+
+    #view-map.active {
+      display: flex !important;
+      flex-direction: column !important;
     }
 
     #map-area {
