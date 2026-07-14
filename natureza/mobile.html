@@ -1032,7 +1032,7 @@
       -webkit-backdrop-filter: blur(15px) !important;
       border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
       display: grid !important;
-      grid-template-columns: repeat(4, 1fr) !important;
+      grid-template-columns: repeat(3, 1fr) !important;
       z-index: 2000 !important;
       box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4) !important;
     }
@@ -1110,8 +1110,58 @@
         <div id="toast-km"></div>
       </div>
       
+      <!-- Workout Summary Stats (moved from Panel to Map) -->
+      <div id="workout-summary" style="border-top: 1px solid var(--border); padding: 12px 14px 4px; background: var(--bg-card);">
+        <div class="spark-label" style="margin-bottom: 8px;">Resumo Geral do Treino</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.15); border-radius: 6px; padding: 8px 10px;">
+            <div style="font-family: var(--font-hud); font-size: 0.75rem; font-weight: 700; color: var(--c1); letter-spacing: 0.5px; margin-bottom: 4px;">🟡 CANOA 1</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <span style="font-size: 0.65rem; color: var(--text-sec); font-family: var(--font-hud); letter-spacing: 0.5px;">DISTÂNCIA</span>
+              <span id="summary-dist1" style="font-family: var(--font-hud); font-size: 0.9rem; font-weight: 700; color: var(--text);">0.00 km</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.65rem; color: var(--text-sec); font-family: var(--font-hud); letter-spacing: 0.5px;">VEL. MÉDIA</span>
+              <div style="text-align: right;">
+                <span id="summary-avg-spd1" style="font-family: var(--font-hud); font-size: 0.9rem; font-weight: 700; color: var(--text);">0.0 km/h</span>
+                <span id="summary-pace1" style="font-size: 0.65rem; color: var(--text-sec); font-family: var(--font-hud); margin-left: 2px;">(0:00/km)</span>
+              </div>
+            </div>
+          </div>
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 8px 10px;">
+            <div style="font-family: var(--font-hud); font-size: 0.75rem; font-weight: 700; color: var(--c2); letter-spacing: 0.5px; margin-bottom: 4px;">⚪ CANOA 2</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <span style="font-size: 0.65rem; color: var(--text-sec); font-family: var(--font-hud); letter-spacing: 0.5px;">DISTÂNCIA</span>
+              <span id="summary-dist2" style="font-family: var(--font-hud); font-size: 0.9rem; font-weight: 700; color: var(--text);">0.00 km</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.65rem; color: var(--text-sec); font-family: var(--font-hud); letter-spacing: 0.5px;">VEL. MÉDIA</span>
+              <div style="text-align: right;">
+                <span id="summary-avg-spd2" style="font-family: var(--font-hud); font-size: 0.9rem; font-weight: 700; color: var(--text);">0.0 km/h</span>
+                <span id="summary-pace2" style="font-size: 0.65rem; color: var(--text-sec); font-family: var(--font-hud); margin-left: 2px;">(0:00/km)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gap Bar (moved from Panel to Map) -->
+      <div id="gap-bar" style="margin: 6px 14px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 6px 10px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <span id="gap-label" style="font-family: var(--font-hud); font-size: 0.7rem; font-weight: 600; color: var(--text-sec); letter-spacing: 1px;">GAP ENTRE CANOAS</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="gap-value" style="font-family: var(--font-hud); font-size: 0.95rem; font-weight: 700; color: var(--text);">— m</span>
+          <span id="gap-leader" style="font-family: var(--font-hud); font-size: 0.75rem; font-weight: 700; color: var(--accent);">—</span>
+        </div>
+      </div>
+
+      <!-- Sparkline (moved from Panel to Map) -->
+      <div id="sparkline-wrap" style="padding: 6px 14px 10px; background: var(--bg-card); border-bottom: 1px solid var(--border);">
+        <div class="spark-label" style="margin-bottom: 4px;">Velocidade · últimos 60s</div>
+        <svg id="sparkline" style="height: 48px; width: 100%; display: block;"></svg>
+      </div>
+      
       <!-- CONTROLS BAR (inside Map view) -->
-      <div id="controls-bar">
+      <div id="controls-bar" style="background: var(--bg-panel); border-top: 1px solid var(--border); padding: 10px 14px;">
         <div id="timeline-row">
           <span class="time-display" id="time-cur">00:00</span>
           <div id="timeline-track">
@@ -1122,6 +1172,14 @@
           </div>
           <span class="time-display" id="time-tot">00:00</span>
         </div>
+        
+        <!-- Live distance row (below timeline bar) -->
+        <div id="timeline-distances" style="display: flex; justify-content: space-between; font-family: var(--font-hud); font-size: 0.75rem; font-weight: 700; color: var(--text-sec); margin-top: 4px; padding: 0 4px; margin-bottom: 4px;">
+          <span id="dist-cur-c1" style="color: var(--c1);">🟡 C1: 0.00 km</span>
+          <span id="dist-cur-gap" style="color: var(--accent);">GAP: 0.0 m</span>
+          <span id="dist-cur-c2" style="color: var(--c2);">⚪ C2: 0.00 km</span>
+        </div>
+
         <div id="buttons-row">
           <button class="ctrl-btn" onclick="jumpSec(-10)" title="Recuar 10s">⏮ 10s</button>
           <button class="ctrl-btn" id="btn-play" onclick="togglePlay()">▶</button>
@@ -1143,15 +1201,16 @@
       </div>
     </div>
 
-    <!-- TAB: PAINEL / HUD -->
+    <!-- TAB: PAINEL / HUD (including Overview, HUD, and Charts) -->
     <div id="view-hud" class="mobile-tab" style="padding: 16px;">
-      <!-- Minimap (General overview map at top of Panel tab) -->
+      <!-- Minimap (General overview map) -->
       <div id="minimap-wrap" style="height: 180px; margin-bottom: 16px; position: relative;">
         <div id="map-overview" style="height: 100%; border-radius: 8px;"></div>
         <div class="minimap-label">VISÃO GERAL</div>
       </div>
+      
       <!-- HUD Cards -->
-      <div id="hud" style="margin-bottom: 16px;">
+      <div id="hud" style="margin-bottom: 20px;">
         <div class="hud-cards" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="hud-card c1" id="hud-card-c1">
             <div class="hud-title">🟡 CANOA 1</div>
@@ -1166,62 +1225,22 @@
             <div class="hud-dist" id="hud-dist2">0.00 km</div>
           </div>
         </div>
-        <div id="gap-bar" style="margin-top: 10px;">
-          <span id="gap-label">GAP</span>
-          <span id="gap-value">— m</span>
-          <span id="gap-leader">—</span>
-        </div>
       </div>
-      <!-- Sparkline -->
-      <div id="sparkline-wrap" style="margin-bottom: 16px;">
-        <div class="spark-label">Velocidade · últimos 60s</div>
-        <svg id="sparkline"></svg>
-      </div>
-      <!-- Workout Summary Stats -->
-      <div id="workout-summary" style="border-top: 1px solid var(--border); padding-top: 16px;">
-        <div class="spark-label" style="margin-bottom: 10px;">Resumo Geral do Treino</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.15); border-radius: 6px; padding: 10px;">
-            <div style="font-family: var(--font-hud); font-size: 0.75rem; font-weight: 700; color: var(--c1); letter-spacing: 0.5px; margin-bottom: 6px;">🟡 CANOA 1</div>
-            <div style="margin-bottom: 4px;">
-              <span style="font-size: 0.7rem; color: var(--text-sec); display: block; font-family: var(--font-hud); letter-spacing: 0.5px;">DISTÂNCIA TOTAL</span>
-              <span id="summary-dist1" style="font-family: var(--font-hud); font-size: 1.05rem; font-weight: 700; color: var(--text);">0.00 km</span>
-            </div>
-            <div>
-              <span style="font-size: 0.7rem; color: var(--text-sec); display: block; font-family: var(--font-hud); letter-spacing: 0.5px;">VELOCIDADE MÉDIA</span>
-              <span id="summary-avg-spd1" style="font-family: var(--font-hud); font-size: 1.05rem; font-weight: 700; color: var(--text);">0.0 km/h</span>
-              <div id="summary-pace1" style="font-size: 0.7rem; color: var(--text-sec); font-family: var(--font-hud); margin-top: 2px;">(0:00/km)</div>
-            </div>
-          </div>
-          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 10px;">
-            <div style="font-family: var(--font-hud); font-size: 0.75rem; font-weight: 700; color: var(--c2); letter-spacing: 0.5px; margin-bottom: 6px;">⚪ CANOA 2</div>
-            <div style="margin-bottom: 4px;">
-              <span style="font-size: 0.7rem; color: var(--text-sec); display: block; font-family: var(--font-hud); letter-spacing: 0.5px;">DISTÂNCIA TOTAL</span>
-              <span id="summary-dist2" style="font-family: var(--font-hud); font-size: 1.05rem; font-weight: 700; color: var(--text);">0.00 km</span>
-            </div>
-            <div>
-              <span style="font-size: 0.7rem; color: var(--text-sec); display: block; font-family: var(--font-hud); letter-spacing: 0.5px;">VELOCIDADE MÉDIA</span>
-              <span id="summary-avg-spd2" style="font-family: var(--font-hud); font-size: 1.05rem; font-weight: 700; color: var(--text);">0.0 km/h</span>
-              <div id="summary-pace2" style="font-size: 0.7rem; color: var(--text-sec); font-family: var(--font-hud); margin-top: 2px;">(0:00/km)</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- TAB: GRÁFICOS -->
-    <div id="view-charts" class="mobile-tab" style="padding: 16px;">
-      <div style="font-family: var(--font-hud); font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        <span>ANÁLISE DE GRÁFICOS</span>
-      </div>
-      <div class="chart-block" style="margin-bottom: 20px;">
-        <div class="chart-title">Velocidade × Tempo (km/h)</div>
-        <div class="chart-wrap" style="height: 200px;"><canvas id="speed-chart"></canvas></div>
-      </div>
-      <div class="chart-block">
-        <div class="chart-title">Gap entre Canoas (metros)</div>
-        <div class="chart-wrap" style="height: 200px;"><canvas id="gap-chart"></canvas></div>
+      <!-- Charts (Moved from View Charts to Panel tab) -->
+      <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="font-family: var(--font-hud); font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>ANÁLISE DE GRÁFICOS</span>
+        </div>
+        <div class="chart-block" style="margin-bottom: 20px;">
+          <div class="chart-title">Velocidade × Tempo (km/h)</div>
+          <div class="chart-wrap" style="height: 200px;"><canvas id="speed-chart"></canvas></div>
+        </div>
+        <div class="chart-block" style="margin-bottom: 10px;">
+          <div class="chart-title">Gap entre Canoas (metros)</div>
+          <div class="chart-wrap" style="height: 200px;"><canvas id="gap-chart"></canvas></div>
+        </div>
       </div>
     </div>
 
@@ -1261,10 +1280,6 @@
     <button class="nav-item" id="btn-nav-hud" onclick="switchTabMobile('hud')">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
       <span>Painel</span>
-    </button>
-    <button class="nav-item" id="btn-nav-charts" onclick="switchTabMobile('charts')">
-      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>Gráficos</span>
     </button>
     <button class="nav-item" id="btn-nav-splits" onclick="switchTabMobile('splits')">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -1326,6 +1341,7 @@ let speedChart   = null;
 let gapChart     = null;
 let prevLeaderC1 = null;
 let prevKmPassed = 0;
+let splitsData   = [];
 
 let trD1 = [];
 let trD2 = [];
@@ -1768,27 +1784,34 @@ function updateFrameTime(timeMs) {
 
   prevLeaderC1 = leadC1;
 
-  // 9. Detect km checkpoint pass
-  if (isPlaying) {
-    const kmPassed = cpIndices.filter(ci => ci <= idx).length;
-    if (kmPassed > prevKmPassed) {
-      showKmToast(`✓ km ${kmPassed}`);
-      prevKmPassed = kmPassed;
-    }
+  // 9. Persistent km checkpoint splits pass
+  const currentKm = Math.floor(dist1 / 1000);
+  const toastKm = document.getElementById('toast-km');
+  if (currentKm > 0 && splitsData[currentKm]) {
+    const data = splitsData[currentKm];
+    toastKm.textContent = `KM ${currentKm} · C1: ${data.spd1} | C2: ${data.spd2}`;
+    toastKm.classList.add('show');
+  } else {
+    toastKm.classList.remove('show');
   }
 
-  // 10. Timeline fill
+  // 10. Timeline fill & current real-time distance HUD update
   const totalMs = (D.length - 1) * 2000;
   const pct = timeMs / totalMs;
   document.getElementById('timeline-fill').style.width = `${pct * 100}%`;
   document.getElementById('timeline-handle').style.left = `${pct * 100}%`;
   document.getElementById('time-cur').textContent = fmtDur(Math.floor(timeMs / 1000));
+  
+  // Real-time timeline distances
+  document.getElementById('dist-cur-c1').textContent = `🟡 C1: ${(dist1/1000).toFixed(2)} km`;
+  document.getElementById('dist-cur-c2').textContent = `⚪ C2: ${(dist2/1000).toFixed(2)} km`;
+  document.getElementById('dist-cur-gap').textContent = `GAP: ${gapM} m`;
 
   // 11. Sparkline (uses base idx)
   updateSparkline(idx);
 
-  // 12. Charts cursor (if visible)
-  if (activeView === 'charts') {
+  // 12. Charts cursor (updated if Panel/HUD tab is active)
+  if (activeView === 'hud') {
     speedChart && speedChart.update('none');
     gapChart   && gapChart.update('none');
   }
@@ -1987,26 +2010,25 @@ function switchTabMobile(tabId) {
     }, 50);
   }
 
-  // Redraw do Leaflet Overview Map quando abrir o Painel
-  if (tabId === 'hud' && mapOverview) {
-    setTimeout(() => {
-      mapOverview.invalidateSize();
-      if (D && D.length > 0) {
-        const allC1 = D.map(p => [p.la1, p.lo1]);
-        const allC2 = D.map(p => [p.la2, p.lo2]);
-        mapOverview.fitBounds(L.latLngBounds([...allC1, ...allC2]), { padding: [12, 12] });
-      }
-    }, 100);
-  }
-
-  // Redraw dos Gráficos Chart.js quando abrir
-  if (tabId === 'charts') {
+  // Redraw do Leaflet Overview Map e Gráficos Chart.js quando abrir o Painel
+  if (tabId === 'hud') {
+    if (mapOverview) {
+      setTimeout(() => {
+        mapOverview.invalidateSize();
+        if (D && D.length > 0) {
+          const allC1 = D.map(p => [p.la1, p.lo1]);
+          const allC2 = D.map(p => [p.la2, p.lo2]);
+          mapOverview.fitBounds(L.latLngBounds([...allC1, ...allC2]), { padding: [12, 12] });
+        }
+      }, 100);
+    }
+    // Redraw dos Gráficos Chart.js (que agora residem no Painel)
     setTimeout(() => {
       speedChart?.resize();
       gapChart?.resize();
       speedChart?.update('none');
       gapChart?.update('none');
-    }, 50);
+    }, 150);
   }
 }
 
@@ -2126,6 +2148,12 @@ function renderSplitsTable() {
         badgeC2 = spd >= 10.5 ? 'pace-fast' : (spd >= 8.5 ? 'pace-med' : 'pace-slow');
       }
     }
+
+    // Cache splits speeds globally
+    splitsData[i] = {
+      spd1: spdStr1,
+      spd2: spdStr2
+    };
 
     // Determinar o rótulo do trecho
     let label = `km ${i}`;
