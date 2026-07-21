@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIBE Natureza · OC6 Race Viewer · Treino #02</title>
-  <meta name="description" content="Animação interativa do treino OC6 de 12 de julho de 2026 — VIBE Natureza. Acompanhe as duas canoas em tempo real com HUD de telemetria, gráficos de velocidade e efeitos de arrasto na água.">
+  <title>VIBE Natureza · OC6 · Treino #03</title>
+  <meta name="description" content="Animação interativa do treino OC6 de 19 de julho de 2026 — VIBE Natureza. Acompanhe as duas canoas em tempo real com HUD de telemetria, gráficos de velocidade e efeitos de arrasto na água.">
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -466,12 +466,6 @@
     }
 
     /* Sparkline */
-    #sparkline-wrap {
-      padding: 10px 12px;
-      flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-    }
-
     .spark-label {
       font-family: var(--font-hud);
       font-size: 0.6rem;
@@ -480,12 +474,6 @@
       color: var(--text-muted);
       text-transform: uppercase;
       margin-bottom: 4px;
-    }
-
-    #sparkline {
-      width: 100%;
-      height: 56px;
-      display: block;
     }
 
     /* Charts view */
@@ -610,6 +598,67 @@
       letter-spacing: 0.5px;
     }
     .pf-share-btn:hover { background: rgba(6,182,212,0.25); box-shadow: 0 0 12px var(--border-glow); }
+
+    /* Scale control 20px higher & Heatmap Legend */
+    .leaflet-bottom.leaflet-left .leaflet-control-scale {
+      margin-bottom: 24px !important;
+    }
+    .heatmap-legend {
+      position: absolute;
+      bottom: 24px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(10, 16, 26, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-family: var(--font-hud);
+      font-size: 10px;
+      color: var(--text-sec);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      pointer-events: auto;
+    }
+    .legend-title {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+    }
+    .legend-bar {
+      display: flex;
+      gap: 2px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .legend-step {
+      padding: 2px 5px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 8.5px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+    .legend-unit {
+      font-size: 8px;
+      color: var(--text-muted);
+      text-align: right;
+      margin-top: 2px;
+    }
+
+    .lap-tooltip {
+      background-color: #064e3b !important;
+      border: 1px solid #10b981 !important;
+      color: #fff !important;
+      font-family: var(--font-hud);
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 4px;
+      padding: 2px 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
 
     /* ================================================================
        CONTROLS BAR
@@ -1084,7 +1133,7 @@
     <div class="header-left">
       <span class="header-badge">🏄 VIBE NATUREZA</span>
       <h1>OC6 Race Viewer</h1>
-      <span class="header-sub">Treino #02 · 12 Jul 2026</span>
+      <span class="header-sub">Treino #03 · 19 Jul 2026</span>
     </div>
     <div class="header-right">
       <button class="icon-btn" onclick="toggleFullscreen()" title="Tela cheia">⛶</button>
@@ -1104,6 +1153,19 @@
         <div id="map-overlay-top">
           <button class="canoe-follow-btn active" id="btn-follow-c1" onclick="setFollow(1)">🟡 C1 CANOA 1</button>
           <button class="canoe-follow-btn" id="btn-follow-c2" onclick="setFollow(2)">⚪ C2 CANOA 2</button>
+        </div>
+        <!-- Legenda do Heatmap -->
+        <div class="heatmap-legend">
+          <div class="legend-title">HEATMAP DE VELOCIDADE</div>
+          <div class="legend-bar">
+            <span class="legend-step" style="background:#3b82f6;" title="< 3.0 km/h">&lt;3</span>
+            <span class="legend-step" style="background:#06b6d4;" title="3.0 - 6.0 km/h">3-6</span>
+            <span class="legend-step" style="background:#10b981;" title="6.0 - 8.5 km/h">6-8.5</span>
+            <span class="legend-step" style="background:#f59e0b;" title="8.5 - 10.5 km/h">8.5-10.5</span>
+            <span class="legend-step" style="background:#f97316;" title="10.5 - 12.5 km/h">10.5-12.5</span>
+            <span class="legend-step" style="background:#ef4444;" title="> 12.5 km/h">&gt;12.5</span>
+          </div>
+          <div class="legend-unit">km/h</div>
         </div>
         <!-- Toasts -->
         <div id="toast"></div>
@@ -1154,11 +1216,7 @@
         </div>
       </div>
 
-      <!-- Sparkline (moved from Panel to Map) -->
-      <div id="sparkline-wrap" style="padding: 6px 14px 10px; background: var(--bg-card); border-bottom: 1px solid var(--border);">
-        <div class="spark-label" style="margin-bottom: 4px;">Velocidade · últimos 60s</div>
-        <svg id="sparkline" style="height: 48px; width: 100%; display: block;"></svg>
-      </div>
+
       
       <!-- CONTROLS BAR (inside Map view) -->
       <div id="controls-bar" style="background: var(--bg-panel); border-top: 1px solid var(--border); padding: 10px 14px;">
@@ -1248,7 +1306,7 @@
     <div id="view-splits" class="mobile-tab" style="padding: 16px;">
       <div style="font-family: var(--font-hud); font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>TABELA DETALHADA DE SPLITS</span>
+        <span>TABELA DE PACE POR KM</span>
       </div>
       <p style="font-size: 0.8rem; color: var(--text-sec); margin-bottom: 16px; line-height: 1.4;">
         Ritmo (Pace em min/km) e velocidade média das canoas a cada 1 km do percurso.
@@ -1283,7 +1341,7 @@
     </button>
     <button class="nav-item" id="btn-nav-splits" onclick="switchTabMobile('splits')">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>Splits</span>
+      <span>Pace</span>
     </button>
   </div>
 
@@ -1305,17 +1363,21 @@
    CONSTANTS
 ================================================================ */
 const CHECKPOINTS = [
-  {km:1,  lat:-27.476985, lon:-48.541572},
-  {km:2,  lat:-27.468403, lon:-48.544459},
-  {km:3,  lat:-27.459684, lon:-48.546597},
-  {km:4,  lat:-27.464782, lon:-48.552496},
-  {km:5,  lat:-27.47033,  lon:-48.560392},
-  {km:6,  lat:-27.477941, lon:-48.565079},
-  {km:7,  lat:-27.486662, lon:-48.567177},
-  {km:8,  lat:-27.495362, lon:-48.567861},
-  {km:9,  lat:-27.491647, lon:-48.558866},
-  {km:10, lat:-27.489188, lon:-48.549187},
-  {km:11, lat:-27.486066, lon:-48.53988}
+  {km: 1, lat: -27.4293163, lon: -48.4942182},
+  {km: 2, lat: -27.4232076, lon: -48.4869318},
+  {km: 3, lat: -27.4162104, lon: -48.4809705},
+  {km: 4, lat: -27.4158768, lon: -48.4748374},
+  {km: 5, lat: -27.4229909, lon: -48.4805027},
+  {km: 6, lat: -27.4297441, lon: -48.4868928},
+  {km: 7, lat: -27.4345551, lon: -48.4947159},
+  {km: 8, lat: -27.4338933, lon: -48.5012503},
+  {km: 9, lat: -27.4275268, lon: -48.4943684},
+  {km: 10, lat: -27.4216262, lon: -48.486983},
+  {km: 11, lat: -27.4155481, lon: -48.4797205},
+  {km: 12, lat: -27.4173782, lon: -48.4753811},
+  {km: 13, lat: -27.4240091, lon: -48.4816349},
+  {km: 14, lat: -27.4304631, lon: -48.4882672},
+  {km: 15, lat: -27.4339808, lon: -48.4965249}
 ];
 const STEP_MS   = 2000;   // data interval
 const TILE_URL  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
@@ -1353,6 +1415,7 @@ let tr1o = null, tr2o = null; // polylines overview map
 
 let mapDetail   = null;
 let mapOverview = null;
+let canvasRenderer = null;
 
 // Haversine formula
 function haversine(la1, lo1, la2, lo2) {
@@ -1373,18 +1436,125 @@ function fmtDur(sec) {
 }
 
 async function loadData() {
-  setLoadMsg('Carregando dados simplificados...');
-  setLoadMsg('Calculando distâncias e checkpoints...');
+  setLoadMsg('Carregando telemetria EKF e dados de Gap...');
+  const [data1, data2, dataGap] = await Promise.all([
+    fetch('jsons/canoa1_oc6_posicoes_ekf.json').then(r => {
+      if (!r.ok) throw new Error('Erro ao carregar canoa1_oc6_posicoes_ekf.json');
+      return r.json();
+    }),
+    fetch('jsons/canoa2_oc6_posicoes_ekf.json').then(r => {
+      if (!r.ok) throw new Error('Erro ao carregar canoa2_oc6_posicoes_ekf.json');
+      return r.json();
+    }),
+    fetch('jsons/gap_canoas_oc6.json').then(r => {
+      if (!r.ok) throw new Error('Erro ao carregar gap_canoas_oc6.json');
+      return r.json();
+    })
+  ]);
+
+  const c1Tele = data1.telemetria || [];
+  const c2Tele = data2.telemetria || [];
+  const gapTele = dataGap.telemetria || [];
+
+  if (!c1Tele.length || !c2Tele.length) {
+    throw new Error('Arquivos de telemetria vazios ou inválidos.');
+  }
+
+  setLoadMsg('Processando dados e eliminando intervalo de pausa (44min - 47min)...');
+
+  const map1 = new Map();
+  c1Tele.forEach(pt => map1.set(pt.timestamp_ms, pt));
+
+  const map2 = new Map();
+  c2Tele.forEach(pt => map2.set(pt.timestamp_ms, pt));
+
+  const gapMap = new Map();
+  gapTele.forEach(pt => gapMap.set(pt.timestamp_ms, pt.gap_m));
+
+  const tMin = Math.max(c1Tele[0].timestamp_ms, c2Tele[0].timestamp_ms);
+  const tMax = Math.min(c1Tele[c1Tele.length - 1].timestamp_ms, c2Tele[c2Tele.length - 1].timestamp_ms);
+
+  D = [];
+  const STEP_MS = 1000;
+
+  let last1 = c1Tele[0];
+  let last2 = c2Tele[0];
+
+  let cumDist1 = 0;
+  let cumDist2 = 0;
+  let prevPt1 = null;
+  let prevPt2 = null;
+
+  let animT = 0;
+
+  for (let tMs = tMin; tMs <= tMax; tMs += STEP_MS) {
+    const p1 = map1.get(tMs) || last1;
+    const p2 = map2.get(tMs) || last2;
+    last1 = p1;
+    last2 = p2;
+
+    const secFromStart = (tMs - tMin) / 1000.0;
+    const spd1Kmh = (p1.velocidade_ms || 0) * 3.6;
+    const spd2Kmh = (p2.velocidade_ms || 0) * 3.6;
+
+    // Eliminar pausa entre voltas (entre 44min / 2640s e 46min 40s / 2800s com velocidade < 1.8 km/h)
+    if (secFromStart >= 2640 && secFromStart <= 2800 && spd1Kmh < 1.8 && spd2Kmh < 1.8) {
+      continue;
+    }
+
+    const la1 = p1.posicao_cg[0];
+    const lo1 = p1.posicao_cg[1];
+    const pla1 = p1.bancos && p1.bancos.banco_6 ? p1.bancos.banco_6[0] : la1;
+    const plo1 = p1.bancos && p1.bancos.banco_6 ? p1.bancos.banco_6[1] : lo1;
+    const h1 = p1.direcao_movimento_deg !== undefined ? p1.direcao_movimento_deg : (p1.heading_deg || 0);
+    const s1 = p1.velocidade_ms !== undefined ? p1.velocidade_ms : 0;
+
+    const la2 = p2.posicao_cg[0];
+    const lo2 = p2.posicao_cg[1];
+    const pla2 = p2.bancos && p2.bancos.banco_6 ? p2.bancos.banco_6[0] : la2;
+    const plo2 = p2.bancos && p2.bancos.banco_6 ? p2.bancos.banco_6[1] : lo2;
+    const h2 = p2.direcao_movimento_deg !== undefined ? p2.direcao_movimento_deg : (p2.heading_deg || 0);
+    const s2 = p2.velocidade_ms !== undefined ? p2.velocidade_ms : 0;
+
+    if (prevPt1) {
+      cumDist1 += haversine(prevPt1[0], prevPt1[1], la1, lo1);
+    }
+    if (prevPt2) {
+      cumDist2 += haversine(prevPt2[0], prevPt2[1], la2, lo2);
+    }
+
+    prevPt1 = [la1, lo1];
+    prevPt2 = [la2, lo2];
+
+    // Obter gap pré-calculado do arquivo JSON, senão haversine centro-a-centro instantâneo
+    const cd = gapMap.get(tMs) !== undefined ? gapMap.get(tMs) : haversine(la1, lo1, la2, lo2);
+
+    D.push({
+      t: animT,
+      timestamp_ms: tMs,
+      timestamp_iso: p1.timestamp_iso || p2.timestamp_iso,
+      la1, lo1, pla1, plo1,
+      h1: +h1.toFixed(2),
+      s1: +s1.toFixed(3),
+      dist1: +cumDist1.toFixed(1),
+      la2, lo2, pla2, plo2,
+      h2: +h2.toFixed(2),
+      s2: +s2.toFixed(3),
+      dist2: +cumDist2.toFixed(1),
+      cd: +cd.toFixed(1)
+    });
+
+    animT += STEP_MS;
+  }
+
+  setLoadMsg('Calculando distâncias acumuladas e checkpoints...');
   computeDistances();
   computeCpIndices();
 }
 
 function computeDistances() {
-  distC1 = [0]; distC2 = [0];
-  for (let i = 1; i < D.length; i++) {
-    distC1.push(distC1[i-1] + haversine(D[i-1].la1, D[i-1].lo1, D[i].la1, D[i].lo1));
-    distC2.push(distC2[i-1] + haversine(D[i-1].la2, D[i-1].lo2, D[i].la2, D[i].lo2));
-  }
+  distC1 = D.map(p => p.dist1);
+  distC2 = D.map(p => p.dist2);
 }
 
 function computeCpIndices() {
@@ -1404,7 +1574,7 @@ function computeCpIndices() {
 function makeCanoeIcon(color, stroke, id) {
   const html = `
     <div class="canoe-container-icon" style="position: relative; overflow: visible;">
-      <svg class="canoe-svg" viewBox="-70 -35 140 70" width="140" height="70" overflow="visible" style="position: absolute;">
+      <svg class="canoe-svg" viewBox="-70 -35 140 70" width="140" height="70" overflow="visible" style="position: absolute; left: -70px; top: -35px; transform-origin: center;">
         <path d="M -24 0 C -15 -1.8,15 -1.8,24 0 C 15 1.8,-15 1.8,-24 0 Z"
               fill="${color}" stroke="${stroke}" stroke-width="1.2"/>
         <path d="M 24 0 C 20 -1.5,20 1.5,24 0 Z" fill="#fff" opacity="0.9"/>
@@ -1418,14 +1588,95 @@ function makeCanoeIcon(color, stroke, id) {
   return L.divIcon({ html, className: 'canoe-icon-wrap', iconSize: [0,0], iconAnchor: [0,0] });
 }
 
-function updateWake(markerEl, speed, color) {
-  // Wake animation removed as requested by the user
+function getSpeedColor(spdKmh) {
+  if (spdKmh < 3.0) return '#3b82f6';
+  if (spdKmh < 6.0) return '#06b6d4';
+  if (spdKmh < 8.5) return '#10b981';
+  if (spdKmh < 10.5) return '#f59e0b';
+  if (spdKmh < 12.5) return '#f97316';
+  return '#ef4444';
+}
+
+const LAP1_LIMIT = 2640;
+
+function updateHeatTrail(group, dataArray, maxIdx, getLat, getLng, getSpeed) {
+  if (!group || !canvasRenderer) return;
+  group.clearLayers();
+  if (maxIdx < 1) return;
+  
+  let currentSegment = [];
+  let currentColor = null;
+  let currentOpacity = 0.85;
+
+  for (let i = 0; i <= maxIdx; i++) {
+    const pt = dataArray[i];
+    const lat = getLat(pt);
+    const lng = getLng(pt);
+    const spdKmh = getSpeed(pt) * 3.6;
+    const color = getSpeedColor(spdKmh);
+    const ptOpacity = (maxIdx >= LAP1_LIMIT && i < LAP1_LIMIT) ? 0.20 : 0.85;
+
+    if (currentColor === null) {
+      currentColor = color;
+      currentOpacity = ptOpacity;
+      currentSegment.push([lat, lng]);
+    } else if (color === currentColor && ptOpacity === currentOpacity) {
+      currentSegment.push([lat, lng]);
+    } else {
+      currentSegment.push([lat, lng]);
+      L.polyline(currentSegment, {
+        color: currentColor,
+        weight: 3.0,
+        opacity: currentOpacity,
+        lineCap: 'round',
+        lineJoin: 'round',
+        renderer: canvasRenderer
+      }).addTo(group);
+      
+      currentSegment = [[lat, lng]];
+      currentColor = color;
+      currentOpacity = ptOpacity;
+    }
+  }
+  if (currentSegment.length > 1) {
+    L.polyline(currentSegment, {
+      color: currentColor,
+      weight: 3.0,
+      opacity: currentOpacity,
+      lineCap: 'round',
+      lineJoin: 'round',
+      renderer: canvasRenderer
+    }).addTo(group);
+  }
+}
+
+function updateCanoeScaleAndRotation(markerEl, heading) {
+  if (!markerEl || !mapDetail) return;
+  const svg = markerEl.querySelector('.canoe-svg');
+  if (!svg) return;
+  
+  const z = mapDetail.getZoom();
+  const lat = mapDetail.getCenter().lat;
+  
+  // Real meters per pixel formula at current latitude:
+  const metersPerPx = (156543.03392 * Math.cos(lat * Math.PI / 180)) / Math.pow(2, z);
+  
+  // Real physical length of OC6 canoe: 13.71 meters
+  const minPhysicalMeters = 13.71;
+  const targetPx = minPhysicalMeters / metersPerPx;
+  const baseSvgPx = 48;
+  
+  let scale = targetPx / baseSvgPx;
+  if (scale < 0.65) scale = 0.65;
+  
+  // O SVG da canoa por padrão aponta para a direita (90° / Leste).
+  // Subtraímos 90° para alinhar o vetor de proa ao azimute da bússola (0° = Norte).
+  const rotateDeg = heading - 90;
+  svg.style.transform = `scale(${scale.toFixed(4)}) rotate(${rotateDeg.toFixed(2)}deg)`;
 }
 
 function rotateCanoe(markerEl, heading) {
-  if (!markerEl) return;
-  const svg = markerEl.querySelector('.canoe-svg');
-  if (svg) svg.style.transform = `rotate(${heading}deg)`;
+  updateCanoeScaleAndRotation(markerEl, heading);
 }
 
 /* ================================================================
@@ -1457,11 +1708,19 @@ function setupMaps() {
   // Detail map
   mapDetail = L.map('map-detail', {
     center: [D[0].la1, D[0].lo1],
-    zoom: 17,
+    zoom: 18,
+    maxZoom: 22,
     zoomControl: true,
     attributionControl: true,
     layers: [satelliteTiles] // Default map layer: Satélite
   });
+
+  // Régua de Escala do Leaflet (métrico no canto inferior esquerdo)
+  L.control.scale({
+    metric: true,
+    imperial: false,
+    position: 'bottomleft'
+  }).addTo(mapDetail);
 
   // Layer control
   const baseLayers = {
@@ -1479,15 +1738,34 @@ function setupMaps() {
       .addTo(mapDetail);
   });
 
+  // Marcadores de início das voltas (Largadas)
+  L.circleMarker([-27.4353854, -48.5015886], {
+    radius: 9, color: '#10B981', fillColor: '#064e3b', fillOpacity: 0.9, weight: 2
+  }).bindTooltip("Início da Volta 1", { permanent: true, direction: 'top', className: 'lap-tooltip' })
+    .addTo(mapDetail);
+
+  L.circleMarker([-27.4351474, -48.5022698], {
+    radius: 9, color: '#10B981', fillColor: '#064e3b', fillOpacity: 0.9, weight: 2
+  }).bindTooltip("Início da Volta 2", { permanent: true, direction: 'bottom', className: 'lap-tooltip' })
+    .addTo(mapDetail);
+
   // Canoe markers on detail map (passing id 1 and 2 to draw speed label)
   const ic1 = makeCanoeIcon('#F59E0B', '#D97706', 1);
   const ic2 = makeCanoeIcon('#FFFFFF', '#CCCCCC', 2);
   mc1d = L.marker([D[0].la1, D[0].lo1], { icon: ic1, zIndexOffset: 1000 }).addTo(mapDetail);
   mc2d = L.marker([D[0].la2, D[0].lo2], { icon: ic2, zIndexOffset: 999  }).addTo(mapDetail);
 
-  // Trails on detail map - weight 1.5 (fine lines) and 0.85 opacity (clear)
-  tr1d = L.polyline([], { color: '#F59E0B', weight: 1.5, opacity: 0.85 }).addTo(mapDetail);
-  tr2d = L.polyline([], { color: '#FFFFFF', weight: 1.5, opacity: 0.85 }).addTo(mapDetail);
+  // Canvas Renderer para Heatmap fluido
+  canvasRenderer = L.canvas({ padding: 0.5 });
+
+  // Layer Groups para Heatmaps de Velocidade partindo da Popa (banco_6)
+  tr1d = L.layerGroup().addTo(mapDetail);
+  tr2d = L.layerGroup().addTo(mapDetail);
+
+  mapDetail.on('zoomend zoom', () => {
+    if (mc1d && D && D[currentIndex]) rotateCanoe(mc1d.getElement(), D[currentIndex].h1);
+    if (mc2d && D && D[currentIndex]) rotateCanoe(mc2d.getElement(), D[currentIndex].h2);
+  });
 
   // Overview map
   mapOverview = L.map('map-overview', {
@@ -1511,6 +1789,15 @@ function setupMaps() {
       radius: 5, color: '#06B6D4', fillColor: '#070e1a', fillOpacity: 1, weight: 1.5
     }).addTo(mapOverview);
   });
+
+  // Marcadores de início das voltas no mapa visão geral
+  L.circleMarker([-27.4353854, -48.5015886], {
+    radius: 5, color: '#10B981', fillColor: '#070e1a', fillOpacity: 1, weight: 1.5
+  }).addTo(mapOverview);
+
+  L.circleMarker([-27.4351474, -48.5022698], {
+    radius: 5, color: '#10B981', fillColor: '#070e1a', fillOpacity: 1, weight: 1.5
+  }).addTo(mapOverview);
 
   // Canoe dot markers on overview
   mc1o = L.circleMarker([D[0].la1, D[0].lo1], {
@@ -1547,6 +1834,23 @@ const cursorPlugin = {
   }
 };
 
+// Suavização por média móvel simples
+function movingAverage(data, windowSize = 9) {
+  let result = [];
+  for (let i = 0; i < data.length; i++) {
+    let sum = 0, count = 0;
+    for (let w = -Math.floor(windowSize/2); w <= Math.floor(windowSize/2); w++) {
+      let idx = i + w;
+      if (idx >= 0 && idx < data.length) {
+        sum += data[idx];
+        count++;
+      }
+    }
+    result.push(+(sum / count).toFixed(2));
+  }
+  return result;
+}
+
 // We wrap Chart creations to handle potential errors in setup
 function setupCharts() {
   try {
@@ -1555,9 +1859,11 @@ function setupCharts() {
     console.warn("Cursor plugin already registered");
   }
 
-  const labels = D.map((_, i) => i * 2);
-  const spd1   = D.map(p => +(p.s1 * 3.6).toFixed(2));
-  const spd2   = D.map(p => +(p.s2 * 3.6).toFixed(2));
+  const labels = D.map((_, i) => i);
+  const spd1Raw = D.map(p => +(p.s1 * 3.6).toFixed(2));
+  const spd2Raw = D.map(p => +(p.s2 * 3.6).toFixed(2));
+  const spd1 = movingAverage(spd1Raw, 9);
+  const spd2 = movingAverage(spd2Raw, 9);
   const gaps   = D.map(p => +p.cd.toFixed(1));
 
   const commonOpts = {
@@ -1588,11 +1894,37 @@ function setupCharts() {
     data: {
       labels,
       datasets: [
-        { label: 'Canoa 1', data: spd1, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true },
-        { label: 'Canoa 2', data: spd2, borderColor: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }
+        { label: 'Canoa 1', data: spd1, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: true },
+        { label: 'Canoa 2', data: spd2, borderColor: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: true }
       ]
     },
-    options: { ...commonOpts }
+    options: {
+      ...commonOpts,
+      plugins: {
+        ...commonOpts.plugins,
+        tooltip: {
+          callbacks: {
+            title: function(context) {
+              const idx = Math.round(context[0].raw !== undefined ? context[0].dataIndex : context[0].parsed.x);
+              const pt = D[idx];
+              return pt ? `Tempo: ${fmtDur(Math.floor((pt.t - D[0].t) / 1000))}` : '';
+            },
+            label: function(context) {
+              const idx = context.dataIndex;
+              const pt = D[idx];
+              if (!pt) return '';
+              const label = context.dataset.label;
+              const val = context.parsed.y.toFixed(1);
+              const dist = label === 'Canoa 1' ? pt.dist1 : pt.dist2;
+              return [
+                `${label}: ${val} km/h`,
+                `Distância: ${(dist/1000).toFixed(2)} km`
+              ];
+            }
+          }
+        }
+      }
+    }
   });
 
   gapChart = new Chart(document.getElementById('gap-chart'), {
@@ -1602,10 +1934,35 @@ function setupCharts() {
       datasets: [{
         label: 'Gap (m)', data: gaps,
         borderColor: '#06B6D4', backgroundColor: 'rgba(6,182,212,0.08)',
-        borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true
+        borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: true
       }]
     },
-    options: { ...commonOpts }
+    options: {
+      ...commonOpts,
+      plugins: {
+        ...commonOpts.plugins,
+        tooltip: {
+          callbacks: {
+            title: function(context) {
+              const idx = Math.round(context[0].raw !== undefined ? context[0].dataIndex : context[0].parsed.x);
+              const pt = D[idx];
+              return pt ? `Tempo: ${fmtDur(Math.floor((pt.t - D[0].t) / 1000))}` : '';
+            },
+            label: function(context) {
+              const idx = context.dataIndex;
+              const pt = D[idx];
+              if (!pt) return '';
+              const val = context.parsed.y.toFixed(1);
+              return [
+                `Gap: ${val} m`,
+                `Dist. C1: ${(pt.dist1/1000).toFixed(2)} km`,
+                `Dist. C2: ${(pt.dist2/1000).toFixed(2)} km`
+              ];
+            }
+          }
+        }
+      }
+    }
   });
 }
 
@@ -1622,7 +1979,7 @@ function setupTimeline() {
   function getMs(e) {
     const rect = track.getBoundingClientRect();
     const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    return pct * (D.length - 1) * 2000;
+    return pct * (D.length - 1) * 1000;
   }
 
   track.addEventListener('mousedown', e => { dragging = true; seekToTime(getMs(e)); });
@@ -1642,7 +1999,7 @@ function setupTimeline() {
     mark.className = 'tl-cp-mark';
     mark.style.left = `${pct * 100}%`;
     mark.title = `km ${CHECKPOINTS[i].km}`;
-    mark.addEventListener('click', e => { e.stopPropagation(); seekToTime(idx * 2000); });
+    mark.addEventListener('click', e => { e.stopPropagation(); seekToTime(idx * 1000); });
     cpCont.appendChild(mark);
   });
 }
@@ -1656,7 +2013,7 @@ function setupCpButtons() {
     btn.className = 'cp-btn';
     btn.textContent = cp.km;
     btn.title = `km ${cp.km}`;
-    btn.addEventListener('click', () => seekToTime(cpIndices[i] * 2000));
+    btn.addEventListener('click', () => seekToTime(cpIndices[i] * 1000));
     cont.appendChild(btn);
   });
 }
@@ -1675,8 +2032,8 @@ function interpolateAngle(a, b, t) {
    FRAME UPDATE (Continuous/60 FPS)
 ================================================================ */
 function updateFrameTime(timeMs) {
-  let idx = Math.floor(timeMs / 2000);
-  let fraction = (timeMs % 2000) / 2000;
+  let idx = Math.floor(timeMs / 1000);
+  let fraction = (timeMs % 1000) / 1000;
 
   if (idx >= D.length - 1) {
     idx = D.length - 2;
@@ -1697,7 +2054,7 @@ function updateFrameTime(timeMs) {
   const la2 = ptA.la2 + (ptB.la2 - ptA.la2) * fraction;
   const lo2 = ptA.lo2 + (ptB.lo2 - ptA.lo2) * fraction;
 
-  // Interpolate Rotation (Heading)
+  // Interpolate Rotation (Heading / Motion Bearing)
   const h1 = interpolateAngle(ptA.h1, ptB.h1, fraction);
   const h2 = interpolateAngle(ptA.h2, ptB.h2, fraction);
 
@@ -1721,22 +2078,26 @@ function updateFrameTime(timeMs) {
   rotateCanoe(mc1d.getElement(), h1);
   rotateCanoe(mc2d.getElement(), h2);
 
-  // 3. Update speed labels beside the canoes (new feature)
+  // 3. Update speed labels beside the canoes
   const speedLabel1 = document.querySelector('.canoe-speed-label-1');
   if (speedLabel1) speedLabel1.textContent = `${(s1 * 3.6).toFixed(1)} km/h`;
   const speedLabel2 = document.querySelector('.canoe-speed-label-2');
   if (speedLabel2) speedLabel2.textContent = `${(s2 * 3.6).toFixed(1)} km/h`;
 
-  // 4. Trails (fine lines, continuously updated)
-  const trailPoints1 = D.slice(0, idx + 1).map(p => [p.la1, p.lo1]);
-  trailPoints1.push([la1, lo1]);
-  const trailPoints2 = D.slice(0, idx + 1).map(p => [p.la2, p.lo2]);
-  trailPoints2.push([la2, lo2]);
-  
-  tr1d.setLatLngs(trailPoints1);
-  tr2d.setLatLngs(trailPoints2);
-  tr1o.setLatLngs(trailPoints1);
-  tr2o.setLatLngs(trailPoints2);
+  // 4. Heatmap de velocidade partindo da Popa / Banco 6 (pla1, plo1 e pla2, plo2)
+  try {
+    updateHeatTrail(tr1d, D, idx, p => p.pla1, p => p.plo1, p => p.s1);
+    updateHeatTrail(tr2d, D, idx, p => p.pla2, p => p.plo2, p => p.s2);
+  } catch(errHeat) {
+    console.warn("updateHeatTrail:", errHeat);
+  }
+
+  if (tr1o && tr2o) {
+    const trailPoints1 = D.slice(0, idx + 1).map(p => [p.pla1, p.plo1]);
+    const trailPoints2 = D.slice(0, idx + 1).map(p => [p.pla2, p.plo2]);
+    tr1o.setLatLngs(trailPoints1);
+    tr2o.setLatLngs(trailPoints2);
+  }
 
   // 5. Pan detail map to followed canoe smoothly
   if (isPlaying) {
@@ -1755,10 +2116,14 @@ function updateFrameTime(timeMs) {
   document.getElementById('hud-spd2-ms').textContent = `${s2.toFixed(2)} m/s`;
   document.getElementById('hud-dist2').textContent = `${(dist2/1000).toFixed(2)} km`;
 
-  // 7. Gap + leader
+  // 7. Gap entre os 2 centros das canoas em cada instante (lido de gap_canoas_oc6.json)
+  const gapVal = ptA.cd + (ptB.cd - ptA.cd) * fraction;
+  const gapM = gapVal.toFixed(1);
   const leadC1 = dist1 >= dist2;
-  const gapM   = Math.abs(dist1 - dist2).toFixed(1);
+
   document.getElementById('gap-value').textContent = `${gapM} m`;
+  const distGapEle = document.getElementById('dist-cur-gap');
+  if (distGapEle) distGapEle.textContent = `GAP: ${gapM} m`;
   const leaderEl = document.getElementById('gap-leader');
   const hc1 = document.getElementById('hud-card-c1');
   const hc2 = document.getElementById('hud-card-c2');
@@ -1776,12 +2141,7 @@ function updateFrameTime(timeMs) {
     hc2.classList.add('leading'); hc1.classList.remove('leading');
   }
 
-  // 8. Detect overtake (only on forward playback)
-  if (isPlaying && prevLeaderC1 !== null && leadC1 !== prevLeaderC1 && +gapM > 3) {
-    if (leadC1) showToast('🏁 C1 ASSUME A LIDERANÇA!', '#F59E0B');
-    else         showToast('🏁 C2 ASSUME A LIDERANÇA!', '#FFFFFF');
-  }
-
+  // 8. Overtake detection toast suppressed
   prevLeaderC1 = leadC1;
 
   // 9. Persistent km checkpoint splits pass
@@ -1796,7 +2156,7 @@ function updateFrameTime(timeMs) {
   }
 
   // 10. Timeline fill & current real-time distance HUD update
-  const totalMs = (D.length - 1) * 2000;
+  const totalMs = (D.length - 1) * 1000;
   const pct = timeMs / totalMs;
   document.getElementById('timeline-fill').style.width = `${pct * 100}%`;
   document.getElementById('timeline-handle').style.left = `${pct * 100}%`;
@@ -1807,8 +2167,7 @@ function updateFrameTime(timeMs) {
   document.getElementById('dist-cur-c2').textContent = `⚪ C2: ${(dist2/1000).toFixed(2)} km`;
   document.getElementById('dist-cur-gap').textContent = `GAP: ${gapM} m`;
 
-  // 11. Sparkline (uses base idx)
-  updateSparkline(idx);
+
 
   // 12. Charts cursor (updated if Panel/HUD tab is active)
   if (activeView === 'hud') {
@@ -1823,35 +2182,6 @@ function updateFrameTime(timeMs) {
   document.getElementById('btn-play').textContent = isPlaying ? '⏸' : '▶';
 }
 
-/* ================================================================
-   SPARKLINE
-================================================================ */
-function updateSparkline(idx) {
-  const svg = document.getElementById('sparkline');
-  const W = svg.clientWidth || 316;
-  const H = 56;
-  const WIN = 30;  // 30 points = 60s
-  const MAX = 6.0;  // m/s scale
-
-  const s  = Math.max(0, idx - WIN);
-  const n  = idx - s;
-  if (n < 2) { svg.innerHTML = ''; return; }
-
-  const pts1 = [], pts2 = [];
-  for (let i = s; i <= idx; i++) {
-    const x = ((i - s) / WIN) * W;
-    pts1.push(`${x.toFixed(1)},${(H - (D[i].s1 / MAX) * H * 0.88).toFixed(1)}`);
-    pts2.push(`${x.toFixed(1)},${(H - (D[i].s2 / MAX) * H * 0.88).toFixed(1)}`);
-  }
-
-  // 10 km/h = 2.78 m/s guide line
-  const gy = (H - (2.78 / MAX) * H * 0.88).toFixed(1);
-  svg.innerHTML =
-    `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="#1F2937" stroke-width="1" stroke-dasharray="3,3"/>` +
-    `<polyline points="${pts1.join(' ')}" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>` +
-    `<polyline points="${pts2.join(' ')}" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>` +
-    `<text x="4" y="${+gy - 3}" fill="#374151" font-size="8" font-family="Rajdhani">10 km/h</text>`;
-}
 
 /* ================================================================
    PHOTO FINISH
@@ -1873,7 +2203,7 @@ function sharePF() {
   const pt = D[currentIndex];
   const elapsed = Math.floor((pt.t - D[0].t) / 1000);
   const txt =
-    `VIBE Natureza · OC6 Treino #02 · ${fmtDur(elapsed)}\n` +
+    `VIBE Natureza · OC6 Treino #03 · ${fmtDur(elapsed)}\n` +
     `🟡 C1: ${(pt.s1*3.6).toFixed(1)} km/h | ${(distC1[currentIndex]/1000).toFixed(2)} km\n` +
     `🌸 C2: ${(pt.s2*3.6).toFixed(1)} km/h | ${(distC2[currentIndex]/1000).toFixed(2)} km\n` +
     `Gap: ${pt.cd.toFixed(1)} m`;
@@ -1920,7 +2250,7 @@ function animLoop(now) {
   if (lastRaf !== null) {
     const dt = now - lastRaf;
     playTimeMs += dt * speed;
-    const maxTime = (D.length - 1) * 2000;
+    const maxTime = (D.length - 1) * 1000;
     if (playTimeMs >= maxTime) {
       playTimeMs = maxTime;
       isPlaying = false;
@@ -1938,7 +2268,7 @@ function animLoop(now) {
 function togglePlay() {
   isPlaying = !isPlaying;
   if (isPlaying) {
-    const maxTime = (D.length - 1) * 2000;
+    const maxTime = (D.length - 1) * 1000;
     if (playTimeMs >= maxTime) {
       playTimeMs = 0;
     }
@@ -1960,8 +2290,8 @@ function setSpeed(s) {
 function seekToTime(timeMs) {
   const wasPlaying = isPlaying;
   if (wasPlaying) { isPlaying = false; cancelAnimationFrame(rafId); }
-  playTimeMs = Math.max(0, Math.min((D.length - 1) * 2000, timeMs));
-  const idx = Math.floor(playTimeMs / 2000);
+  playTimeMs = Math.max(0, Math.min((D.length - 1) * 1000, timeMs));
+  const idx = Math.floor(playTimeMs / 1000);
   prevKmPassed = cpIndices.filter(ci => ci <= idx).length;
   updateFrameTime(playTimeMs);
   if (wasPlaying) {
@@ -2108,6 +2438,7 @@ function renderSplitsTable() {
     let spdStr1 = '—';
     let badgeC1 = 'pace-slow';
     let distReal1 = 0;
+    let spdVal1 = 0;
     
     if (i < kmIdx1.length) {
       const idxStart = kmIdx1[i - 1];
@@ -2122,6 +2453,7 @@ function renderSplitsTable() {
         paceStr1 = `${pMin}:${pSec.toString().padStart(2, '0')}`;
         const spd = (dist / (dt / 1000)) * 3.6;
         spdStr1 = `${spd.toFixed(1)} km/h`;
+        spdVal1 = spd;
         badgeC1 = spd >= 10.5 ? 'pace-fast' : (spd >= 8.5 ? 'pace-med' : 'pace-slow');
       }
     }
@@ -2131,6 +2463,7 @@ function renderSplitsTable() {
     let spdStr2 = '—';
     let badgeC2 = 'pace-slow';
     let distReal2 = 0;
+    let spdVal2 = 0;
     
     if (i < kmIdx2.length) {
       const idxStart = kmIdx2[i - 1];
@@ -2145,6 +2478,7 @@ function renderSplitsTable() {
         paceStr2 = `${pMin}:${pSec.toString().padStart(2, '0')}`;
         const spd = (dist / (dt / 1000)) * 3.6;
         spdStr2 = `${spd.toFixed(1)} km/h`;
+        spdVal2 = spd;
         badgeC2 = spd >= 10.5 ? 'pace-fast' : (spd >= 8.5 ? 'pace-med' : 'pace-slow');
       }
     }
@@ -2166,15 +2500,21 @@ function renderSplitsTable() {
       }
     }
 
+    const isC1Faster = spdVal1 > 0 && spdVal1 > spdVal2;
+    const isC2Faster = spdVal2 > 0 && spdVal2 > spdVal1;
+
+    const mark1 = isC1Faster ? '<span style="color:#10b981; font-weight:bold; margin-right:2px;">⚡</span>' : '';
+    const mark2 = isC2Faster ? '<span style="color:#10b981; font-weight:bold; margin-right:2px;">⚡</span>' : '';
+
     html += `
       <tr style="border-bottom: 1px solid var(--border); transition: background-color 0.2s;">
         <td style="padding: 10px; font-weight: bold; color: var(--text-sec); font-family: var(--font-hud); letter-spacing: 0.5px;">${label}</td>
         <td style="padding: 10px; text-align: center;">
-          ${paceStr1 !== '—' ? `<span class="pace-badge ${badgeC1}">${paceStr1}</span>` : '<span style="color:var(--text-muted)">—</span>'}
+          ${paceStr1 !== '—' ? `<span class="pace-badge ${badgeC1}" style="${isC1Faster ? 'border: 1px solid #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.3);' : ''}">${mark1}${paceStr1}</span>` : '<span style="color:var(--text-muted)">—</span>'}
           <div style="font-size: 11px; color: var(--text-sec); margin-top: 4px; font-weight: 600; font-family: var(--font-hud);">${spdStr1}</div>
         </td>
         <td style="padding: 10px; text-align: center;">
-          ${paceStr2 !== '—' ? `<span class="pace-badge ${badgeC2}">${paceStr2}</span>` : '<span style="color:var(--text-muted)">—</span>'}
+          ${paceStr2 !== '—' ? `<span class="pace-badge ${badgeC2}" style="${isC2Faster ? 'border: 1px solid #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.3);' : ''}">${mark2}${paceStr2}</span>` : '<span style="color:var(--text-muted)">—</span>'}
           <div style="font-size: 11px; color: var(--text-sec); margin-top: 4px; font-weight: 600; font-family: var(--font-hud);">${spdStr2}</div>
         </td>
       </tr>`;

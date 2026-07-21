@@ -75,6 +75,10 @@
                         <i class="fa-solid fa-ship"></i>
                         <span>Escalação OC6</span>
                     </button>
+                    <button class="nav-btn" data-tab="telemetria">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Telemetria EKF</span>
+                    </button>
                     <button class="nav-btn" data-tab="financeiro">
                         <i class="fa-solid fa-money-bill-trend-up"></i>
                         <span>Financeiro</span>
@@ -227,6 +231,100 @@
                                     <!-- Dynamic rows for seats 1 to 6 detailing functions and assigned names -->
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2.5 TAB: TELEMETRIA EKF -->
+                <section id="tab-telemetria" class="tab-panel">
+                    <div class="panel-header">
+                        <h2>Análise de Telemetria EKF · 2 Canoas (Treino #03)</h2>
+                        <p>Visualização em alta precisão processada via Filtro de Kalman Estendido (EKF) fundindo múltiplos sensores GPS por banco nas 2 canoas OC6.</p>
+                    </div>
+
+                    <div class="telemetria-overview-grid grid-two-columns">
+                        <!-- Canoa 1 Card -->
+                        <div class="card telemetria-card c1-border">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-ship" style="color: #f59e0b;"></i> Canoa 1 (VIBE Natureza)</h3>
+                                <span class="badge badge-warning" id="badge-c1-summary">15.53 km • 10.9 km/h Média</span>
+                            </div>
+                            <div class="telemetria-stats-box">
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Distância Percorrida</span>
+                                    <span class="stat-val" id="tele-c1-dist">15.53 km</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Velocidade Média</span>
+                                    <span class="stat-val" id="tele-c1-avg">10.9 km/h</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Velocidade Máxima</span>
+                                    <span class="stat-val" id="tele-c1-max">13.5 km/h</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Registros / Freq.</span>
+                                    <span class="stat-val">5.126 pts (1.0 Hz)</span>
+                                </div>
+                            </div>
+                            <div class="gps-coleta-info">
+                                <h4><i class="fa-solid fa-satellite-dish"></i> Sensores GPS Coletados (C1):</h4>
+                                <ul class="gps-sensors-list">
+                                    <li><strong>Banco 3:</strong> Jean <span>(GPX • +3h)</span></li>
+                                    <li><strong>Banco 4:</strong> Valter <span>(TXT)</span></li>
+                                    <li><strong>Banco 5:</strong> Esdras <span>(FIT)</span></li>
+                                    <li><strong>Banco 6:</strong> Noé <span>(TXT)</span></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Canoa 2 Card -->
+                        <div class="card telemetria-card c2-border">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-ship" style="color: #ffffff;"></i> Canoa 2 (C2 Suplentes)</h3>
+                                <span class="badge badge-info" id="badge-c2-summary">15.24 km • 10.7 km/h Média</span>
+                            </div>
+                            <div class="telemetria-stats-box">
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Distância Percorrida</span>
+                                    <span class="stat-val" id="tele-c2-dist">15.24 km</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Velocidade Média</span>
+                                    <span class="stat-val" id="tele-c2-avg">10.7 km/h</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Velocidade Máxima</span>
+                                    <span class="stat-val" id="tele-c2-max">13.1 km/h</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-lbl">Registros / Freq.</span>
+                                    <span class="stat-val">5.143 pts (1.0 Hz)</span>
+                                </div>
+                            </div>
+                            <div class="gps-coleta-info">
+                                <h4><i class="fa-solid fa-satellite-dish"></i> Sensores GPS Coletados (C2):</h4>
+                                <ul class="gps-sensors-list">
+                                    <li><strong>Banco 1:</strong> Filipe <span>(TXT)</span></li>
+                                    <li><strong>Banco 2:</strong> Luiz <span>(GPX)</span></li>
+                                    <li><strong>Banco 3:</strong> Fernando <span>(TXT)</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Embedded Race Viewer / Animation Frame -->
+                    <div class="card race-viewer-card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-play" style="color: #06b6d4;"></i> Simulador 2D da Telemetria (Race Viewer Interativo)</h3>
+                            <a href="treino03.html?v=2" target="_blank" class="btn btn-primary btn-small">
+                                <i class="fa-solid fa-up-right-from-square"></i> Abrir em Tela Cheia
+                            </a>
+                        </div>
+                        <p class="card-description">Acompanhe as duas canoas simultaneamente em tempo real com controle de replay, HUD de telemetria, rotação e heatmap de velocidade.</p>
+                        
+                        <div class="iframe-container" style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); height: 680px; margin-top: 15px;">
+                            <iframe src="treino03.html?v=2" style="width: 100%; height: 100%; border: none;"></iframe>
                         </div>
                     </div>
                 </section>

@@ -341,6 +341,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'escalacao':
                 renderEscalacaoPanel();
                 break;
+            case 'telemetria':
+                renderTelemetriaPanel();
+                break;
             case 'financeiro':
                 renderFinanceiroPanel();
                 break;
@@ -1398,10 +1401,93 @@ Regras e Alinhamentos:
 
 
     // -----------------------------------------------------
+    // 5.2.5 ABAS: TELEMETRIA EKF (PAINEL TELEMETRIA)
+    // -----------------------------------------------------
+    function renderTelemetriaPanel() {
+        console.log("CentralVibe: Rendering Telemetria EKF Panel...");
+        
+        fetch('jsons/canoa1_oc6_posicoes_ekf.json')
+            .then(r => r.json())
+            .then(d1 => {
+                if (!d1 || !d1.telemetria) return;
+                const tele1 = d1.telemetria;
+                let totalDist1 = 0;
+                let maxSpd1 = 0;
+                let sumSpd1 = 0;
+
+                for (let i = 0; i < tele1.length; i++) {
+                    const spd = tele1[i].velocidade_kmh || (tele1[i].velocidade_ms * 3.6);
+                    if (spd > maxSpd1) maxSpd1 = spd;
+                    sumSpd1 += spd;
+                    if (i > 0) {
+                        const p1 = tele1[i-1].posicao_cg;
+                        const p2 = tele1[i].posicao_cg;
+                        const R = 6371000;
+                        const dLat = (p2[0] - p1[0]) * Math.PI / 180;
+                        const dLon = (p2[1] - p1[1]) * Math.PI / 180;
+                        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(p1[0]*Math.PI/180)*Math.cos(p2[0]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+                        totalDist1 += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    }
+                }
+                const avgSpd1 = sumSpd1 / tele1.length;
+
+                const distKm1 = (totalDist1 / 1000).toFixed(2);
+                const elDist1 = document.getElementById('tele-c1-dist');
+                const elAvg1 = document.getElementById('tele-c1-avg');
+                const elMax1 = document.getElementById('tele-c1-max');
+                const badge1 = document.getElementById('badge-c1-summary');
+
+                if (elDist1) elDist1.textContent = `${distKm1} km`;
+                if (elAvg1) elAvg1.textContent = `${avgSpd1.toFixed(1)} km/h`;
+                if (elMax1) elMax1.textContent = `${maxSpd1.toFixed(1)} km/h`;
+                if (badge1) badge1.textContent = `${distKm1} km • ${avgSpd1.toFixed(1)} km/h Média`;
+            }).catch(e => console.warn("Telemetria C1 fetch error:", e));
+
+        fetch('jsons/canoa2_oc6_posicoes_ekf.json')
+            .then(r => r.json())
+            .then(d2 => {
+                if (!d2 || !d2.telemetria) return;
+                const tele2 = d2.telemetria;
+                let totalDist2 = 0;
+                let maxSpd2 = 0;
+                let sumSpd2 = 0;
+
+                for (let i = 0; i < tele2.length; i++) {
+                    const spd = tele2[i].velocidade_kmh || (tele2[i].velocidade_ms * 3.6);
+                    if (spd > maxSpd2) maxSpd2 = spd;
+                    sumSpd2 += spd;
+                    if (i > 0) {
+                        const p1 = tele2[i-1].posicao_cg;
+                        const p2 = tele2[i].posicao_cg;
+                        const R = 6371000;
+                        const dLat = (p2[0] - p1[0]) * Math.PI / 180;
+                        const dLon = (p2[1] - p1[1]) * Math.PI / 180;
+                        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(p1[0]*Math.PI/180)*Math.cos(p2[0]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+                        totalDist2 += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    }
+                }
+                const avgSpd2 = sumSpd2 / tele2.length;
+
+                const distKm2 = (totalDist2 / 1000).toFixed(2);
+                const elDist2 = document.getElementById('tele-c2-dist');
+                const elAvg2 = document.getElementById('tele-c2-avg');
+                const elMax2 = document.getElementById('tele-c2-max');
+                const badge2 = document.getElementById('badge-c2-summary');
+
+                if (elDist2) elDist2.textContent = `${distKm2} km`;
+                if (elAvg2) elAvg2.textContent = `${avgSpd2.toFixed(1)} km/h`;
+                if (elMax2) elMax2.textContent = `${maxSpd2.toFixed(1)} km/h`;
+                if (badge2) badge2.textContent = `${distKm2} km • ${avgSpd2.toFixed(1)} km/h Média`;
+            }).catch(e => console.warn("Telemetria C2 fetch error:", e));
+    }
+
+
+    // -----------------------------------------------------
     // 7. INICIALIZAÇÃO DE TODOS OS PAINÉIS
     // -----------------------------------------------------
     renderTreinosPanel();
     renderEscalacaoPanel();
+    renderTelemetriaPanel();
     renderFinanceiroPanel();
     renderEstadiaPanel();
     renderTransladoPanel();
