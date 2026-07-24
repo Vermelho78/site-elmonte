@@ -7,5 +7,7 @@
 inteligencia site
 inteligencia site/*
 node_modules
+assets-backup
+assets-backup/*
 *.log
 *.bak
