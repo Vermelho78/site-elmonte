@@ -1,0 +1,11 @@
+.git
+.git/*
+.github
+.github/*
+.gemini
+.gemini/*
+inteligencia site
+inteligencia site/*
+node_modules
+*.log
+*.bak
