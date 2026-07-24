@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL MONTE | Desenvolvimento de Plugins para Softwares BIM e CAD</title>
+    <meta name="description" content="A EL MONTE combina a dureza da engenharia civil com a fluidez da engenharia de software elaborando plugins precisos para Softwares BIM e CAD. Caso de sucesso: Dutotec BIM IA.">
+    <!-- Open Graph (Links Inteligentes WhatsApp/LinkedIn) -->
+    <meta property="og:title" content="EL MONTE | Engenharia de Software BIM e CAD">
+    <meta property="og:description" content="Automatização de processos, inteligência de dados e exatidão analítica. Elevamos o BIM ao mais alto nível técnico corporativo.">
+    <meta property="og:image" content="https://elmonte.dev.br/assets/selo_ai_softwares.png">
+    <meta property="og:url" content="https://elmonte.dev.br">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <!-- Favicon -->
+    <link rel="icon" href="assets/logo.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1XKZJ8TLCZ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1XKZJ8TLCZ', {
+        anonymize_ip: true,
+        page_title: document.title,
+        send_page_view: true,
+        cookie_flags: 'SameSite=None; Secure'
+      });
+    </script>
+</head>
+<body>
+    <!-- HUD Overlay Background Elements -->
+    <div class="hud-background">
+        <div class="hud-grid"></div>
+        <div class="hud-ring-1"></div>
+        <div class="hud-ring-2"></div>
+        <div class="math-equations">
+            <span>∑ (fx × dx) = 0</span>
+            <br><br>
+            <span>Δy / Δx = ∇f</span>
+            <br><br>
+            <span>v = ∫ a dt</span>
+        </div>
+        <canvas id="hudCanvas"></canvas>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-links">
+                <a href="#hero">Início</a>
+                <a href="#calculadora">Calculadora</a>
+                <a href="#suites">Suítes</a>
+                <a href="#case">Cases</a>
+                <a href="#contato">Contato</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section id="hero" class="hero-section">
+            <div class="hero-content">
+                <div class="badge-container">
+                    <img src="assets/logo.png" alt="EL MONTE HUD" class="hero-logo">
+                </div>
+                <h1 class="glitch" data-text="ELIMINE O RETRABALHO BIM">ELIMINE O RETRABALHO BIM</h1>
+                <h2 class="subtitle">Recupere até 15 horas de projeto por mês com automação de elite</h2>
+                <p class="description">
+                    Nós não vendemos apenas plugins. Desenvolvemos soluções que devolvem o controle sobre seus modelos e eliminam as tarefas repetitivas que drenam seu tempo.
+                </p>
+                <div class="cta-group">
+                    <a href="#calculadora" class="btn-primary">
+                        <span class="btn-text">Calcular Meu Ganho</span>
+                        <div class="btn-glow"></div>
+                    </a>
+                    <a href="#case" class="btn-secondary">Explorar Case</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- ROI Calculator Section (FIRST after Hero)          -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section id="calculadora" class="calculator-section">
+            <div class="container">
+                <div class="calculator-card">
+                    <div class="calculator-header">
+                        <span class="section-badge">SYS.ROI.CALCULATOR</span>
+                        <h2>SISTEMA PLANETÁRIO DE PRODUTIVIDADE</h2>
+                        <p>Selecione as dores que drenam suas horas no Revit. Quanto maior a bolha, maior o peso do problema. Ao clicar, ela será atraída para o centro do seu universo de dores.</p>
+                    </div>
+
+                    <!-- Category Legend -->
+                    <div class="category-legend" id="categoryLegend">
+                        <!-- Generated via JS -->
+                    </div>
+                    
+                    <!-- Physics Solar System Cloud -->
+                    <div class="pain-cloud" id="painCloud">
+                        <!-- Generated via JS -->
+                    </div>
+
+                    <!-- Generate Plan Button -->
+                    <div class="generate-plan-wrap" id="generatePlanWrap" style="display:none;">
+                        <div class="selection-summary" id="selectionSummary">
+                            <span id="selectedCount">0</span> dores selecionadas · <span id="totalHoursPreview">0</span>h/mês de impacto
+                        </div>
+                        <button class="btn-generate" id="btnGeneratePlan">
+                            <span class="btn-generate-icon">⚡</span>
+                            <span class="btn-generate-text">GERAR PLANO PERSONALIZADO</span>
+                            <div class="btn-generate-glow"></div>
+                        </button>
+                    </div>
+
+                    <!-- Custom Plan Result (shown after generate) -->
+                    <div class="custom-plan-result" id="customPlanResult" style="display:none;">
+                        <h3>SUA SUÍTE PERSONALIZADA</h3>
+                        <div class="custom-plan-body" id="customPlanBody">
+                            <!-- Generated via JS -->
+                        </div>
+                    </div>
+
+                    <div class="calculator-cta" id="calculatorCta" style="display:none;">
+                        <p>Com as Suítes EL MONTE, você recupera <strong id="roiPercent">0%</strong> da sua produtividade mensal.</p>
+                        <a href="#contato" class="btn-primary">Solicitar Orçamento Personalizado</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- Product Suites Section (SECOND)                    -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section id="suites" class="suites-section">
+            <div class="container">
+                <div class="section-header center">
+                    <span class="section-badge">SYS.PRODUCT.SUITES</span>
+                    <h2>NOSSAS SUÍTES DE PRODUTIVIDADE</h2>
+                    <p>Ferramentas focadas na dor de cada profissional do ecossistema BIM.</p>
+                    <div class="divider center"></div>
+                </div>
+                
+                <div class="suites-grid">
+                    <!-- Suite Projetista -->
+                    <div class="suite-card" data-suite="projetista">
+                        <div class="suite-color-bar" style="background: #ff4444;"></div>
+                        <div class="suite-header">
+                            <h3>Suite Projetista</h3>
+                            <span class="suite-target">Arquitetos & Engenheiros</span>
+                        </div>
+                        <p class="suite-description">Fim dos cliques infinitos. Automatize a inserção, posicionamento e conexão de elementos no Revit.</p>
+                        <ul class="suite-features">
+                            <li>Inserção Inteligente</li>
+                            <li>Conectores Automáticos</li>
+                            <li>Posicionamento de Precisão</li>
+                        </ul>
+                        <div class="suite-pricing">
+                            <span class="price-label">A partir de</span>
+                            <span class="price-value">R$ 99<small>/mês</small></span>
+                        </div>
+                        <a href="#calculadora" class="btn-suite">Simular Ganho</a>
+                    </div>
+
+                    <!-- Suite BIM Manager -->
+                    <div class="suite-card featured" data-suite="bim_manager">
+                        <div class="suite-color-bar" style="background: #f0c040;"></div>
+                        <div class="suite-header">
+                            <h3>Suite BIM Manager</h3>
+                            <span class="suite-target">Gestores & Coordenadores</span>
+                        </div>
+                        <p class="suite-description">Governança sem esforço. Padronize bibliotecas, limpe warnings e execute tarefas em lote.</p>
+                        <ul class="suite-features">
+                            <li>Gestão de Bibliotecas</li>
+                            <li>Processamento em Lote</li>
+                            <li>Auditoria de Parâmetros</li>
+                        </ul>
+                        <div class="suite-pricing">
+                            <span class="price-label">A partir de</span>
+                            <span class="price-value">R$ 149<small>/mês</small></span>
+                        </div>
+                        <a href="#calculadora" class="btn-suite active">Simular Ganho</a>
+                    </div>
+
+                    <!-- Suite Libmaker -->
+                    <div class="suite-card" data-suite="libmaker">
+                        <div class="suite-color-bar" style="background: #44cc88;"></div>
+                        <div class="suite-header">
+                            <h3>Suite Libmaker</h3>
+                            <span class="suite-target">Fabricantes & Especialistas</span>
+                        </div>
+                        <p class="suite-description">Da geometria bruta à família inteligente em minutos. Automatize a criação e validação de conteúdo.</p>
+                        <ul class="suite-features">
+                            <li>Criação Paramétrica</li>
+                            <li>Conversor de Geometria</li>
+                            <li>Validação de Conectores</li>
+                        </ul>
+                        <div class="suite-pricing">
+                            <span class="price-label">A partir de</span>
+                            <span class="price-value">R$ 129<small>/mês</small></span>
+                        </div>
+                        <a href="#calculadora" class="btn-suite">Simular Ganho</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Case Study Section -->
+        <section id="case" class="case-section">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-badge">SYS.CASE.STUDY</span>
+                    <h2>DUTOTEC BIM IA</h2>
+                    <div class="divider"></div>
+                </div>
+                
+                <div class="case-grid">
+                    <div class="case-info">
+                        <p>O <strong>Dutotec BIM IA</strong> (disponível em <a href="https://www.dutotecbimia.com.br" target="_blank" style="color: var(--color-accent-glow); text-decoration: none; border-bottom: 1px solid;">www.dutotecbimia.com.br</a>) é a prova material do nosso compromisso com a excelência em software para construção civil. Criamos um sistema poderoso, que organiza produtos com maestria lógica, integrando ferramentas proprietárias em uma suíte completa e altamente performática.</p>
+                        
+                        <ul class="feature-list">
+                            <li>Algoritmos de roteamento automático para eletrocalhas</li>
+                            <li>Geração inteligente de relatórios e listas de materiais</li>
+                            <li>Interface sofisticada, focada em eficiência.</li>
+                        </ul>
+                    </div>
+
+                    <div class="dashboard-mockup">
+                        <div class="mockup-header">
+                            <div class="dot red"></div>
+                            <div class="dot yellow"></div>
+                            <div class="dot green"></div>
+                            <span class="mockup-title">sys.dutotec.ai_module</span>
+                        </div>
+                        <div class="mockup-body">
+                            <div class="hud-loader">
+                                <div class="loader-circle"></div>
+                                <span class="loader-text">PROCESSANDO ALGORITMO DE ROTEAMENTO</span>
+                            </div>
+                            <div class="mockup-stats">
+                                <div class="stat-bar" style="width: 85%"></div>
+                                <div class="stat-bar" style="width: 60%; background: rgba(255,0,0,0.2); box-shadow: none;"></div>
+                                <div class="stat-bar" style="width: 90%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Contact Section -->
+        <section id="contato" class="contact-section">
+            <div class="container">
+                <div class="contact-card">
+                    <div class="contact-visual">
+                        <div class="qr-col">
+                            <span class="qr-label">CONEXÃO RÁPIDA</span>
+                            <div class="qr-frame">
+                                <img src="assets/WhatsApp-QRCDE.jpeg" alt="WhatsApp QR Code" class="qr-image">
+                            </div>
+                            <span class="qr-instruction">Escaneie para iniciar chat</span>
+                        </div>
+                    </div>
+                    <div class="contact-content">
+                        <h2>INICIAR PROTOCOLO DE CONEXÃO</h2>
+                        <p>Pronto para desenvolver uma solução customizada para o seu fluxo de trabalho? Conecte-se aos nossos engenheiros de software.</p>
+                        
+                        <div class="contact-info-display">
+                            <div class="info-item">
+                                <span class="info-label">TEMINAL WHATSAPP</span>
+                                <span class="info-value">+55 48 99979-9162</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">TRANSMISSÃO E-MAIL</span>
+                                <span class="info-value">contato@elmonte.dev.br</span>
+                            </div>
+                        </div>
+
+                        <div class="contact-actions">
+                            <a id="cta-whatsapp" href="https://wa.me/5548999799162" target="_blank" rel="noopener noreferrer" data-cta="whatsapp" class="contact-btn wpp">
+                                <span class="btn-icon">💬</span>
+                                ABRIR WHATSAPP
+                            </a>
+                            <a id="cta-email" href="mailto:contato@elmonte.dev.br" data-cta="email" class="contact-btn mail">
+                                <span class="btn-icon">✉️</span>
+                                ENVIAR E-MAIL
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Selo de Fechamento -->
+        <section class="final-seal-section">
+            <div class="container">
+                <img src="assets/selo_ai_softwares.png" alt="Selo EL MONTE" class="final-seal">
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content">
+            <div class="footer-logo">
+                <img src="assets/selo_ai_softwares.png" alt="EL MONTE Logo" class="footer-brand-logo">
+            </div>
+            <div class="footer-info">
+                <span>ENG. CIVIL ⨯ ENG. SOFTWARE</span>
+                <span>MÓDULO SISTEMA ONLINE</span>
+            </div>
+            <div class="footer-copy">
+                &copy; <span id="year"></span> EL MONTE. Todos os diretórios reservados.
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+
+    <!-- Rastreamento de Conversões (CTAs) -->
+    <script>
+    (function() {
+      // Gera ou recupera client_id para GA4 Measurement Protocol
+      function getClientId() {
+        let cid = localStorage.getItem('_ga_cid');
+        if (!cid) {
+          cid = crypto.randomUUID();
+          localStorage.setItem('_ga_cid', cid);
+        }
+        return cid;
+      }
+    
+      document.querySelectorAll('[data-cta]').forEach(link => {
+        link.addEventListener('click', function(e) {
+          const ctaType = this.dataset.cta;
+          // Ignora a conversão de URL para links `mailto:`
+          let targetUrl;
+          try {
+            targetUrl = new URL(this.href);
+          } catch (e) {
+             // Provavelmente um mailto ou tel
+          }
+    
+          // Adiciona UTMs automáticos se for http/https (funciona para WhatsApp)
+          if (targetUrl && (targetUrl.protocol === 'http:' || targetUrl.protocol === 'https:')) {
+            if (!targetUrl.searchParams.has('utm_source')) {
+              targetUrl.searchParams.set('utm_source', 'site_organico');
+              targetUrl.searchParams.set('utm_medium', 'cta_button');
+              targetUrl.searchParams.set('utm_campaign', `contato_${ctaType}`);
+              this.href = targetUrl.toString();
+            }
+          }
+    
+          // Envio via gtag (padrão)
+          if (typeof gtag === 'function') {
+            gtag('event', 'click_cta', {
+              cta_type: ctaType,
+              page_location: window.location.href,
+              page_title: document.title,
+              link_url: this.href
+            });
+          }
+    
+          // Fallback via sendBeacon + Measurement Protocol
+          try {
+            const payload = JSON.stringify({
+              client_id: getClientId(),
+              events: [{
+                name: 'click_cta',
+                params: {
+                  cta_type: ctaType,
+                  page_location: window.location.href,
+                  page_title: document.title,
+                  link_url: this.href,
+                  timestamp: Date.now()
+                }
+              }]
+            });
+            navigator.sendBeacon(
+              `https://www.google-analytics.com/mp/collect?measurement_id=G-1XKZJ8TLCZ&api_secret=T9laQEPWSP2DfdUR40K7ig`,
+              payload
+            );
+          } catch (err) {
+            console.warn('sendBeacon fallback failed:', err);
+          }
+        });
+      });
+    })();
+    </script>
+</body>
+</html>

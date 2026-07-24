@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL MONTE | Consultoria Executiva de Software BIM/CAD & Autodesk ADN Member</title>
+    <meta name="description" content="Consultoria em Engenharia de Software, IA e Add-ins BIM/CAD sob medida. Membro oficial Autodesk Developer Network (ADN). Criador do DutotecBIMAI.">
+    <link rel="icon" href="assets/logo.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1XKZJ8TLCZ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1XKZJ8TLCZ', { anonymize_ip: true, page_title: document.title, send_page_view: true });
+    </script>
+
+    <style>
+        /* OPÇÃO 7: Ultimate Executive Suite & Command Center (index7.html) */
+        :root {
+            --bg: #F3F4F6;
+            --card: #FFFFFF;
+            --text: #111827;
+            --text-sub: #4B5563;
+            --primary: #111827;
+            --accent-gold: #B45309;
+            --accent-gold-hover: #92400E;
+            --accent-gold-bg: #FEF3C7;
+            --border: #D1D5DB;
+            --font-head: 'Montserrat', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.5; padding-bottom: 40px; }
+        .container { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+        h1, h2, h3, h4 { font-family: var(--font-head); }
+
+        header { padding: 22px 0 14px; background: #FFF; border-bottom: 1px solid var(--border); sticky; top:0; z-index:100; }
+        .logo-row { display: flex; align-items: center; justify-content: space-between; }
+        .logo { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.35rem; color: var(--primary); text-decoration: none; font-family: var(--font-head); }
+        .logo img.brand-img { height: 40px; width: auto; }
+        .badge-head { font-size: 0.78rem; font-weight: 700; color: var(--accent-gold); background: var(--accent-gold-bg); padding: 5px 14px; border-radius: 4px; border: 1px solid #FCD34D; display: flex; align-items: center; gap: 6px; }
+        .badge-head img { height: 18px; }
+
+        .hero-box { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 44px; box-shadow: 0 10px 25px rgba(0,0,0,0.04); position: relative; overflow: hidden; margin: 24px 0; }
+        .watermark-hero { position: absolute; right: -15px; bottom: -15px; width: 300px; opacity: 0.04; pointer-events: none; }
+        .badge-adn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--accent-gold-bg); border: 1px solid #FCD34D; color: var(--accent-gold); border-radius: 4px; font-size: 0.82rem; font-weight: 700; margin-bottom: 18px; }
+        .badge-adn img { height: 16px; }
+        h1 { font-size: 2.4rem; font-weight: 800; color: var(--primary); margin-bottom: 14px; line-height: 1.2; }
+        .desc { font-size: 1.08rem; color: var(--text-sub); margin-bottom: 28px; max-width: 740px; }
+
+        .assets-badge-row { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .asset-badge { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-weight: 600; }
+        .asset-badge img { height: 26px; }
+
+        .btn-wpp { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; background: var(--accent-gold); color: #FFF !important; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 0.98rem; transition: background 0.2s ease; box-shadow: 0 4px 12px rgba(180, 83, 9, 0.25); }
+        .btn-wpp:hover { background: var(--accent-gold-hover); }
+
+        /* Command Grid Layout */
+        .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .grid-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); position: relative; }
+        .grid-card img.stamp { position: absolute; right: 24px; top: 24px; width: 32px; opacity: 0.85; }
+        .grid-card h2 { font-size: 1.3rem; color: var(--primary); margin-bottom: 12px; }
+        .grid-card p { font-size: 0.94rem; color: var(--text-sub); margin-bottom: 18px; line-height: 1.55; }
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { font-size: 0.76rem; font-weight: 600; padding: 4px 10px; background: var(--bg); color: var(--primary); border-radius: 4px; border: 1px solid var(--border); }
+
+        /* Case Showcase */
+        .case-card { grid-column: span 2; background: var(--primary); color: #FFF; border-radius: 14px; padding: 40px; display: flex; align-items: center; justify-content: space-between; gap: 28px; border-left: 6px solid var(--accent-gold); }
+        .case-card h2 { color: #FFF; font-size: 1.7rem; margin-bottom: 8px; }
+        .case-card p { color: #D1D5DB; font-size: 0.96rem; margin-bottom: 18px; }
+        .btn-dutotec { display: inline-block; padding: 12px 22px; background: var(--accent-gold); color: #FFF; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 0.92rem; }
+        .case-stamp-box { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 20px 28px; text-align: center; flex-shrink: 0; }
+        .case-stamp-box img { width: 68px; }
+
+        footer { text-align: center; margin-top: 40px; font-size: 0.84rem; color: var(--text-sub); }
+
+        @media(max-width:768px) {
+            .cards-grid, .case-card { grid-template-columns: 1fr; grid-column: span 1; flex-direction: column; text-align: center; }
+            h1 { font-size: 1.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container logo-row">
+            <a href="#" class="logo">
+                <img src="assets/logo.png" alt="EL MONTE Logo" class="brand-img">
+                <span>EL MONTE</span>
+            </a>
+            <div class="badge-head">
+                <img src="assets/selo_ai_softwares.png" alt="Selo">
+                AUTODESK ADN MEMBER
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="hero-box">
+            <img src="assets/selo_ai_softwares.png" alt="" class="watermark-hero">
+            <div class="badge-adn">
+                <img src="assets/selo_ai_softwares.png" alt="ADN">
+                Membro Autodesk Developer Network (ADN)
+            </div>
+            <h1>Consultoria Executiva em Software BIM/CAD & IA</h1>
+            <p class="desc">Desenvolvimento sob medida de add-ins para Revit e AutoCAD, automação com inteligência artificial e otimização de processos técnicos.</p>
+
+            <div class="assets-badge-row">
+                <div class="asset-badge">
+                    <img src="assets/logo.png" alt="Logo">
+                    <span>Engenharia de Software Nativa</span>
+                </div>
+                <div class="asset-badge">
+                    <img src="assets/6.png" alt="Badge 6">
+                    <span>Sistemas Corporativos</span>
+                </div>
+            </div>
+
+            <a id="cta-wpp-hero" href="https://wa.me/5548999799162?text=Visitei%20seu%20site." target="_blank" rel="noopener noreferrer" data-cta="whatsapp_hero" class="btn-wpp">💬 Agendar Consultoria no WhatsApp (+55 48 99979-9162)</a>
+        </div>
+
+        <div class="cards-grid">
+            <div class="grid-card">
+                <img src="assets/selo_ai_softwares.png" alt="Selo" class="stamp">
+                <h2>Plugins BIM/CAD Customizados</h2>
+                <p>Add-ins nativos em C# .NET para Revit API e AutoCAD API. Eliminação de tarefas repetitivas e padronização corporativa.</p>
+                <div class="tag-list">
+                    <span class="tag">Revit API</span>
+                    <span class="tag">AutoCAD API</span>
+                    <span class="tag">C# .NET</span>
+                </div>
+            </div>
+
+            <div class="grid-card">
+                <img src="assets/6.png" alt="Badge 6" class="stamp" style="width:34px;">
+                <h2>Inteligência Artificial & Roteamento</h2>
+                <p>Algoritmos generativos para traçados automáticos de infraestrutura técnica e automação de regras de projeto.</p>
+                <div class="tag-list">
+                    <span class="tag">Roteamento Automático</span>
+                    <span class="tag">IA Generativa</span>
+                </div>
+            </div>
+
+            <div class="case-card">
+                <div>
+                    <span style="font-size:0.78rem; font-weight:700; color:#FCD34D; text-transform:uppercase;">CASE FLAGSHIP</span>
+                    <h2>Plataforma DutotecBIMAI</h2>
+                    <p>Ecossistema corporativo com inteligência artificial para roteamento de eletrocalhas no Revit, desenvolvido pela EL MONTE.</p>
+                    <a href="https://www.dutotecbimia.com.br" target="_blank" rel="noopener noreferrer" class="btn-dutotec">Acessar dutotecbimia.com.br ↗</a>
+                </div>
+                <div class="case-stamp-box">
+                    <img src="assets/selo_ai_softwares.png" alt="Selo">
+                    <div style="font-size:0.75rem; font-weight:700; color:#FFF; margin-top:6px;">ENGENHARIA ADN</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            &copy; EL MONTE · Autodesk Developer Network (ADN) Member · contato@elmonte.dev.br
+        </div>
+    </footer>
+
+    <script>
+    (function() {
+      function getClientId() {
+        let cid = localStorage.getItem('_ga_cid');
+        if (!cid) {
+          cid = crypto.randomUUID();
+          localStorage.setItem('_ga_cid', cid);
+        }
+        return cid;
+      }
+      document.querySelectorAll('[data-cta]').forEach(link => {
+        link.addEventListener('click', function(e) {
+          const ctaType = this.dataset.cta;
+          let targetUrl;
+          try { targetUrl = new URL(this.href); } catch (e) {}
+          if (targetUrl && (targetUrl.protocol === 'http:' || targetUrl.protocol === 'https:')) {
+            if (!targetUrl.searchParams.has('utm_source')) {
+              targetUrl.searchParams.set('utm_source', 'site_organico');
+              targetUrl.searchParams.set('utm_medium', 'cta_button');
+              targetUrl.searchParams.set('utm_campaign', `contato_${ctaType}`);
+              this.href = targetUrl.toString();
+            }
+          }
+          if (typeof gtag === 'function') {
+            gtag('event', 'click_cta', { cta_type: ctaType, page_location: window.location.href, page_title: document.title, link_url: this.href });
+          }
+        });
+      });
+    })();
+    </script>
+</body>
+</html>
