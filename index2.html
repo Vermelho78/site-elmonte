@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EL MONTE | BIM/CAD & IA</title>
-    <meta name="description" content="Consultoria em Engenharia de Software, IA e Add-ins BIM/CAD sob medida. Membro Autodesk Developer Network (ADN). Criador do DutotecBIMAI.">
+    <title>EL MONTE | Consultoria Executiva em Software BIM/CAD & Autodesk ADN Member</title>
+    <meta name="description" content="Consultoria em Engenharia de Software, IA e Add-ins BIM/CAD sob medida. Membro oficial Autodesk Developer Network (ADN). Criador do DutotecBIMAI.">
     
     <!-- Open Graph (Preview Inteligente WhatsApp/LinkedIn/Redes Sociais) -->
-    <meta property="og:title" content="EL MONTE | BIM/CAD & IA">
-    <meta property="og:description" content="Desenvolvimento especializado de add-ins para Revit e AutoCAD, algoritmos proprietários de IA e arquitetura de software de alta performance.">
+    <meta property="og:title" content="EL MONTE | Consultoria Executiva em Software BIM/CAD & Autodesk ADN Member">
+    <meta property="og:description" content="Desenvolvimento especializado de add-ins para Revit e AutoCAD, algoritmos proprietários de IA e arquitetura de software de alta performance. Criador do DutotecBIMAI.">
     <meta property="og:image" content="https://elmonte.dev.br/assets/selo_ai_softwares.png">
     <meta property="og:url" content="https://elmonte.dev.br">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
 
     <!-- Favicon -->
-    <link rel="icon" href="assets/selo_ai_softwares.png" type="image/png">
+    <link rel="icon" href="assets/logo.png" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -79,15 +79,115 @@
             border-left: 6px solid var(--accent-gold);
         }
         
-        .hero-content-wrap { position: relative; z-index: 2; max-width: 660px; }
+        .hero-content-wrap { position: relative; z-index: 2; max-width: 680px; }
         .badge-adn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--accent-gold-bg); border: 1px solid #FCD34D; color: var(--accent-gold); border-radius: 4px; font-size: 0.82rem; font-weight: 700; margin-bottom: 20px; }
         .badge-adn img { height: 16px; }
         
         .hero-box-dark h1 { font-size: 2.45rem; font-weight: 800; color: #FFFFFF; margin-bottom: 16px; line-height: 1.2; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.4); }
-        .hero-box-dark .desc { font-size: 1.1rem; color: #E5E7EB; margin-bottom: 32px; line-height: 1.6; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+        .hero-box-dark .desc { font-size: 1.1rem; color: #E5E7EB; margin-bottom: 28px; line-height: 1.6; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 
-        .btn-wpp { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; background: var(--accent-gold); color: #FFF !important; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 0.98rem; transition: background 0.2s ease; box-shadow: 0 4px 14px rgba(180, 83, 9, 0.3); }
-        .btn-wpp:hover { background: var(--accent-gold-hover); }
+        /* HERO ACTION BUTTONS */
+        .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .btn-hero { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 26px; border-radius: 6px; font-weight: 700; font-size: 0.95rem; font-family: var(--font-body); text-decoration: none; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; }
+        
+        .btn-email { background: var(--accent-gold); color: #FFF !important; box-shadow: 0 4px 14px rgba(180, 83, 9, 0.3); }
+        .btn-email:hover { background: var(--accent-gold-hover); transform: translateY(-1px); }
+        
+        .btn-form { background: rgba(255, 255, 255, 0.12); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.35); backdrop-filter: blur(8px); }
+        .btn-form:hover { background: rgba(255, 255, 255, 0.22); border-color: #FFFFFF; transform: translateY(-1px); }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.78);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-card {
+            background: #FFFFFF;
+            color: var(--text);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 480px;
+            padding: 32px;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            transform: translateY(20px);
+            transition: transform 0.25s ease;
+        }
+        .modal-overlay.active .modal-card {
+            transform: translateY(0);
+        }
+        .modal-close {
+            position: absolute;
+            top: 16px; right: 18px;
+            background: transparent;
+            border: none;
+            font-size: 1.6rem;
+            cursor: pointer;
+            color: var(--text-sub);
+            line-height: 1;
+        }
+        .modal-close:hover { color: var(--primary); }
+        .modal-header h3 { font-size: 1.35rem; color: var(--primary); margin-bottom: 6px; }
+        .modal-header p { font-size: 0.88rem; color: var(--text-sub); margin-bottom: 20px; }
+        .form-group { margin-bottom: 14px; text-align: left; }
+        .form-group label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-family: var(--font-body);
+            background: #F9FAFB;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.15);
+            background: #FFF;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent-gold);
+            color: #FFF;
+            font-weight: 700;
+            font-size: 0.96rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            margin-top: 8px;
+        }
+        .btn-submit:hover { background: var(--accent-gold-hover); }
+        .form-success-msg {
+            margin-top: 16px;
+            padding: 16px;
+            background: #DEF7EC;
+            color: #03543F;
+            border: 1px solid #BCF0DA;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
 
         .benchmark-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 36px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
         .bench-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -151,6 +251,8 @@
         @media(max-width:768px) {
             .hero-box-dark { padding: 32px 24px; }
             .hero-box-dark h1 { font-size: 1.85rem; }
+            .hero-actions { flex-direction: column; width: 100%; }
+            .btn-hero { width: 100%; }
             .bench-display, .tab-grid, .case-card { grid-template-columns: 1fr; flex-direction: column; text-align: center; }
         }
     </style>
@@ -164,7 +266,7 @@
                 <span>EL MONTE</span>
             </a>
             <div>
-                <img src="assets/ADN01.png" alt="Selo Autodesk ADN" style="height:80px;">
+                <img src="assets/ADN02.png" alt="Selo Autodesk ADN" style="height:35px;">
             </div>
         </div>
     </header>
@@ -176,7 +278,17 @@
                 <h1>Consultoria Executiva em Software BIM/CAD & Inteligência Artificial</h1>
                 <p class="desc">Desenvolvimento especializado de add-ins para Revit e AutoCAD, algoritmos proprietários de IA e arquitetura de software de alta performance.</p>
 
-                <a id="cta-wpp-hero" href="https://wa.me/5548999799162?text=Visitei%20seu%20site." target="_blank" rel="noopener noreferrer" data-cta="whatsapp_hero" class="btn-wpp">💬 Agendar Consultoria no WhatsApp (+55 48 99979-9162)</a>
+                <div class="hero-actions">
+                    <!-- 1. Botão Email no lugar do WhatsApp -->
+                    <a id="cta-email-hero" href="mailto:contato@elmonte.dev.br?subject=Solicita%C3%A7%C3%A3o%20de%20Consultoria%20-%20EL%20MONTE" data-cta="email_hero" class="btn-hero btn-email">
+                        ✉️ Contatar por E-mail (contato@elmonte.dev.br)
+                    </a>
+                    
+                    <!-- 2. Segundo botão para formulário -->
+                    <button id="btn-open-form" type="button" class="btn-hero btn-form" onclick="openContactModal()">
+                        📋 Preencher Formulário de Contato
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -286,10 +398,49 @@
         </div>
     </main>
 
+    <!-- MODAL FORMULÁRIO DE CONTATO -->
+    <div id="contactModal" class="modal-overlay" onclick="closeContactModalOnOuter(event)">
+        <div class="modal-card">
+            <button class="modal-close" onclick="closeContactModal()" aria-label="Fechar">&times;</button>
+            <div class="modal-header">
+                <h3>Solicitar Consultoria Executiva</h3>
+                <p>Preencha os dados abaixo e a nossa equipe entrará em contato.</p>
+            </div>
+            <form id="contactForm" onsubmit="handleFormSubmit(event)">
+                <div class="form-group">
+                    <label for="form-name">Nome Completo *</label>
+                    <input type="text" id="form-name" required placeholder="Ex: Engenheiro João Silva">
+                </div>
+                <div class="form-group">
+                    <label for="form-email">E-mail Corporativo *</label>
+                    <input type="email" id="form-email" required placeholder="joao@suaempresa.com.br">
+                </div>
+                <div class="form-group">
+                    <label for="form-whats">WhatsApp / Telefone *</label>
+                    <input type="tel" id="form-whats" required placeholder="(48) 99999-9999">
+                </div>
+                <div class="form-group">
+                    <label for="form-subject">Assunto de Interesse *</label>
+                    <select id="form-subject" required>
+                        <option value="" disabled selected>Selecione uma opção...</option>
+                        <option value="Add-ins Revit & AutoCAD">Add-ins Revit & AutoCAD Customizados</option>
+                        <option value="Inteligência Artificial & Roteamento">Algoritmos de IA & Roteamento Generativo</option>
+                        <option value="Suíte BIM para Fabricantes">Plataformas e Suítes BIM para Fabricantes</option>
+                        <option value="Outros Assuntos / Consultoria">Outros Assuntos / Consultoria Geral</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-submit">Enviar Solicitação 🚀</button>
+            </form>
+            <div id="formSuccess" class="form-success-msg" style="display:none;">
+                ✅ <strong>Formulário enviado com sucesso!</strong><br>Obrigado pelo contato. Retornaremos em breve.
+            </div>
+        </div>
+    </div>
+
     <footer>
-        <div class="container">
-            &copy; EL MONTE Softwares · contato@elmonte.dev.br · 2026
-            <img hidden="true" src="assets/ADN01.png" alt="Selo Autodesk ADN" style="height:50px;">
+        <div class="container logo-row">
+            &copy; EL MONTE Softwares · contato@elmonte.dev.br
+            <img src="assets/ADN01.jpg" alt="Selo Autodesk ADN" style="height:100px;">
         </div>
     </footer>
 
@@ -315,6 +466,37 @@
         document.getElementById(tabId).classList.add('active');
     }
 
+    /* Modal Form Functions */
+    function openContactModal() {
+        document.getElementById('contactModal').classList.add('active');
+    }
+    function closeContactModal() {
+        document.getElementById('contactModal').classList.remove('active');
+    }
+    function closeContactModalOnOuter(e) {
+        if (e.target.id === 'contactModal') {
+            closeContactModal();
+        }
+    }
+    function handleFormSubmit(e) {
+        e.preventDefault();
+        const name = document.getElementById('form-name').value;
+        const email = document.getElementById('form-email').value;
+        const whats = document.getElementById('form-whats').value;
+        const subject = document.getElementById('form-subject').value;
+
+        if (typeof gtag === 'function') {
+            gtag('event', 'submit_form', {
+                event_category: 'lead',
+                event_label: subject,
+                user_name: name
+            });
+        }
+
+        document.getElementById('contactForm').style.display = 'none';
+        document.getElementById('formSuccess').style.display = 'block';
+    }
+
     /* Rastreamento Inteligente de Conversões (GA4 + Measurement Protocol Fallback + UTMs) */
     (function() {
       function getClientId() {
@@ -332,7 +514,6 @@
           let targetUrl;
           try { targetUrl = new URL(this.href); } catch (e) {}
 
-          // Auto-anexo de parâmetros UTM em links externos (como WhatsApp/Dutotec)
           if (targetUrl && (targetUrl.protocol === 'http:' || targetUrl.protocol === 'https:')) {
             if (!targetUrl.searchParams.has('utm_source')) {
               targetUrl.searchParams.set('utm_source', 'site_organico');
@@ -342,7 +523,6 @@
             }
           }
 
-          // Disparo de Evento de Conversão no GA4
           if (typeof gtag === 'function') {
             gtag('event', 'click_cta', {
               cta_type: ctaType,
@@ -352,7 +532,6 @@
             });
           }
 
-          // Fallback via Measurement Protocol + sendBeacon
           try {
             const payload = JSON.stringify({
               client_id: getClientId(),
