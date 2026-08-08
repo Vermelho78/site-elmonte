@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: vaatracker-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
