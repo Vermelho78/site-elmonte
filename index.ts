@@ -44,6 +44,15 @@ async function startServer() {
   // Setup Socket.io event handlers
   setupSocketIO(io);
 
+  // Health check endpoints
+  app.get("/health", (req, res) => {
+    res.json({ status: "online", service: "VaaTracker Realtime Backend", timestamp: Date.now() });
+  });
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "online", service: "VaaTracker Realtime Backend", timestamp: Date.now() });
+  });
+
   // REST Fallback for HTTP position updates from 4G/5G mobile phones
   app.post("/api/position", (req, res) => {
     const { vesselId, vesselNumber, competitorName, latitude, longitude, accuracy, timestamp, isSos } = req.body;
