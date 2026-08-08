@@ -1,1 +1,7 @@
+/vaatracker/competitor  /vaatracker/competitor.html  200
+/vaatracker/competitor/  /vaatracker/competitor.html  200
+/vaatracker/competitor/*  /vaatracker/competitor.html  200
+/vaatracker/monitor  /vaatracker/monitor.html  200
+/vaatracker/monitor/  /vaatracker/monitor.html  200
+/vaatracker/monitor/*  /vaatracker/monitor.html  200
 /vaatracker/*  /vaatracker/index.html  200
