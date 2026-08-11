@@ -265,6 +265,16 @@ table.splits-tbl td.pace-cell{text-align:center}
 
   <script src="./vaarec-client.js"></script>
   <script>
+  window.showAuthGate = function() {
+    const modal = document.getElementById('auth-gate-modal');
+    if (modal) modal.style.display = 'flex';
+  };
+
+  window.hideAuthGate = function() {
+    const modal = document.getElementById('auth-gate-modal');
+    if (modal) modal.style.display = 'none';
+  };
+
   window.handleAuthSubmit = async function() {
     const emailInput = document.getElementById('auth-email-input');
     const email = emailInput ? emailInput.value.trim() : '';
@@ -291,7 +301,7 @@ table.splits-tbl td.pace-cell{text-align:center}
         statusEl.style.color = '#10b981';
         statusEl.textContent = 'Acesso liberado!';
       }
-      hideAuthGate();
+      window.hideAuthGate();
       startViewerApp();
     } catch (err) {
       if (statusEl) {
@@ -1354,18 +1364,6 @@ async function loadTrackFromContract(trackObj, defaultFilename, isGpxDefault) {
 
 
 
-let CONTRACT = null;
-
-function showAuthGate() {
-  const modal = document.getElementById('auth-gate-modal');
-  if (modal) modal.style.display = 'flex';
-}
-
-function hideAuthGate() {
-  const modal = document.getElementById('auth-gate-modal');
-  if (modal) modal.style.display = 'none';
-}
-
 async function startViewerApp() {
   const slug = VaarecClient.getSlugFromUrl();
   try {
@@ -1407,10 +1405,10 @@ async function startViewerApp() {
 async function init(){
   const userEmail = VaarecClient.getUserEmail();
   if (!userEmail) {
-    showAuthGate();
+    window.showAuthGate();
     return;
   }
-  hideAuthGate();
+  window.hideAuthGate();
   startViewerApp();
 }
   
