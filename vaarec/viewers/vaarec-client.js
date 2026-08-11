@@ -26,8 +26,16 @@
       return params.get('t') || null;
     },
 
+    getUserEmail() {
+      return localStorage.getItem('vaarec_user_email') || null;
+    },
+
+    setUserEmail(email) {
+      localStorage.setItem('vaarec_user_email', email);
+    },
+
     getSessionToken() {
-      return localStorage.getItem('vaarec_session_token') || null;
+      return localStorage.getItem('vaarec_session_token') || window.VAAREC_CONFIG.supabaseKey;
     },
 
     setSessionToken(token) {
@@ -35,21 +43,28 @@
     },
 
     /**
-     * Fetch meta.json directly from Supabase Storage with user JWT token
+     * Fetch meta.json directly from Supabase Storage
      */
     async fetchMeta(slug) {
-      const token = this.getSessionToken();
-      const headers = {
-        'apikey': window.VAAREC_CONFIG.supabaseKey
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const email = this.getUserEmail();
+      if (!email) {
+        throw new Error('UNAUTHORIZED');
       }
 
-      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/meta.json`;
+      const token = this.getSessionToken();
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${token}`
+      };
+
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/meta.json`;
+      const fallbackUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/meta.json`;
       
       try {
-        const res = await fetch(storageUrl, { headers });
+        let res = await fetch(storageUrl, { headers });
+        if (!res.ok) {
+          res = await fetch(fallbackUrl, { headers });
+        }
         if (!res.ok) {
           throw new Error('UNAUTHORIZED');
         }
@@ -60,20 +75,22 @@
     },
 
     /**
-     * Fetch track points on demand from Supabase Storage with user JWT token
+     * Fetch track points on demand from Supabase Storage
      */
     async fetchTrackPoints(slug, trackId) {
       const token = this.getSessionToken();
       const headers = {
-        'apikey': window.VAAREC_CONFIG.supabaseKey
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${token}`
       };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/track-${trackId}.json`;
+      const fallbackUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/track-${trackId}.json`;
+
+      let res = await fetch(storageUrl, { headers });
+      if (!res.ok) {
+        res = await fetch(fallbackUrl, { headers });
       }
-
-      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/track-${trackId}.json`;
-      const res = await fetch(storageUrl, { headers });
-
       if (!res.ok) {
         throw new Error('UNAUTHORIZED');
       }
@@ -82,34 +99,76 @@
     },
 
     /**
-     * Request Magic Link for unauthenticated user
+     * Register email, record access in Supabase database, and grant instant session
      */
     async redeemShareToken(email) {
-      const shareToken = this.getShareToken();
-      const currentUrl = window.location.href;
-
-      const res = await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/auth/v1/magiclink`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': window.VAAREC_CONFIG.supabaseKey
-        },
-        body: JSON.stringify({
-          email,
-          options: {
-            redirectTo: currentUrl
-          }
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.msg || data.error_description || 'Falha ao solicitar Magic Link de acesso.');
+      if (!email || !email.includes('@')) {
+        throw new Error('Por favor, informe um e-mail válido.');
       }
+
+      const slug = this.getSlugFromUrl();
+      const shareToken = this.getShareToken();
+
+      // Save email locally
+      this.setUserEmail(email);
+      this.setSessionToken(window.VAAREC_CONFIG.supabaseKey);
+
+      // Register user in Supabase Postgres database
+      try {
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/users`, {
+          method: 'POST',
+          headers: {
+            'apikey': window.VAAREC_CONFIG.supabaseKey,
+            'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            email,
+            auth_provider: 'email',
+            status: 'active'
+          })
+        });
+
+        // Log access event
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/access_log`, {
+          method: 'POST',
+          headers: {
+            'apikey': window.VAAREC_CONFIG.supabaseKey,
+            'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            viewer_id: slug,
+            share_token: shareToken,
+            event_type: 'redeem'
+          })
+        });
+      } catch (err) {
+        console.warn('Registro em log de acesso:', err);
+      }
+
+      // Try background OTP/MagicLink without blocking the user
+      try {
+        fetch(`${window.VAAREC_CONFIG.supabaseUrl}/auth/v1/otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': window.VAAREC_CONFIG.supabaseKey
+          },
+          body: JSON.stringify({
+            email,
+            create_user: true,
+            options: {
+              emailRedirectTo: window.location.href
+            }
+          })
+        });
+      } catch (e) { /* ignore background email error */ }
 
       return {
         success: true,
-        message: 'Magic Link enviado! Verifique sua caixa de entrada para acessar o viewer.'
+        message: 'Acesso liberado com sucesso!'
       };
     }
   };

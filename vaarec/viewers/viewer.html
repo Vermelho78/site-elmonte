@@ -75,7 +75,7 @@
     <div class="auth-card">
       <div style="font-size: 40px; margin-bottom: 10px;">🛶</div>
       <h2>Acesso ao Replay VAAREC</h2>
-      <p>Este replay é protegido. Insira seu e-mail para receber um link de acesso ou continuar.</p>
+      <p>Este replay é protegido. Insira seu e-mail para acessar a transmissão instantaneamente.</p>
       
       <form class="auth-form" id="auth-form">
         <div>
@@ -83,7 +83,7 @@
           <input type="email" id="email" placeholder="seu@email.com" required autocomplete="off" />
         </div>
 
-        <button type="submit" class="btn-submit">Solicitar Link de Acesso 🚀</button>
+        <button type="submit" class="btn-submit">Acessar Replay 🚀</button>
       </form>
 
       <div class="auth-status" id="auth-status"></div>
@@ -104,12 +104,12 @@
 
       const slug = VaarecClient.getSlugFromUrl();
       try {
-        // Tentar buscar metadados do Supabase Storage
+        // Tentar buscar metadados se o e-mail já estiver salvo no navegador
         metaData = await VaarecClient.fetchMeta(slug);
         hideAuthGate();
         initViewer(metaData);
       } catch (err) {
-        // Se não autenticado ou erro, MANTER o modal visível
+        // Se não autenticado, MANTER o modal visível
         showAuthGate();
       }
     });
@@ -129,12 +129,18 @@
       const statusEl = document.getElementById('auth-status');
       statusEl.style.display = 'block';
       statusEl.style.color = '#60a5fa';
-      statusEl.textContent = 'Enviando solicitação de acesso...';
+      statusEl.textContent = 'Liberando acesso...';
 
       try {
-        const res = await VaarecClient.redeemShareToken(email);
+        await VaarecClient.redeemShareToken(email);
         statusEl.style.color = '#22c55e';
-        statusEl.textContent = res.message || 'Link de acesso enviado! Verifique seu e-mail.';
+        statusEl.textContent = 'Acesso liberado!';
+
+        // Carregar metadados e inicializar mapa
+        const slug = VaarecClient.getSlugFromUrl();
+        metaData = await VaarecClient.fetchMeta(slug);
+        hideAuthGate();
+        initViewer(metaData);
       } catch (err) {
         statusEl.style.color = '#ef4444';
         statusEl.textContent = err.message || 'Erro ao validar acesso.';
