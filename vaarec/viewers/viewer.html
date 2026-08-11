@@ -1364,6 +1364,7 @@ async function loadTrackFromContract(trackObj, defaultFilename, isGpxDefault) {
 
 
 
+
 async function startViewerApp() {
   const slug = VaarecClient.getSlugFromUrl();
   try {
@@ -1411,69 +1412,9 @@ async function init(){
   window.hideAuthGate();
   startViewerApp();
 }
-  
-  const pathName = window.location.pathname;
-  const baseName = pathName.substring(pathName.lastIndexOf('/') + 1).replace('.html', '');
-  
-  // Prioridade 1: Contrato 100% autônomo embutido no HTML
-  if (typeof window.CONTRACT !== 'undefined' && window.CONTRACT.sportPackage && window.CONTRACT.name && !window.CONTRACT.name.includes("Base Espacial")) {
-    CONTRACT = window.CONTRACT;
-    console.log('[Viewer] Contrato autônomo embutido carregado com sucesso:', CONTRACT.name);
-  } else if (baseName && baseName !== 'viewer' && baseName !== 'index') {
-    try {
-      const jsonUrl = `./${baseName}.json`;
-      const res = await fetch(jsonUrl);
-      if (res.ok) {
-        CONTRACT = await res.json();
-        console.log(`[Viewer] Contrato ${jsonUrl} carregado via fetch.`);
-      } else if (typeof window.CONTRACT !== 'undefined') {
-        CONTRACT = window.CONTRACT;
-      }
-    } catch(e) {
-      console.warn('[Viewer] Falha no fetch do JSON. Usando contrato embutido:', e);
-      if (typeof window.CONTRACT !== 'undefined') CONTRACT = window.CONTRACT;
-    }
-  } else {
-    try{
-      const stored=localStorage.getItem('vaarec_contract');
-      if(stored){CONTRACT={...DEFAULT_CONTRACT,...JSON.parse(stored)};console.log('Contract loaded from localStorage');}
-      else if (typeof window.CONTRACT !== 'undefined') { CONTRACT = window.CONTRACT; }
-    }catch(e){console.warn('Contract parse error:',e);}
-  }
 
-  try{
-    const contractTracks = CONTRACT?.sportPackage?.tracks || CONTRACT?.tracks || [];
-    const t1 = contractTracks[0];
-    const t2 = contractTracks[1];
-
-    setLoadMsg(`Carregando Canoa 1${t1 ? ' (' + t1.name + ')' : ''}…`);
-    const pts1 = await loadTrackFromContract(t1, null, true);
-
-    setLoadMsg(`Carregando Canoa 2${t2 ? ' (' + t2.name + ')' : ''}…`);
-    const pts2 = await loadTrackFromContract(t2, null, false);
-
-    const ptsB=pts2.length?pts2:pts1.map(p=>({...p,lat:p.lat+0.0001,lon:p.lon+0.0001,spdKmh:(p.spdKmh||0)*0.97}));
-
-    setLoadMsg('Sincronizando timelines…');
-    D=mergeToTimeline(pts1,ptsB);
-    if(!D.length)throw new Error('Timelines sem sobreposição temporal — verifique os arquivos GPS');
-
-    setLoadMsg('Calculando distâncias…');computeDistances();
-
-    setLoadMsg('Inicializando mapa principal…');setupMap();
-    setLoadMsg('Configurando gráficos…');setupCharts();
-    setupTimeline();renderSplits();
-    applyContract();
-    updateFrame(0);
-    hideLoading();
-    setTimeout(()=>{mapDetail?.invalidateSize();},200);
-  }catch(err){
-    console.error('Init error:',err);
-    showLoadError(err.message);
-  }
-}
-
-document.addEventListener('DOMContentLoaded',init);
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
+  
