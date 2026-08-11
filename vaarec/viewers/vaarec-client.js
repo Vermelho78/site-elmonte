@@ -51,46 +51,28 @@
         throw new Error('UNAUTHORIZED');
       }
 
-      const token = this.getSessionToken();
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/meta.json`;
       const headers = {
-        'apikey': window.VAAREC_CONFIG.supabaseKey,
-        'Authorization': `Bearer ${token}`
+        'apikey': window.VAAREC_CONFIG.supabaseKey
       };
 
-      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/meta.json`;
-      const fallbackUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/meta.json`;
-      
-      try {
-        let res = await fetch(storageUrl, { headers });
-        if (!res.ok) {
-          res = await fetch(fallbackUrl, { headers });
-        }
-        if (!res.ok) {
-          throw new Error('UNAUTHORIZED');
-        }
-        return await res.json();
-      } catch (err) {
+      const res = await fetch(storageUrl, { headers });
+      if (!res.ok) {
         throw new Error('UNAUTHORIZED');
       }
+      return await res.json();
     },
 
     /**
      * Fetch track points on demand from Supabase Storage
      */
     async fetchTrackPoints(slug, trackId) {
-      const token = this.getSessionToken();
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/track-${trackId}.json`;
       const headers = {
-        'apikey': window.VAAREC_CONFIG.supabaseKey,
-        'Authorization': `Bearer ${token}`
+        'apikey': window.VAAREC_CONFIG.supabaseKey
       };
 
-      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/track-${trackId}.json`;
-      const fallbackUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/track-${trackId}.json`;
-
-      let res = await fetch(storageUrl, { headers });
-      if (!res.ok) {
-        res = await fetch(fallbackUrl, { headers });
-      }
+      const res = await fetch(storageUrl, { headers });
       if (!res.ok) {
         throw new Error('UNAUTHORIZED');
       }
@@ -147,24 +129,6 @@
       } catch (err) {
         console.warn('Registro em log de acesso:', err);
       }
-
-      // Try background OTP/MagicLink without blocking the user
-      try {
-        fetch(`${window.VAAREC_CONFIG.supabaseUrl}/auth/v1/otp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': window.VAAREC_CONFIG.supabaseKey
-          },
-          body: JSON.stringify({
-            email,
-            create_user: true,
-            options: {
-              emailRedirectTo: window.location.href
-            }
-          })
-        });
-      } catch (e) { /* ignore background email error */ }
 
       return {
         success: true,
