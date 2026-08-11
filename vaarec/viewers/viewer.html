@@ -250,13 +250,13 @@ table.splits-tbl td.pace-cell{text-align:center}
       <h2 style="font-family: 'Rajdhani', sans-serif; font-size: 22px; color: #fff; margin-bottom: 8px;">Acesso ao Replay VAAREC</h2>
       <p style="font-size: 13px; color: #9CA3AF; margin-bottom: 20px; line-height: 1.5;">Este replay GPS é protegido. Insira seu e-mail para transmitir a prova instantaneamente.</p>
       
-      <form id="auth-form" action="javascript:void(0);" onsubmit="handleAuthSubmit(); return false;" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+      <form id="auth-form" action="javascript:void(0);" onsubmit="window.handleAuthSubmit(); return false;" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
         <div>
           <label style="font-size: 12px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px;">Seu E-mail</label>
           <input type="email" id="auth-email-input" placeholder="seu@email.com" required autocomplete="off" style="width: 100%; padding: 12px 14px; background: #111827; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-size: 14px; outline: none;" />
         </div>
 
-        <button type="button" onclick="handleAuthSubmit();" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #06B6D4, #3B82F6); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 6px;">Acessar Replay 🚀</button>
+        <button type="button" onclick="window.handleAuthSubmit();" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #06B6D4, #3B82F6); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 6px;">Acessar Replay 🚀</button>
       </form>
 
       <div id="auth-status-msg" style="margin-top: 14px; font-size: 13px; font-weight: 600; display: none;"></div>
@@ -265,6 +265,41 @@ table.splits-tbl td.pace-cell{text-align:center}
 
   <script src="./vaarec-client.js"></script>
   <script>
+  window.handleAuthSubmit = async function() {
+    const emailInput = document.getElementById('auth-email-input');
+    const email = emailInput ? emailInput.value.trim() : '';
+    const statusEl = document.getElementById('auth-status-msg');
+
+    if (!email || !email.includes('@')) {
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = 'Por favor, informe um e-mail válido.';
+      }
+      return;
+    }
+
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#38bdf8';
+      statusEl.textContent = 'Liberando acesso...';
+    }
+
+    try {
+      await VaarecClient.redeemShareToken(email);
+      if (statusEl) {
+        statusEl.style.color = '#10b981';
+        statusEl.textContent = 'Acesso liberado!';
+      }
+      hideAuthGate();
+      startViewerApp();
+    } catch (err) {
+      if (statusEl) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = err.message || 'Erro ao validar acesso.';
+      }
+    }
+  };
   
 /* ================================================================
    CONSTANTS & DEFAULT CONTRACT
@@ -1258,10 +1293,11 @@ async function loadTrackFromContract(trackObj, defaultFilename, isGpxDefault) {
 
   // 3. Recorte rigoroso para que 00:00:00 corresponda à Largada (Comum)
   
-  if ((!pts || pts.length === 0) && trackObj && trackObj.id) {
+  if ((!pts || pts.length === 0) && trackObj && (trackObj.id || trackObj.trackId)) {
     try {
       const slug = VaarecClient.getSlugFromUrl();
-      const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, trackObj.id);
+      const rawId = trackObj.id || trackObj.trackId;
+      const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, rawId);
       if (fetchedPoints && fetchedPoints.length > 0) {
         console.log(`[Viewer] Carregados ${fetchedPoints.length} pontos via Supabase Storage para track: ${trackObj.name}`);
         pts = fetchedPoints.map(p => ({
@@ -1330,42 +1366,6 @@ function hideAuthGate() {
   if (modal) modal.style.display = 'none';
 }
 
-async function handleAuthSubmit() {
-  const emailInput = document.getElementById('auth-email-input');
-  const email = emailInput ? emailInput.value.trim() : '';
-  const statusEl = document.getElementById('auth-status-msg');
-
-  if (!email || !email.includes('@')) {
-    if (statusEl) {
-      statusEl.style.display = 'block';
-      statusEl.style.color = '#ef4444';
-      statusEl.textContent = 'Por favor, informe um e-mail válido.';
-    }
-    return;
-  }
-
-  if (statusEl) {
-    statusEl.style.display = 'block';
-    statusEl.style.color = '#38bdf8';
-    statusEl.textContent = 'Liberando acesso...';
-  }
-
-  try {
-    await VaarecClient.redeemShareToken(email);
-    if (statusEl) {
-      statusEl.style.color = '#10b981';
-      statusEl.textContent = 'Acesso liberado!';
-    }
-    hideAuthGate();
-    startViewerApp();
-  } catch (err) {
-    if (statusEl) {
-      statusEl.style.color = '#ef4444';
-      statusEl.textContent = err.message || 'Erro ao validar acesso.';
-    }
-  }
-}
-
 async function startViewerApp() {
   const slug = VaarecClient.getSlugFromUrl();
   try {
@@ -1383,7 +1383,7 @@ async function startViewerApp() {
     const pts1 = await loadTrackFromContract(t1, null, true);
 
     setLoadMsg(`Carregando Canoa 2${t2 ? ' (' + t2.name + ')' : ''}…`);
-    const pts2 = await loadTrackFromContract(t2, null, false);
+    const pts2 = t2 ? await loadTrackFromContract(t2, null, false) : [];
 
     const ptsB = pts2.length ? pts2 : pts1.map(p=>({...p, lat:p.lat+0.0001, lon:p.lon+0.0001, spdKmh:(p.spdKmh||0)*0.97}));
 

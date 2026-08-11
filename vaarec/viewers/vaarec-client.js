@@ -67,14 +67,19 @@
      * Fetch track points on demand from Supabase Storage
      */
     async fetchTrackPoints(slug, trackId) {
-      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/track-${trackId}.json`;
+      const cleanId = String(trackId).replace(/^track-/, '');
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/track-${cleanId}.json`;
+      const fallbackUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/track-${trackId}.json`;
       const headers = {
         'apikey': window.VAAREC_CONFIG.supabaseKey
       };
 
-      const res = await fetch(storageUrl, { headers });
+      let res = await fetch(storageUrl, { headers });
       if (!res.ok) {
-        throw new Error('UNAUTHORIZED');
+        res = await fetch(fallbackUrl, { headers });
+      }
+      if (!res.ok) {
+        throw new Error('FAILED_TO_LOAD_TRACK');
       }
       const data = await res.json();
       return data.points || [];

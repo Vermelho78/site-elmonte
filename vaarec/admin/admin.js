@@ -63,14 +63,17 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
       const tracks = [];
 
       if (meta.sportPackage && Array.isArray(meta.sportPackage.tracks)) {
-        meta.sportPackage.tracks = meta.sportPackage.tracks.map((track) => {
+        meta.sportPackage.tracks = meta.sportPackage.tracks.map((track, idx) => {
           const { points, ...trackMeta } = track;
+          const rawId = track.id || track.trackId || (idx + 1);
+          const cleanTrackId = String(rawId).replace(/^track-/, '');
+
           tracks.push({
-            trackId: track.id,
+            trackId: cleanTrackId,
             name: track.name,
             points: points || []
           });
-          return trackMeta;
+          return { ...trackMeta, id: cleanTrackId };
         });
       }
 
@@ -151,7 +154,6 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
 
 document.getElementById('btn-create-link').addEventListener('click', () => {
   const slug = document.getElementById('viewer-slug').value.trim();
-  const maxUses = document.getElementById('max-uses').value.trim();
 
   if (!slug) {
     alert('Informe o slug do viewer.');
