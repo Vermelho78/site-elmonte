@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="./vaarec-client.js"></script>
 
   <style>
@@ -63,7 +62,7 @@
 <body>
 
   <div id="header">
-    <h1 id="race-title">VAAREC Viewer • Carregando...</h1>
+    <h1 id="race-title">VAAREC Viewer • Replay GPS</h1>
     <span class="badge" id="race-category">GPS Replay</span>
   </div>
 
@@ -110,12 +109,8 @@
         hideAuthGate();
         initViewer(metaData);
       } catch (err) {
-        if (err.message === 'UNAUTHORIZED') {
-          showAuthGate();
-        } else {
-          console.warn('Erro ao carregar meta.json:', err);
-          hideAuthGate();
-        }
+        // Se não autenticado ou erro, MANTER o modal visível
+        showAuthGate();
       }
     });
 

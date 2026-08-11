@@ -5,7 +5,7 @@
 (function() {
   window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
     supabaseUrl: 'https://ahqwpngtawzstghcnxpa.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODE1NTgsImV4cCI6MjEwMjA1NzU1OH0.m5OsIMT1tJDVQA0eqi8acHCSe7_AQxY-tRQHFfPodn4'
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODE1NTgsImV4cCI6MjE0MjA1NzU1OH0.m5OsIMT1tJDVQA0eqi8acHCSe7_AQxY-tRQHFfPodn4'
   };
 
   window.VaarecClient = {
@@ -47,15 +47,16 @@
       }
 
       const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/meta.json`;
-      const res = await fetch(storageUrl, { headers });
-
-      if (res.status === 401 || res.status === 403) {
+      
+      try {
+        const res = await fetch(storageUrl, { headers });
+        if (!res.ok) {
+          throw new Error('UNAUTHORIZED');
+        }
+        return await res.json();
+      } catch (err) {
         throw new Error('UNAUTHORIZED');
       }
-      if (!res.ok) {
-        throw new Error(`Erro ao carregar meta.json (${res.status}): ${res.statusText}`);
-      }
-      return await res.json();
     },
 
     /**
@@ -73,11 +74,8 @@
       const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/track-${trackId}.json`;
       const res = await fetch(storageUrl, { headers });
 
-      if (res.status === 401 || res.status === 403) {
-        throw new Error('UNAUTHORIZED');
-      }
       if (!res.ok) {
-        throw new Error(`Erro ao carregar pontos da track: ${res.statusText}`);
+        throw new Error('UNAUTHORIZED');
       }
       const data = await res.json();
       return data.points || [];
