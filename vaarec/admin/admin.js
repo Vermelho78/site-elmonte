@@ -1,14 +1,16 @@
 /**
  * VAAREC Admin Panel Logic (Supabase Storage Edition - Zero Card)
  */
+const DEFAULT_SUPABASE_URL = 'https://ahqwpngtawzstghcnxpa.supabase.co';
+const DEFAULT_SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak';
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('supabase-url');
   const keyInput = document.getElementById('supabase-key');
 
-  // Load saved credentials from localStorage
   if (urlInput && keyInput) {
-    urlInput.value = localStorage.getItem('vaarec_supabase_url') || '';
-    keyInput.value = localStorage.getItem('vaarec_supabase_key') || '';
+    urlInput.value = localStorage.getItem('vaarec_supabase_url') || DEFAULT_SUPABASE_URL;
+    keyInput.value = localStorage.getItem('vaarec_supabase_key') || DEFAULT_SUPABASE_SERVICE_KEY;
 
     urlInput.addEventListener('change', () => {
       localStorage.setItem('vaarec_supabase_url', urlInput.value.trim());
@@ -20,8 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.getElementById('btn-publish').addEventListener('click', async () => {
-  let supabaseUrl = document.getElementById('supabase-url').value.trim();
-  let supabaseKey = document.getElementById('supabase-key').value.trim();
+  let supabaseUrl = document.getElementById('supabase-url').value.trim() || DEFAULT_SUPABASE_URL;
+  let supabaseKey = document.getElementById('supabase-key').value.trim() || DEFAULT_SUPABASE_SERVICE_KEY;
   const fileInput = document.getElementById('json-file');
   const statusEl = document.getElementById('publish-status');
 

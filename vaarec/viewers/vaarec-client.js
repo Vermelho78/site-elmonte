@@ -4,8 +4,8 @@
  */
 (function() {
   window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
-    supabaseUrl: 'https://sua-url-supabase.supabase.co',
-    supabaseKey: 'sua-chave-anon-supabase'
+    supabaseUrl: 'https://ahqwpngtawzstghcnxpa.supabase.co',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODE1NTgsImV4cCI6MjEwMjA1NzU1OH0.m5OsIMT1tJDVQA0eqi8acHCSe7_AQxY-tRQHFfPodn4'
   };
 
   window.VaarecClient = {
