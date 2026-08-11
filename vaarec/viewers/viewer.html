@@ -244,19 +244,19 @@ table.splits-tbl td.pace-cell{text-align:center}
 </style>
 
   <!-- Modal de Autenticação / Portão de Acesso VAAREC -->
-  <div id="auth-gate-modal" style="position: fixed; inset: 0; background: rgba(3, 7, 18, 0.92); backdrop-filter: blur(14px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px;">
+  <div id="auth-gate-modal" style="position: fixed; inset: 0; background: rgba(3, 7, 18, 0.94); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px;">
     <div style="background: #0d1520; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; width: 100%; max-width: 400px; padding: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
       <div style="font-size: 44px; margin-bottom: 10px;">🛶</div>
       <h2 style="font-family: 'Rajdhani', sans-serif; font-size: 22px; color: #fff; margin-bottom: 8px;">Acesso ao Replay VAAREC</h2>
       <p style="font-size: 13px; color: #9CA3AF; margin-bottom: 20px; line-height: 1.5;">Este replay GPS é protegido. Insira seu e-mail para transmitir a prova instantaneamente.</p>
       
-      <form id="auth-form" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+      <form id="auth-form" action="javascript:void(0);" onsubmit="handleAuthSubmit(); return false;" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
         <div>
           <label style="font-size: 12px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px;">Seu E-mail</label>
           <input type="email" id="auth-email-input" placeholder="seu@email.com" required autocomplete="off" style="width: 100%; padding: 12px 14px; background: #111827; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-size: 14px; outline: none;" />
         </div>
 
-        <button type="submit" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #06B6D4, #3B82F6); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 6px;">Acessar Replay 🚀</button>
+        <button type="button" onclick="handleAuthSubmit();" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #06B6D4, #3B82F6); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 6px;">Acessar Replay 🚀</button>
       </form>
 
       <div id="auth-status-msg" style="margin-top: 14px; font-size: 13px; font-weight: 600; display: none;"></div>
@@ -1330,58 +1330,89 @@ function hideAuthGate() {
   if (modal) modal.style.display = 'none';
 }
 
-async function init(){
-  const slug = VaarecClient.getSlugFromUrl();
-  const userEmail = VaarecClient.getUserEmail();
+async function handleAuthSubmit() {
+  const emailInput = document.getElementById('auth-email-input');
+  const email = emailInput ? emailInput.value.trim() : '';
+  const statusEl = document.getElementById('auth-status-msg');
 
-  const authForm = document.getElementById('auth-form');
-  if (authForm && !authForm.dataset.bound) {
-    authForm.dataset.bound = 'true';
-    authForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const emailInput = document.getElementById('auth-email-input');
-      const email = emailInput ? emailInput.value.trim() : '';
-      const statusEl = document.getElementById('auth-status-msg');
-
-      if (statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.style.color = '#38bdf8';
-        statusEl.textContent = 'Liberando acesso...';
-      }
-
-      try {
-        await VaarecClient.redeemShareToken(email);
-        if (statusEl) {
-          statusEl.style.color = '#10b981';
-          statusEl.textContent = 'Acesso liberado!';
-        }
-        hideAuthGate();
-        init(); // Re-iniciar viewer após autenticação
-      } catch (err) {
-        if (statusEl) {
-          statusEl.style.color = '#ef4444';
-          statusEl.textContent = err.message || 'Erro ao validar acesso.';
-        }
-      }
-    });
-  }
-
-  if (!userEmail) {
-    showAuthGate();
+  if (!email || !email.includes('@')) {
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = 'Por favor, informe um e-mail válido.';
+    }
     return;
   }
 
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#38bdf8';
+    statusEl.textContent = 'Liberando acesso...';
+  }
+
   try {
+    await VaarecClient.redeemShareToken(email);
+    if (statusEl) {
+      statusEl.style.color = '#10b981';
+      statusEl.textContent = 'Acesso liberado!';
+    }
+    hideAuthGate();
+    startViewerApp();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = err.message || 'Erro ao validar acesso.';
+    }
+  }
+}
+
+async function startViewerApp() {
+  const slug = VaarecClient.getSlugFromUrl();
+  try {
+    showLoading();
     setLoadMsg('Carregando metadados da prova...');
     CONTRACT = await VaarecClient.fetchMeta(slug);
     window.CONTRACT = CONTRACT;
     console.log('[Viewer] Contrato da prova carregado via Supabase:', CONTRACT.name);
-    hideAuthGate();
-  } catch(e) {
-    console.warn('[Viewer] Usuário não autenticado ou falha ao carregar metadados. Exibindo modal.', e);
+    
+    const contractTracks = CONTRACT?.sportPackage?.tracks || CONTRACT?.tracks || [];
+    const t1 = contractTracks[0];
+    const t2 = contractTracks[1];
+
+    setLoadMsg(`Carregando Canoa 1${t1 ? ' (' + t1.name + ')' : ''}…`);
+    const pts1 = await loadTrackFromContract(t1, null, true);
+
+    setLoadMsg(`Carregando Canoa 2${t2 ? ' (' + t2.name + ')' : ''}…`);
+    const pts2 = await loadTrackFromContract(t2, null, false);
+
+    const ptsB = pts2.length ? pts2 : pts1.map(p=>({...p, lat:p.lat+0.0001, lon:p.lon+0.0001, spdKmh:(p.spdKmh||0)*0.97}));
+
+    setLoadMsg('Sincronizando timelines…');
+    D = mergeToTimeline(pts1, ptsB);
+
+    setLoadMsg('Calculando distâncias…'); computeDistances();
+    setLoadMsg('Inicializando mapa principal…'); setupMap();
+    setLoadMsg('Configurando gráficos…'); setupCharts();
+    setupTimeline(); renderSplits();
+    applyContract();
+    updateFrame(0);
+    hideLoading();
+    setTimeout(() => { mapDetail?.invalidateSize(); }, 200);
+  } catch (err) {
+    console.error('Start viewer error:', err);
+    showLoadError(err.message || 'Erro ao carregar dados da prova.');
+  }
+}
+
+async function init(){
+  const userEmail = VaarecClient.getUserEmail();
+  if (!userEmail) {
     showAuthGate();
     return;
   }
+  hideAuthGate();
+  startViewerApp();
+}
   
   const pathName = window.location.pathname;
   const baseName = pathName.substring(pathName.lastIndexOf('/') + 1).replace('.html', '');
