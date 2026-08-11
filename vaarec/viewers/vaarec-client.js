@@ -10,11 +10,15 @@
 
   window.VaarecClient = {
     getSlugFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('v')) return params.get('v');
+      if (params.get('slug')) return params.get('slug');
+      
       const path = window.location.pathname;
       const match = path.match(/\/viewers\/([^.]+)/);
-      if (match) return match[1];
-      const params = new URLSearchParams(window.location.search);
-      return params.get('slug') || 'viewer-05_08_2026-ManaO-AMador-Fem';
+      if (match && match[1] !== 'viewer' && match[1] !== 'index') return match[1];
+      
+      return 'viewer-05_08_2026-ManaO-AMador-Fem';
     },
 
     getShareToken() {
@@ -49,7 +53,7 @@
         throw new Error('UNAUTHORIZED');
       }
       if (!res.ok) {
-        throw new Error(`Erro ao carregar meta.json: ${res.statusText}`);
+        throw new Error(`Erro ao carregar meta.json (${res.status}): ${res.statusText}`);
       }
       return await res.json();
     },

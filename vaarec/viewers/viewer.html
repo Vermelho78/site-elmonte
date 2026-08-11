@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VAAREC Viewer • Replay GPS</title>
+  
+  <!-- Estilos e Bibliotecas -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script src="./vaarec-client.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: rgba(21, 31, 46, 0.95);
+      --line: #26364c;
+      --text: #eaf2ff;
+      --muted: #94a8c6;
+      --blue: #3b82f6;
+      --green: #22c55e;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+    #header { height: 50px; background: var(--card); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 100; }
+    #header h1 { font-size: 16px; font-weight: 700; color: var(--text); }
+    #header .badge { font-size: 12px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: var(--blue); padding: 4px 10px; border-radius: 99px; }
+
+    #main-container { flex: 1; position: relative; display: flex; }
+    #map { width: 100%; height: 100%; background: #070a10; z-index: 1; }
+
+    /* Auth Gate Modal */
+    #auth-gate-modal {
+      position: fixed; inset: 0; background: rgba(7, 10, 16, 0.85); backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;
+    }
+    .auth-card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 20px; width: 100%; max-width: 400px;
+      padding: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .auth-card h2 { font-size: 20px; margin-bottom: 8px; color: #fff; }
+    .auth-card p { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+    .auth-form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+    .auth-form label { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .auth-form input {
+      width: 100%; padding: 12px 14px; background: #0e1726; border: 1px solid var(--line);
+      border-radius: 10px; color: #fff; font-size: 14px; outline: none;
+    }
+    .auth-form input:focus { border-color: var(--blue); }
+    .btn-submit {
+      width: 100%; padding: 14px; background: linear-gradient(135deg, #2563eb, #3b82f6);
+      border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+      margin-top: 10px; transition: transform 0.1s;
+    }
+    .btn-submit:active { transform: scale(0.98); }
+    .auth-status { margin-top: 14px; font-size: 13px; color: var(--green); font-weight: 600; display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h1 id="race-title">VAAREC Viewer • Carregando...</h1>
+    <span class="badge" id="race-category">GPS Replay</span>
+  </div>
+
+  <div id="main-container">
+    <div id="map"></div>
+  </div>
+
+  <!-- Modal de Autenticação / Portão de Acesso -->
+  <div id="auth-gate-modal">
+    <div class="auth-card">
+      <div style="font-size: 40px; margin-bottom: 10px;">🛶</div>
+      <h2>Acesso ao Replay VAAREC</h2>
+      <p>Este replay é protegido. Insira seu e-mail para receber um link de acesso ou continuar.</p>
+      
+      <form class="auth-form" id="auth-form">
+        <div>
+          <label for="email">Seu E-mail</label>
+          <input type="email" id="email" placeholder="seu@email.com" required autocomplete="off" />
+        </div>
+
+        <button type="submit" class="btn-submit">Solicitar Link de Acesso 🚀</button>
+      </form>
+
+      <div class="auth-status" id="auth-status"></div>
+    </div>
+  </div>
+
+  <script>
+    let map = null;
+    let metaData = null;
+    const loadedTracks = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Iniciar Leaflet Map
+      map = L.map('map', { zoomControl: true }).setView([-27.607, -48.461], 13);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
+      }).addTo(map);
+
+      const slug = VaarecClient.getSlugFromUrl();
+      try {
+        // Tentar buscar metadados do Supabase Storage
+        metaData = await VaarecClient.fetchMeta(slug);
+        hideAuthGate();
+        initViewer(metaData);
+      } catch (err) {
+        if (err.message === 'UNAUTHORIZED') {
+          showAuthGate();
+        } else {
+          console.warn('Erro ao carregar meta.json:', err);
+          hideAuthGate();
+        }
+      }
+    });
+
+    function showAuthGate() {
+      document.getElementById('auth-gate-modal').style.display = 'flex';
+    }
+
+    function hideAuthGate() {
+      document.getElementById('auth-gate-modal').style.display = 'none';
+    }
+
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+
+      const statusEl = document.getElementById('auth-status');
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#60a5fa';
+      statusEl.textContent = 'Enviando solicitação de acesso...';
+
+      try {
+        const res = await VaarecClient.redeemShareToken(email);
+        statusEl.style.color = '#22c55e';
+        statusEl.textContent = res.message || 'Link de acesso enviado! Verifique seu e-mail.';
+      } catch (err) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = err.message || 'Erro ao validar acesso.';
+      }
+    });
+
+    function initViewer(data) {
+      document.getElementById('race-title').textContent = data.name || 'Replay VAAREC';
+      window.CONTRACT = data;
+
+      // Desenhar boias
+      if (Array.isArray(data.buoys)) {
+        data.buoys.forEach(b => {
+          if (b.lat && b.lng) {
+            L.circleMarker([b.lat, b.lng], { radius: 6, color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.8 })
+             .addTo(map)
+             .bindPopup(`<b>Boia:</b> ${b.name || 'Sem nome'}`);
+          }
+        });
+      }
+
+      // Se houver viewport configurada
+      if (data.viewport20km && data.viewport20km.center) {
+        map.setView([data.viewport20km.center.lat, data.viewport20km.center.lng], data.viewport20km.zoom || 13);
+      }
+    }
+
+    // Função para carregar pontos de uma track sob demanda ao dar play/clicar
+    async function loadTrackPointsIfNeeded(trackId) {
+      if (loadedTracks[trackId]) return loadedTracks[trackId];
+      const slug = VaarecClient.getSlugFromUrl();
+      const points = await VaarecClient.fetchTrackPoints(slug, trackId);
+      loadedTracks[trackId] = points;
+      return points;
+    }
+  </script>
+</body>
+</html>
