@@ -1,8 +1,12 @@
 /**
- * VAAREC Client Authentication & Data Stream Loader
+ * VAAREC Client Authentication & Supabase Storage Stream Loader
+ * Zero-Card Architecture (Supabase Auth + Supabase Storage + RLS)
  */
 (function() {
-  const API_BASE = window.VAAREC_API_BASE || 'https://vaarec-worker.elmonte.workers.dev';
+  window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
+    supabaseUrl: 'https://sua-url-supabase.supabase.co',
+    supabaseKey: 'sua-chave-anon-supabase'
+  };
 
   window.VaarecClient = {
     getSlugFromUrl() {
@@ -26,49 +30,85 @@
       localStorage.setItem('vaarec_session_token', token);
     },
 
+    /**
+     * Fetch meta.json directly from Supabase Storage with user JWT token
+     */
     async fetchMeta(slug) {
       const token = this.getSessionToken();
-      const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      const res = await fetch(`${API_BASE}/api/viewer/${slug}/meta`, { headers });
-      if (res.status === 401) {
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/meta.json`;
+      const res = await fetch(storageUrl, { headers });
+
+      if (res.status === 401 || res.status === 403) {
         throw new Error('UNAUTHORIZED');
       }
       if (!res.ok) {
-        throw new Error(`Error fetching meta: ${res.statusText}`);
+        throw new Error(`Erro ao carregar meta.json: ${res.statusText}`);
       }
       return await res.json();
     },
 
+    /**
+     * Fetch track points on demand from Supabase Storage with user JWT token
+     */
     async fetchTrackPoints(slug, trackId) {
       const token = this.getSessionToken();
-      const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      const res = await fetch(`${API_BASE}/api/viewer/${slug}/track/${trackId}`, { headers });
-      if (res.status === 401) {
+      const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/authenticated/vaarec-data/viewers/${slug}/track-${trackId}.json`;
+      const res = await fetch(storageUrl, { headers });
+
+      if (res.status === 401 || res.status === 403) {
         throw new Error('UNAUTHORIZED');
       }
       if (!res.ok) {
-        throw new Error(`Error fetching track points: ${res.statusText}`);
+        throw new Error(`Erro ao carregar pontos da track: ${res.statusText}`);
       }
       const data = await res.json();
       return data.points || [];
     },
 
-    async redeemShareToken(email, turnstileToken) {
+    /**
+     * Request Magic Link for unauthenticated user
+     */
+    async redeemShareToken(email) {
       const shareToken = this.getShareToken();
-      const res = await fetch(`${API_BASE}/api/share/${shareToken || 'default'}/redeem`, {
+      const currentUrl = window.location.href;
+
+      const res = await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/auth/v1/magiclink`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, turnstileToken })
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': window.VAAREC_CONFIG.supabaseKey
+        },
+        body: JSON.stringify({
+          email,
+          options: {
+            redirectTo: currentUrl
+          }
+        })
       });
+
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Falha ao solicitar acesso.');
+        throw new Error(data.msg || data.error_description || 'Falha ao solicitar Magic Link de acesso.');
       }
-      return data;
+
+      return {
+        success: true,
+        message: 'Magic Link enviado! Verifique sua caixa de entrada para acessar o viewer.'
+      };
     }
   };
 })();

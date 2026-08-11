@@ -1,15 +1,18 @@
 /**
- * VAAREC Admin Panel Logic
+ * VAAREC Admin Panel Logic (Supabase Storage Edition - Zero Card)
  */
-const API_BASE = window.VAAREC_API_BASE || 'https://vaarec-worker.elmonte.workers.dev';
+window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
+  supabaseUrl: 'https://sua-url-supabase.supabase.co',
+  supabaseKey: 'sua-chave-anon-supabase'
+};
 
 document.getElementById('btn-publish').addEventListener('click', async () => {
-  const adminSecret = document.getElementById('admin-secret').value.trim();
+  const serviceKey = document.getElementById('admin-secret').value.trim();
   const fileInput = document.getElementById('json-file');
   const statusEl = document.getElementById('publish-status');
 
-  if (!adminSecret) {
-    alert('Por favor, informe a chave secreta admin.');
+  if (!serviceKey) {
+    alert('Por favor, informe sua Supabase Service Role Key ou Chave de Acesso Admin.');
     return;
   }
   if (!fileInput.files.length) {
@@ -45,29 +48,43 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
 
       const slug = meta.slug || file.name.replace('.json', '');
 
-      statusEl.textContent = `Enviando fragmentos para a nuvem (${tracks.length} tracks)...`;
+      statusEl.textContent = `Enviando fragmentos para o Supabase Storage (${tracks.length} tracks)...`;
 
-      const res = await fetch(`${API_BASE}/api/admin/publish`, {
+      const headers = {
+        'apikey': serviceKey,
+        'Authorization': `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        'x-upsert': 'true'
+      };
+
+      // Upload meta.json to Supabase Storage
+      const metaStorageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/vaarec-data/viewers/${slug}/meta.json`;
+      const metaRes = await fetch(metaStorageUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Secret': adminSecret
-        },
-        body: JSON.stringify({
-          slug,
-          title: meta.name || slug,
-          meta,
-          tracks
-        })
+        headers,
+        body: JSON.stringify(meta)
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao publicar no servidor.');
+      if (!metaRes.ok) {
+        const errText = await metaRes.text();
+        throw new Error(`Erro ao subir meta.json no Supabase Storage: ${errText}`);
+      }
+
+      // Upload track files to Supabase Storage
+      for (const tr of tracks) {
+        const trackStorageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/vaarec-data/viewers/${slug}/track-${tr.trackId}.json`;
+        const trackRes = await fetch(trackStorageUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(tr)
+        });
+        if (!trackRes.ok) {
+          console.warn(`Aviso ao subir track-${tr.trackId}.json`);
+        }
       }
 
       statusEl.style.color = '#22c55e';
-      statusEl.textContent = `✅ Sucesso! Viewer publicado. Rota: /vaarec/viewers/${slug}.html`;
+      statusEl.textContent = `✅ Sucesso! Viewer publicado no Supabase Storage. Rota: /vaarec/viewers/${slug}.html`;
     } catch (err) {
       statusEl.style.color = '#ef4444';
       statusEl.textContent = `❌ Erro: ${err.message}`;
