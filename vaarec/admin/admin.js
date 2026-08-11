@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('btn-publish').addEventListener('click', async () => {
   let supabaseUrl = document.getElementById('supabase-url').value.trim() || DEFAULT_SUPABASE_URL;
   let supabaseKey = document.getElementById('supabase-key').value.trim() || DEFAULT_SUPABASE_SERVICE_KEY;
+  const customSlugInput = document.getElementById('custom-slug');
   const fileInput = document.getElementById('json-file');
   const statusEl = document.getElementById('publish-status');
 
@@ -73,9 +74,11 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
         });
       }
 
-      const slug = meta.slug || file.name.replace('.json', '');
+      // Allow user custom slug or fallback to filename
+      const userCustomSlug = customSlugInput ? customSlugInput.value.trim() : '';
+      const slug = userCustomSlug || meta.slug || file.name.replace('.json', '');
 
-      statusEl.textContent = `Enviando fragmentos para o Supabase Storage (${tracks.length + 1} arquivos)...`;
+      statusEl.textContent = `Enviando fragmentos para o Supabase Storage (${tracks.length + 1} arquivos para "${slug}")...`;
 
       const headers = {
         'apikey': supabaseKey,
@@ -131,8 +134,12 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
         console.warn('Registro na tabela viewers em aviso:', dbErr);
       }
 
+      // Auto fill viewer slug in link generator field
+      const slugInput = document.getElementById('viewer-slug');
+      if (slugInput) slugInput.value = slug;
+
       statusEl.style.color = '#22c55e';
-      statusEl.textContent = `✅ Sucesso! Viewer "${slug}" publicado no Supabase Storage (${uploadedTracks} tracks enviadas). Rota: /vaarec/viewers/${slug}.html`;
+      statusEl.textContent = `✅ Sucesso! Viewer "${slug}" publicado no Supabase Storage (${uploadedTracks} tracks enviadas). Rota: /vaarec/viewers/viewer.html?v=${slug}`;
     } catch (err) {
       statusEl.style.color = '#ef4444';
       statusEl.textContent = `❌ Erro: ${err.message}`;
@@ -152,8 +159,20 @@ document.getElementById('btn-create-link').addEventListener('click', () => {
   }
 
   const token = 't_' + Math.random().toString(36).substring(2, 10);
-  const shareUrl = `https://elmonte.dev.br/vaarec/viewers/${slug}.html?t=${token}`;
+  const shareUrl = `https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(slug)}&t=${token}`;
 
   const linkEl = document.getElementById('generated-link');
-  linkEl.innerHTML = `Link Gerado: <a href="${shareUrl}" target="_blank" style="color: #60a5fa;">${shareUrl}</a> (Limite: ${maxUses || 'Ilimitado'})`;
+  linkEl.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+      <a href="${shareUrl}" target="_blank" style="color: #60a5fa; text-decoration: underline; font-size: 14px;">${shareUrl}</a>
+      <button class="btn" id="btn-copy-link" style="padding: 8px 14px; font-size: 13px; background: #22c55e;">📋 Copiar Link</button>
+    </div>
+  `;
+
+  document.getElementById('btn-copy-link').addEventListener('click', () => {
+    navigator.clipboard.writeText(shareUrl);
+    const copyBtn = document.getElementById('btn-copy-link');
+    copyBtn.textContent = '✅ Link Copiado!';
+    setTimeout(() => { copyBtn.textContent = '📋 Copiar Link'; }, 3000);
+  });
 });
