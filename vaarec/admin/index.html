@@ -47,20 +47,32 @@
     <span class="badge">Painel Ativo</span>
   </header>
 
+  <!-- Configuração das Credenciais do Supabase -->
+  <section class="card">
+    <h2>⚙️ Credenciais da Nuvem (Supabase)</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <div class="form-group">
+        <label for="supabase-url">URL do Projeto Supabase</label>
+        <input type="text" id="supabase-url" placeholder="https://seu-projeto.supabase.co" />
+      </div>
+      <div class="form-group">
+        <label for="supabase-key">Service Role Key (Chave Secreta de Admin)</label>
+        <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." />
+      </div>
+    </div>
+    <p style="font-size: 12px; color: var(--muted);">Essas chaves são salvas com segurança apenas no seu navegador para uso nas edições.</p>
+  </section>
+
   <!-- Upload e Publicação de Novo Viewer -->
   <section class="card">
     <h2>🚀 Publicar Novo Viewer (.json da prova)</h2>
-    <div class="form-group">
-      <label for="admin-secret">Chave Secreta Admin</label>
-      <input type="password" id="admin-secret" placeholder="Cole sua ADMIN_SECRET_KEY" />
-    </div>
 
     <div class="form-group">
-      <label for="json-file">Arquivo JSON da Prova (exportado da ferramenta)</label>
+      <label for="json-file">Arquivo JSON da Prova (exportado da ferramenta local)</label>
       <input type="file" id="json-file" accept=".json" />
     </div>
 
-    <button class="btn" id="btn-publish">Fatiar e Publicar no R2 📤</button>
+    <button class="btn" id="btn-publish">Fatiar e Publicar no Supabase Storage 📤</button>
     <div id="publish-status" style="margin-top: 12px; font-size: 13px; font-weight: 600;"></div>
   </section>
 
@@ -79,26 +91,6 @@
     </div>
     <button class="btn" id="btn-create-link">Gerar Share Link 🔗</button>
     <div id="generated-link" style="margin-top: 14px; word-break: break-all; color: var(--green); font-weight: bold;"></div>
-  </section>
-
-  <!-- Visualizador de Logs de Acesso -->
-  <section class="card">
-    <h2>📊 Monitor de Acessos Recentes</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Horário</th>
-          <th>Evento</th>
-          <th>Viewer Slug</th>
-          <th>IP</th>
-        </tr>
-      </thead>
-      <tbody id="logs-table">
-        <tr>
-          <td colspan="4" style="color: var(--muted); text-align: center;">Nenhum log registrado ainda.</td>
-        </tr>
-      </tbody>
-    </table>
   </section>
 
   <script src="./admin.js"></script>

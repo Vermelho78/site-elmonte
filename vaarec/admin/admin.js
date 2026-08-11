@@ -1,24 +1,49 @@
 /**
  * VAAREC Admin Panel Logic (Supabase Storage Edition - Zero Card)
  */
-window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
-  supabaseUrl: 'https://sua-url-supabase.supabase.co',
-  supabaseKey: 'sua-chave-anon-supabase'
-};
+document.addEventListener('DOMContentLoaded', () => {
+  const urlInput = document.getElementById('supabase-url');
+  const keyInput = document.getElementById('supabase-key');
+
+  // Load saved credentials from localStorage
+  if (urlInput && keyInput) {
+    urlInput.value = localStorage.getItem('vaarec_supabase_url') || '';
+    keyInput.value = localStorage.getItem('vaarec_supabase_key') || '';
+
+    urlInput.addEventListener('change', () => {
+      localStorage.setItem('vaarec_supabase_url', urlInput.value.trim());
+    });
+    keyInput.addEventListener('change', () => {
+      localStorage.setItem('vaarec_supabase_key', keyInput.value.trim());
+    });
+  }
+});
 
 document.getElementById('btn-publish').addEventListener('click', async () => {
-  const serviceKey = document.getElementById('admin-secret').value.trim();
+  let supabaseUrl = document.getElementById('supabase-url').value.trim();
+  let supabaseKey = document.getElementById('supabase-key').value.trim();
   const fileInput = document.getElementById('json-file');
   const statusEl = document.getElementById('publish-status');
 
-  if (!serviceKey) {
-    alert('Por favor, informe sua Supabase Service Role Key ou Chave de Acesso Admin.');
+  if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
+    alert('Por favor, insira uma URL válida do projeto Supabase (ex: https://seu-projeto.supabase.co).');
+    return;
+  }
+  if (!supabaseKey) {
+    alert('Por favor, informe sua Supabase Service Role Key.');
     return;
   }
   if (!fileInput.files.length) {
     alert('Por favor, selecione um arquivo .json de prova.');
     return;
   }
+
+  // Remove trailing slash from URL
+  supabaseUrl = supabaseUrl.replace(/\/+$/, '');
+
+  // Save to localStorage
+  localStorage.setItem('vaarec_supabase_url', supabaseUrl);
+  localStorage.setItem('vaarec_supabase_key', supabaseKey);
 
   statusEl.style.color = '#60a5fa';
   statusEl.textContent = 'Processando e fatiando arquivo JSON...';
@@ -48,17 +73,17 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
 
       const slug = meta.slug || file.name.replace('.json', '');
 
-      statusEl.textContent = `Enviando fragmentos para o Supabase Storage (${tracks.length} tracks)...`;
+      statusEl.textContent = `Enviando fragmentos para o Supabase Storage (${tracks.length + 1} arquivos)...`;
 
       const headers = {
-        'apikey': serviceKey,
-        'Authorization': `Bearer ${serviceKey}`,
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
         'x-upsert': 'true'
       };
 
-      // Upload meta.json to Supabase Storage
-      const metaStorageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/vaarec-data/viewers/${slug}/meta.json`;
+      // 1. Upload meta.json to Supabase Storage
+      const metaStorageUrl = `${supabaseUrl}/storage/v1/object/vaarec-data/viewers/${slug}/meta.json`;
       const metaRes = await fetch(metaStorageUrl, {
         method: 'POST',
         headers,
@@ -67,24 +92,45 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
 
       if (!metaRes.ok) {
         const errText = await metaRes.text();
-        throw new Error(`Erro ao subir meta.json no Supabase Storage: ${errText}`);
+        throw new Error(`Falha ao subir meta.json para o Supabase Storage (${metaRes.status}): ${errText}`);
       }
 
-      // Upload track files to Supabase Storage
+      // 2. Upload track files to Supabase Storage
+      let uploadedTracks = 0;
       for (const tr of tracks) {
-        const trackStorageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/vaarec-data/viewers/${slug}/track-${tr.trackId}.json`;
+        const trackStorageUrl = `${supabaseUrl}/storage/v1/object/vaarec-data/viewers/${slug}/track-${tr.trackId}.json`;
         const trackRes = await fetch(trackStorageUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify(tr)
         });
-        if (!trackRes.ok) {
-          console.warn(`Aviso ao subir track-${tr.trackId}.json`);
+        if (trackRes.ok) {
+          uploadedTracks++;
+        } else {
+          console.warn(`Aviso ao subir track-${tr.trackId}.json: ${trackRes.statusText}`);
         }
       }
 
+      // 3. Register viewer in database
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/viewers`, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            slug,
+            title: meta.name || slug,
+            data_path: `viewers/${slug}/`
+          })
+        });
+      } catch (dbErr) {
+        console.warn('Registro na tabela viewers em aviso:', dbErr);
+      }
+
       statusEl.style.color = '#22c55e';
-      statusEl.textContent = `✅ Sucesso! Viewer publicado no Supabase Storage. Rota: /vaarec/viewers/${slug}.html`;
+      statusEl.textContent = `✅ Sucesso! Viewer "${slug}" publicado no Supabase Storage (${uploadedTracks} tracks enviadas). Rota: /vaarec/viewers/${slug}.html`;
     } catch (err) {
       statusEl.style.color = '#ef4444';
       statusEl.textContent = `❌ Erro: ${err.message}`;
