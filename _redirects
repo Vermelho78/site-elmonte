@@ -1,0 +1,5 @@
+# Cloudflare Pages Redirects for VAAREC
+/vaarec/viewers/viewer /vaarec/viewers/viewer.html 200
+/vaarec/viewers/viewer/ /vaarec/viewers/viewer.html 200
+/vaarec/admin /vaarec/admin/index.html 200
+/vaarec/admin/ /vaarec/admin/index.html 200
