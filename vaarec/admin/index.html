@@ -405,14 +405,15 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
   <script src="./admin.js"></script>
 
   <script>
-    const DEFAULT_SUPABASE_URL = 'https://ahqwpngtawzstghcnxpa.supabase.co';
-    const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak';
+    const ADMIN_BASE_URL = 'https://ahqwpngtawzstghcnxpa.supabase.co';
+    const ADMIN_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak';
 
     function getConfig() {
-      const url = document.getElementById('supabase-url')?.value?.trim() || DEFAULT_SUPABASE_URL;
-      const key = document.getElementById('supabase-key')?.value?.trim() || DEFAULT_KEY;
+      const url = document.getElementById('supabase-url')?.value?.trim() || ADMIN_BASE_URL;
+      const key = document.getElementById('supabase-key')?.value?.trim() || ADMIN_SERVICE_KEY;
       return { url, key, headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' } };
     }
+
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
