@@ -4,40 +4,242 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VAAREC • Painel Administrativo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0b1220;
-      --card: #151f2e;
-      --line: #26364c;
+      --bg: #080e1a;
+      --bg-card: #0e1726;
+      --bg-panel: #111c2d;
+      --line: #1e2f47;
       --text: #eaf2ff;
-      --muted: #94a8c6;
+      --muted: #6b80a0;
+      --accent: #06B6D4;
       --blue: #3b82f6;
       --green: #22c55e;
       --red: #ef4444;
+      --yellow: #f59e0b;
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 30px 20px; max-width: 960px; margin: 0 auto; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 28px 20px;
+      max-width: 980px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
 
-    header { margin-bottom: 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
-    header h1 { font-size: 22px; font-weight: 800; }
-    .badge { font-size: 12px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: var(--green); padding: 4px 12px; border-radius: 99px; }
+    header {
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+    }
+    header h1 {
+      font-size: 20px;
+      font-weight: 800;
+      font-family: 'Rajdhani', sans-serif;
+      letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #e2eeff 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(34,197,94,0.12);
+      border: 1px solid rgba(34,197,94,0.35);
+      color: var(--green);
+      padding: 4px 12px;
+      border-radius: 99px;
+      letter-spacing: 0.5px;
+    }
 
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    .card h2 { font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    /* NAV TABS */
+    .admin-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0;
+    }
+    .tab-btn {
+      padding: 10px 18px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      font-family: 'Inter', sans-serif;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .card h2 {
+      font-size: 15px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      color: var(--text);
+    }
 
     .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
-    input, select { width: 100%; padding: 12px 14px; background: #0e1726; border: 1px solid var(--line); border-radius: 10px; color: #fff; font-size: 14px; outline: none; }
-    input:focus { border-color: var(--blue); }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input, select {
+      width: 100%;
+      padding: 11px 14px;
+      background: #080e1a;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s;
+      font-family: 'Inter', sans-serif;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
 
-    .btn { padding: 12px 20px; background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; border-radius: 10px; color: #fff; font-weight: 700; cursor: pointer; }
+    .btn {
+      padding: 11px 22px;
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:hover { opacity: 0.9; }
     .btn:active { transform: scale(0.98); }
+    .btn-green { background: linear-gradient(135deg, #15803d, #22c55e); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-    th { color: var(--muted); font-weight: 600; background: #0e1726; }
-    td b { color: var(--blue); }
+    /* STATS ROW */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      text-align: center;
+    }
+    .stat-value {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: #080e1a; }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--line);
+    }
+    td {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(30,47,71,0.6);
+      color: var(--text);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(6,182,212,0.04); }
+    td .pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+    td .pill-green { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    td .pill-blue { background: rgba(59,130,246,0.12); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+    td .email-cell { font-family: monospace; font-size: 12px; color: var(--accent); }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+
+    .report-filter-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+      align-items: flex-end;
+    }
+    .report-filter-row .form-group { flex: 1; margin-bottom: 0; }
+    .report-filter-row .btn { flex-shrink: 0; }
+
+    #report-loading {
+      text-align: center;
+      padding: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -47,57 +249,246 @@
     <span class="badge">Painel Ativo</span>
   </header>
 
-  <!-- Configuração das Credenciais do Supabase -->
-  <section class="card">
-    <h2>⚙️ Credenciais da Nuvem (Supabase)</h2>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-      <div class="form-group">
-        <label for="supabase-url">URL do Projeto Supabase</label>
-        <input type="text" id="supabase-url" placeholder="https://seu-projeto.supabase.co" />
+  <!-- NAVIGATION TABS -->
+  <div class="admin-tabs">
+    <button class="tab-btn active" onclick="switchTab('publish')">📤 Publicar Prova</button>
+    <button class="tab-btn" onclick="switchTab('reports')">📊 Relatórios de Acesso</button>
+  </div>
+
+  <!-- TAB: PUBLISH -->
+  <div id="tab-publish" class="tab-panel active">
+
+    <!-- Credenciais -->
+    <section class="card">
+      <h2>⚙️ Credenciais da Nuvem (Supabase)</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="supabase-url">URL do Projeto Supabase</label>
+          <input type="text" id="supabase-url" placeholder="https://seu-projeto.supabase.co" />
+        </div>
+        <div class="form-group">
+          <label for="supabase-key">Service Role Key (Chave Secreta de Admin)</label>
+          <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." />
+        </div>
       </div>
+      <p style="font-size: 12px; color: var(--muted);">Essas chaves são salvas com segurança apenas no seu navegador.</p>
+    </section>
+
+    <!-- Publicar Viewer -->
+    <section class="card">
+      <h2>🚀 Publicar Nova Prova (.json)</h2>
+
       <div class="form-group">
-        <label for="supabase-key">Service Role Key (Chave Secreta de Admin)</label>
-        <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." />
+        <label for="custom-slug">Slug / Identificador Amigável da Prova (Opcional)</label>
+        <input type="text" id="custom-slug" placeholder="Ex: jurere-amador-fem-2026 (Se em branco, usará o nome do arquivo .json)" />
+      </div>
+
+      <div class="form-group">
+        <label for="json-file">Arquivo JSON da Prova (exportado da ferramenta local)</label>
+        <input type="file" id="json-file" accept=".json" />
+      </div>
+
+      <button class="btn" id="btn-publish">Fatiar e Publicar no Supabase Storage 📤</button>
+      <div id="publish-status" style="margin-top: 12px; font-size: 13px; font-weight: 600;"></div>
+    </section>
+
+    <!-- Gerar Link -->
+    <section class="card">
+      <h2>🔗 Gerar Link de Compartilhamento</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="viewer-slug">Slug do Viewer (deve ser igual ao publicado acima)</label>
+          <input type="text" id="viewer-slug" placeholder="ex: jurere-amador-fem-05-08-2026" />
+        </div>
+        <div class="form-group">
+          <label for="max-uses">Limite de Usos (Nulo = Ilimitado)</label>
+          <input type="number" id="max-uses" placeholder="Ex: 50" />
+        </div>
+      </div>
+      <button class="btn" id="btn-create-link">Gerar Share Link 🔗</button>
+      <div id="generated-link" style="margin-top: 14px; word-break: break-all; color: var(--green); font-weight: bold;"></div>
+    </section>
+
+  </div><!-- /tab-publish -->
+
+  <!-- TAB: REPORTS -->
+  <div id="tab-reports" class="tab-panel">
+
+    <!-- Summary Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total-users">–</div>
+        <div class="stat-label">Usuários Únicos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total-access">–</div>
+        <div class="stat-label">Acessos Totais</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total-provas">–</div>
+        <div class="stat-label">Provas Publicadas</div>
       </div>
     </div>
-    <p style="font-size: 12px; color: var(--muted);">Essas chaves são salvas com segurança apenas no seu navegador para uso nas edições.</p>
-  </section>
 
-  <!-- Upload e Publicação de Novo Viewer -->
-  <section class="card">
-    <h2>🚀 Publicar Novo Viewer (.json da prova)</h2>
+    <!-- Access Log Filter -->
+    <section class="card">
+      <h2>📋 Log de Acessos por Prova</h2>
 
-    <div class="form-group">
-      <label for="custom-slug">Slug / Identificador Amigável da Prova (Opcional)</label>
-      <input type="text" id="custom-slug" placeholder="Ex: jurere-amador-fem-2026 (Se em branco, usará o nome do arquivo .json)" />
-    </div>
-
-    <div class="form-group">
-      <label for="json-file">Arquivo JSON da Prova (exportado da ferramenta local)</label>
-      <input type="file" id="json-file" accept=".json" />
-    </div>
-
-    <button class="btn" id="btn-publish">Fatiar e Publicar no Supabase Storage 📤</button>
-    <div id="publish-status" style="margin-top: 12px; font-size: 13px; font-weight: 600;"></div>
-  </section>
-
-  <!-- Gerenciador de Share Links -->
-  <section class="card">
-    <h2>🔗 Gerar Link de Compartilhamento</h2>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-      <div class="form-group">
-        <label for="viewer-slug">Slug do Viewer</label>
-        <input type="text" id="viewer-slug" placeholder="ex: jurere-amador-fem-05-08-2026" />
+      <div class="report-filter-row">
+        <div class="form-group">
+          <label for="filter-slug">Filtrar por Slug da Prova</label>
+          <input type="text" id="filter-slug" placeholder="Ex: ManaO-Pro_Masculino-26jul26 (deixe em branco para todos)" />
+        </div>
+        <button class="btn btn-green" onclick="loadReports()">🔄 Carregar Relatório</button>
       </div>
-      <div class="form-group">
-        <label for="max-uses">Limite de Usos (Nulo = Ilimitado)</label>
-        <input type="number" id="max-uses" placeholder="Ex: 50" />
+
+      <div id="report-loading">⏳ Carregando dados...</div>
+
+      <div class="table-wrap" id="report-table-wrap">
+        <div class="empty-state">
+          <div class="icon">📊</div>
+          <div>Clique em <strong>Carregar Relatório</strong> para ver os acessos.</div>
+        </div>
       </div>
-    </div>
-    <button class="btn" id="btn-create-link">Gerar Share Link 🔗</button>
-    <div id="generated-link" style="margin-top: 14px; word-break: break-all; color: var(--green); font-weight: bold;"></div>
-  </section>
+    </section>
+
+    <!-- Users List -->
+    <section class="card">
+      <h2>👥 Lista de Usuários Registrados</h2>
+      <div class="table-wrap" id="users-table-wrap">
+        <div class="empty-state">
+          <div class="icon">👥</div>
+          <div>Clique em <strong>Carregar Relatório</strong> para ver os usuários.</div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /tab-reports -->
 
   <script src="./admin.js"></script>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', b.textContent.toLowerCase().includes(tab === 'publish' ? 'publicar' : 'relatório')));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      if (tab === 'reports') loadReports();
+    }
+
+    async function loadReports() {
+      const DEFAULT_SUPABASE_URL = 'https://ahqwpngtawzstghcnxpa.supabase.co';
+      const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak';
+      const supabaseUrl = document.getElementById('supabase-url').value.trim() || DEFAULT_SUPABASE_URL;
+      const supabaseKey = document.getElementById('supabase-key').value.trim() || DEFAULT_KEY;
+      const slugFilter = document.getElementById('filter-slug').value.trim();
+
+      const loadingEl = document.getElementById('report-loading');
+      const tableWrap = document.getElementById('report-table-wrap');
+      const usersWrap = document.getElementById('users-table-wrap');
+
+      loadingEl.style.display = 'block';
+      tableWrap.innerHTML = '';
+      usersWrap.innerHTML = '';
+
+      const headers = {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
+      };
+
+      try {
+        // Load access_log
+        let accessUrl = `${supabaseUrl}/rest/v1/access_log?select=*&order=created_at.desc&limit=200`;
+        if (slugFilter) {
+          accessUrl += `&viewer_id=eq.${encodeURIComponent(slugFilter)}`;
+        }
+        const accessRes = await fetch(accessUrl, { headers });
+        const accessData = accessRes.ok ? await accessRes.json() : [];
+
+        // Load users
+        const usersRes = await fetch(`${supabaseUrl}/rest/v1/users?select=*&order=created_at.desc&limit=200`, { headers });
+        const usersData = usersRes.ok ? await usersRes.json() : [];
+
+        // Load viewers
+        const viewersRes = await fetch(`${supabaseUrl}/rest/v1/viewers?select=*`, { headers });
+        const viewersData = viewersRes.ok ? await viewersRes.json() : [];
+
+        // Update stats
+        const uniqueEmails = new Set();
+        accessData.forEach(a => { if (a.email) uniqueEmails.add(a.email); });
+        usersData.forEach(u => { if (u.email) uniqueEmails.add(u.email); });
+
+        document.getElementById('stat-total-users').textContent = usersData.length || uniqueEmails.size;
+        document.getElementById('stat-total-access').textContent = accessData.length;
+        document.getElementById('stat-total-provas').textContent = viewersData.length;
+
+        // Render access_log table
+        if (accessData.length === 0) {
+          tableWrap.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>Nenhum acesso registrado ainda.</div></div>';
+        } else {
+          const rows = accessData.map(row => {
+            const date = row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : '–';
+            return `<tr>
+              <td>${date}</td>
+              <td class="email-cell">${row.email || '–'}</td>
+              <td><b>${row.viewer_id || '–'}</b></td>
+              <td><span class="pill pill-green">${row.event_type || 'redeem'}</span></td>
+              <td style="color: var(--muted); font-size: 11px; font-family: monospace;">${row.share_token || '–'}</td>
+            </tr>`;
+          }).join('');
+
+          tableWrap.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>E-mail</th>
+                  <th>Prova (Slug)</th>
+                  <th>Evento</th>
+                  <th>Token</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `;
+        }
+
+        // Render users table
+        if (usersData.length === 0) {
+          usersWrap.innerHTML = '<div class="empty-state"><div class="icon">👥</div><div>Nenhum usuário registrado ainda.</div></div>';
+        } else {
+          const urows = usersData.map(u => {
+            const date = u.created_at ? new Date(u.created_at).toLocaleString('pt-BR') : '–';
+            return `<tr>
+              <td class="email-cell">${u.email || '–'}</td>
+              <td><span class="pill pill-blue">${u.status || 'active'}</span></td>
+              <td>${u.auth_provider || 'email'}</td>
+              <td>${date}</td>
+            </tr>`;
+          }).join('');
+
+          usersWrap.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>E-mail</th>
+                  <th>Status</th>
+                  <th>Origem</th>
+                  <th>Primeiro Acesso</th>
+                </tr>
+              </thead>
+              <tbody>${urows}</tbody>
+            </table>
+          `;
+        }
+
+      } catch (err) {
+        tableWrap.innerHTML = `<div class="empty-state" style="color: var(--red);">❌ Erro ao carregar: ${err.message}</div>`;
+      } finally {
+        loadingEl.style.display = 'none';
+      }
+    }
+  </script>
+
 </body>
 </html>
