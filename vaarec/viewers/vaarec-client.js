@@ -58,7 +58,10 @@
 
       const res = await fetch(storageUrl, { headers });
       if (!res.ok) {
-        throw new Error('UNAUTHORIZED');
+        if (res.status === 400 || res.status === 404) {
+          throw new Error(`Prova "${slug}" não encontrada no servidor. Verifique se foi publicada corretamente no Painel Admin.`);
+        }
+        throw new Error(`Erro ao carregar dados da prova (${res.status} ${res.statusText}).`);
       }
       return await res.json();
     },
@@ -79,7 +82,7 @@
         res = await fetch(fallbackUrl, { headers });
       }
       if (!res.ok) {
-        throw new Error('FAILED_TO_LOAD_TRACK');
+        throw new Error(`Track "${cleanId}" não encontrada. Tente republicar a prova no Painel Admin.`);
       }
       const data = await res.json();
       return data.points || [];
