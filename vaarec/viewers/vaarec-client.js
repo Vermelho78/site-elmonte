@@ -5,7 +5,7 @@
 (function() {
   window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
     supabaseUrl: 'https://ahqwpngtawzstghcnxpa.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODE1NTgsImV4cCI6MjE0MjA1NzU1OH0.m5OsIMT1tJDVQA0eqi8acHCSe7_AQxY-tRQHFfPodn4'
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak'
   };
 
   window.VaarecClient = {
@@ -103,39 +103,42 @@
       this.setUserEmail(email);
       this.setSessionToken(window.VAAREC_CONFIG.supabaseKey);
 
-      // Register user in Supabase Postgres database
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      };
+
+      // 1. Register user in Supabase Postgres database
       try {
-        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/users`, {
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/users?on_conflict=email`, {
           method: 'POST',
-          headers: {
-            'apikey': window.VAAREC_CONFIG.supabaseKey,
-            'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
-          },
+          headers,
           body: JSON.stringify({
             email,
             auth_provider: 'email',
             status: 'active'
           })
         });
+      } catch (err) {
+        console.warn('Registro de usuario:', err);
+      }
 
-        // Log access event
-        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/access_log`, {
+      // 2. Log access event in event_log table
+      try {
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/event_log`, {
           method: 'POST',
-          headers: {
-            'apikey': window.VAAREC_CONFIG.supabaseKey,
-            'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify({
-            viewer_id: slug,
+            email,
+            viewer_slug: slug,
             share_token: shareToken,
             event_type: 'redeem'
           })
         });
       } catch (err) {
-        console.warn('Registro em log de acesso:', err);
+        console.warn('Registro em event_log:', err);
       }
 
       return {
