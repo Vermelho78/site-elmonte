@@ -63,10 +63,9 @@
     /* NAV TABS */
     .admin-tabs {
       display: flex;
-      gap: 6px;
+      gap: 2px;
       margin-bottom: 24px;
       border-bottom: 1px solid var(--line);
-      padding-bottom: 0;
     }
     .tab-btn {
       padding: 10px 18px;
@@ -82,10 +81,7 @@
       margin-bottom: -1px;
     }
     .tab-btn:hover { color: var(--text); }
-    .tab-btn.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
@@ -105,7 +101,6 @@
       align-items: center;
       gap: 8px;
       font-weight: 700;
-      color: var(--text);
     }
 
     .form-group { margin-bottom: 16px; }
@@ -130,7 +125,7 @@
       transition: border-color .2s;
       font-family: 'Inter', sans-serif;
     }
-    input:focus, select:focus { border-color: var(--accent); }
+    input:focus { border-color: var(--accent); }
 
     .btn {
       padding: 11px 22px;
@@ -147,12 +142,6 @@
     .btn:hover { opacity: 0.9; }
     .btn:active { transform: scale(0.98); }
     .btn-green { background: linear-gradient(135deg, #15803d, #22c55e); }
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--muted);
-    }
-    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
     /* STATS ROW */
     .stats-row {
@@ -202,19 +191,20 @@
       text-align: left;
       padding: 10px 14px;
       border-bottom: 1px solid rgba(30,47,71,0.6);
-      color: var(--text);
     }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: rgba(6,182,212,0.04); }
-    td .pill {
+    .pill {
       font-size: 11px;
       padding: 2px 8px;
       border-radius: 99px;
       font-weight: 600;
+      display: inline-block;
     }
-    td .pill-green { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
-    td .pill-blue { background: rgba(59,130,246,0.12); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
-    td .email-cell { font-family: monospace; font-size: 12px; color: var(--accent); }
+    .pill-green { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .pill-blue { background: rgba(59,130,246,0.12); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+    .email-mono { font-family: monospace; font-size: 12px; color: var(--accent); }
+    .slug-mono { font-family: monospace; font-size: 12px; color: var(--text); font-weight: 600; }
 
     .empty-state {
       text-align: center;
@@ -224,22 +214,38 @@
     }
     .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
 
-    .report-filter-row {
+    .filter-row {
       display: flex;
       gap: 10px;
       margin-bottom: 18px;
       align-items: flex-end;
     }
-    .report-filter-row .form-group { flex: 1; margin-bottom: 0; }
-    .report-filter-row .btn { flex-shrink: 0; }
+    .filter-row .form-group { flex: 1; margin-bottom: 0; }
 
-    #report-loading {
-      text-align: center;
-      padding: 20px;
-      color: var(--muted);
+    .sql-note {
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 10px;
+      padding: 14px 18px;
       font-size: 13px;
-      display: none;
+      color: var(--yellow);
+      margin-bottom: 20px;
+      line-height: 1.6;
     }
+    .sql-note code {
+      display: block;
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 8px;
+      font-size: 11px;
+      color: #e2e8f0;
+      white-space: pre;
+      word-break: break-word;
+      overflow-x: auto;
+    }
+
+    #report-loading { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; display: none; }
   </style>
 </head>
 <body>
@@ -251,14 +257,14 @@
 
   <!-- NAVIGATION TABS -->
   <div class="admin-tabs">
-    <button class="tab-btn active" onclick="switchTab('publish')">📤 Publicar Prova</button>
-    <button class="tab-btn" onclick="switchTab('reports')">📊 Relatórios de Acesso</button>
+    <button class="tab-btn active" id="tab-btn-publish" onclick="switchTab('publish')">📤 Publicar Prova</button>
+    <button class="tab-btn" id="tab-btn-provas" onclick="switchTab('provas')">📁 Provas Publicadas</button>
+    <button class="tab-btn" id="tab-btn-reports" onclick="switchTab('reports')">📊 Relatórios de Acesso</button>
   </div>
 
   <!-- TAB: PUBLISH -->
   <div id="tab-publish" class="tab-panel active">
 
-    <!-- Credenciais -->
     <section class="card">
       <h2>⚙️ Credenciais da Nuvem (Supabase)</h2>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
@@ -274,25 +280,20 @@
       <p style="font-size: 12px; color: var(--muted);">Essas chaves são salvas com segurança apenas no seu navegador.</p>
     </section>
 
-    <!-- Publicar Viewer -->
     <section class="card">
       <h2>🚀 Publicar Nova Prova (.json)</h2>
-
       <div class="form-group">
-        <label for="custom-slug">Slug / Identificador Amigável da Prova (Opcional)</label>
-        <input type="text" id="custom-slug" placeholder="Ex: jurere-amador-fem-2026 (Se em branco, usará o nome do arquivo .json)" />
+        <label for="custom-slug">Slug / Identificador da Prova (Opcional — se em branco, usa o nome do arquivo)</label>
+        <input type="text" id="custom-slug" placeholder="Ex: jurere-amador-fem-2026" />
       </div>
-
       <div class="form-group">
-        <label for="json-file">Arquivo JSON da Prova (exportado da ferramenta local)</label>
+        <label for="json-file">Arquivo JSON da Prova</label>
         <input type="file" id="json-file" accept=".json" />
       </div>
-
       <button class="btn" id="btn-publish">Fatiar e Publicar no Supabase Storage 📤</button>
       <div id="publish-status" style="margin-top: 12px; font-size: 13px; font-weight: 600;"></div>
     </section>
 
-    <!-- Gerar Link -->
     <section class="card">
       <h2>🔗 Gerar Link de Compartilhamento</h2>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
@@ -309,12 +310,59 @@
       <div id="generated-link" style="margin-top: 14px; word-break: break-all; color: var(--green); font-weight: bold;"></div>
     </section>
 
-  </div><!-- /tab-publish -->
+  </div>
+
+  <!-- TAB: PROVAS PUBLICADAS -->
+  <div id="tab-provas" class="tab-panel">
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="pv-total">–</div>
+        <div class="stat-label">Provas Publicadas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="pv-users">–</div>
+        <div class="stat-label">Usuários Únicos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="pv-events">–</div>
+        <div class="stat-label">Acessos Registrados</div>
+      </div>
+    </div>
+
+    <section class="card">
+      <h2>📁 Histórico de Provas Publicadas</h2>
+      <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+        <button class="btn btn-green" onclick="loadProvas()">🔄 Atualizar</button>
+      </div>
+      <div class="table-wrap" id="provas-table-wrap">
+        <div class="empty-state"><div class="icon">📁</div><div>Carregando...</div></div>
+      </div>
+    </section>
+  </div>
 
   <!-- TAB: REPORTS -->
   <div id="tab-reports" class="tab-panel">
 
-    <!-- Summary Stats -->
+    <div class="sql-note">
+      ⚠️ <strong>Configuração única necessária:</strong> Para ativar os relatórios, execute este SQL uma vez no <a href="https://supabase.com/dashboard/project/ahqwpngtawzstghcnxpa/sql/new" target="_blank" style="color: var(--accent);">Supabase SQL Editor →</a>
+      <code>CREATE TABLE IF NOT EXISTS event_log (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT,
+  viewer_slug TEXT NOT NULL,
+  share_token TEXT,
+  event_type TEXT NOT NULL DEFAULT 'redeem',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE event_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_insert" ON event_log FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "service_select" ON event_log FOR SELECT TO service_role USING (true);
+DROP POLICY IF EXISTS "Insert acesso anonimo em users" ON users;
+CREATE POLICY "Insert acesso anonimo em users" ON users FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "Leitura admin de users" ON users;
+CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING (true);</code>
+    </div>
+
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-value" id="stat-total-users">–</div>
@@ -326,62 +374,103 @@
       </div>
       <div class="stat-card">
         <div class="stat-value" id="stat-total-provas">–</div>
-        <div class="stat-label">Provas Publicadas</div>
+        <div class="stat-label">Provas com Acesso</div>
       </div>
     </div>
 
-    <!-- Access Log Filter -->
     <section class="card">
-      <h2>📋 Log de Acessos por Prova</h2>
-
-      <div class="report-filter-row">
+      <h2>📋 Log de Acessos</h2>
+      <div class="filter-row">
         <div class="form-group">
-          <label for="filter-slug">Filtrar por Slug da Prova</label>
-          <input type="text" id="filter-slug" placeholder="Ex: ManaO-Pro_Masculino-26jul26 (deixe em branco para todos)" />
+          <label for="filter-slug">Filtrar por Prova (slug)</label>
+          <input type="text" id="filter-slug" placeholder="Deixe em branco para ver todos" />
         </div>
-        <button class="btn btn-green" onclick="loadReports()">🔄 Carregar Relatório</button>
+        <button class="btn btn-green" onclick="loadReports()">🔄 Atualizar</button>
       </div>
-
-      <div id="report-loading">⏳ Carregando dados...</div>
-
+      <div id="report-loading">⏳ Carregando...</div>
       <div class="table-wrap" id="report-table-wrap">
-        <div class="empty-state">
-          <div class="icon">📊</div>
-          <div>Clique em <strong>Carregar Relatório</strong> para ver os acessos.</div>
-        </div>
+        <div class="empty-state"><div class="icon">📊</div><div>Clique em <strong>Atualizar</strong>.</div></div>
       </div>
     </section>
 
-    <!-- Users List -->
     <section class="card">
-      <h2>👥 Lista de Usuários Registrados</h2>
+      <h2>👥 Usuários Registrados</h2>
       <div class="table-wrap" id="users-table-wrap">
-        <div class="empty-state">
-          <div class="icon">👥</div>
-          <div>Clique em <strong>Carregar Relatório</strong> para ver os usuários.</div>
-        </div>
+        <div class="empty-state"><div class="icon">👥</div><div>Clique em <strong>Atualizar</strong>.</div></div>
       </div>
     </section>
 
-  </div><!-- /tab-reports -->
+  </div>
 
   <script src="./admin.js"></script>
 
   <script>
+    const DEFAULT_SUPABASE_URL = 'https://ahqwpngtawzstghcnxpa.supabase.co';
+    const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak';
+
+    function getConfig() {
+      const url = document.getElementById('supabase-url')?.value?.trim() || DEFAULT_SUPABASE_URL;
+      const key = document.getElementById('supabase-key')?.value?.trim() || DEFAULT_KEY;
+      return { url, key, headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' } };
+    }
+
     function switchTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', b.textContent.toLowerCase().includes(tab === 'publish' ? 'publicar' : 'relatório')));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-btn-' + tab).classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'reports') loadReports();
+      if (tab === 'provas') loadProvas();
+    }
+
+    async function loadProvas() {
+      const { url, headers } = getConfig();
+      try {
+        const [vRes, uRes, eRes] = await Promise.all([
+          fetch(`${url}/rest/v1/viewers?select=*&order=created_at.desc`, { headers }),
+          fetch(`${url}/rest/v1/users?select=id`, { headers }),
+          fetch(`${url}/rest/v1/event_log?select=viewer_slug`, { headers })
+        ]);
+        const viewers = vRes.ok ? await vRes.json() : [];
+        const users = uRes.ok ? await uRes.json() : [];
+        const events = eRes.ok ? await eRes.json() : [];
+
+        document.getElementById('pv-total').textContent = viewers.length;
+        document.getElementById('pv-users').textContent = users.length;
+        document.getElementById('pv-events').textContent = events.length;
+
+        const wrap = document.getElementById('provas-table-wrap');
+        if (viewers.length === 0) {
+          wrap.innerHTML = '<div class="empty-state"><div class="icon">📁</div><div>Nenhuma prova publicada ainda.</div></div>';
+          return;
+        }
+
+        const rows = viewers.map(v => {
+          const date = new Date(v.created_at).toLocaleString('pt-BR');
+          const accessCount = events.filter(e => e.viewer_slug === v.slug).length;
+          const link = `https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(v.slug)}&t=t_nova`;
+          return `<tr>
+            <td class="slug-mono">${v.slug}</td>
+            <td style="color: var(--muted); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${v.title || '–'}</td>
+            <td><span class="pill pill-blue">${accessCount} acessos</span></td>
+            <td style="color: var(--muted); font-size: 12px;">${date}</td>
+            <td><a href="${link}" target="_blank" style="color: var(--accent); font-size: 12px; text-decoration: none;">🔗 Abrir</a></td>
+          </tr>`;
+        }).join('');
+
+        wrap.innerHTML = `<table>
+          <thead><tr><th>Slug</th><th>Título</th><th>Acessos</th><th>Publicado em</th><th>Link</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
+      } catch (err) {
+        document.getElementById('provas-table-wrap').innerHTML = `<div class="empty-state" style="color: var(--red);">❌ ${err.message}</div>`;
+      }
     }
 
     async function loadReports() {
-      const DEFAULT_SUPABASE_URL = 'https://ahqwpngtawzstghcnxpa.supabase.co';
-      const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak';
-      const supabaseUrl = document.getElementById('supabase-url').value.trim() || DEFAULT_SUPABASE_URL;
-      const supabaseKey = document.getElementById('supabase-key').value.trim() || DEFAULT_KEY;
-      const slugFilter = document.getElementById('filter-slug').value.trim();
-
+      const { url, headers } = getConfig();
+      const slugFilter = document.getElementById('filter-slug')?.value?.trim();
       const loadingEl = document.getElementById('report-loading');
       const tableWrap = document.getElementById('report-table-wrap');
       const usersWrap = document.getElementById('users-table-wrap');
@@ -390,104 +479,69 @@
       tableWrap.innerHTML = '';
       usersWrap.innerHTML = '';
 
-      const headers = {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json'
-      };
-
       try {
-        // Load access_log
-        let accessUrl = `${supabaseUrl}/rest/v1/access_log?select=*&order=created_at.desc&limit=200`;
-        if (slugFilter) {
-          accessUrl += `&viewer_id=eq.${encodeURIComponent(slugFilter)}`;
-        }
-        const accessRes = await fetch(accessUrl, { headers });
-        const accessData = accessRes.ok ? await accessRes.json() : [];
+        let eventUrl = `${url}/rest/v1/event_log?select=*&order=created_at.desc&limit=200`;
+        if (slugFilter) eventUrl += `&viewer_slug=eq.${encodeURIComponent(slugFilter)}`;
 
-        // Load users
-        const usersRes = await fetch(`${supabaseUrl}/rest/v1/users?select=*&order=created_at.desc&limit=200`, { headers });
-        const usersData = usersRes.ok ? await usersRes.json() : [];
+        const [evRes, uRes] = await Promise.all([
+          fetch(eventUrl, { headers }),
+          fetch(`${url}/rest/v1/users?select=*&order=created_at.desc&limit=200`, { headers })
+        ]);
 
-        // Load viewers
-        const viewersRes = await fetch(`${supabaseUrl}/rest/v1/viewers?select=*`, { headers });
-        const viewersData = viewersRes.ok ? await viewersRes.json() : [];
+        const events = evRes.ok ? await evRes.json() : [];
+        const users = uRes.ok ? await uRes.json() : [];
+        const uniqueSlugs = new Set(events.map(e => e.viewer_slug));
 
-        // Update stats
-        const uniqueEmails = new Set();
-        accessData.forEach(a => { if (a.email) uniqueEmails.add(a.email); });
-        usersData.forEach(u => { if (u.email) uniqueEmails.add(u.email); });
+        document.getElementById('stat-total-users').textContent = users.length;
+        document.getElementById('stat-total-access').textContent = events.length;
+        document.getElementById('stat-total-provas').textContent = uniqueSlugs.size;
 
-        document.getElementById('stat-total-users').textContent = usersData.length || uniqueEmails.size;
-        document.getElementById('stat-total-access').textContent = accessData.length;
-        document.getElementById('stat-total-provas').textContent = viewersData.length;
-
-        // Render access_log table
-        if (accessData.length === 0) {
-          tableWrap.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>Nenhum acesso registrado ainda.</div></div>';
+        if (events.length === 0) {
+          tableWrap.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>Nenhum acesso registrado. Execute o SQL de configuração acima e acesse um viewer para ver os dados aqui.</div></div>';
         } else {
-          const rows = accessData.map(row => {
-            const date = row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : '–';
+          const rows = events.map(e => {
+            const date = e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '–';
             return `<tr>
-              <td>${date}</td>
-              <td class="email-cell">${row.email || '–'}</td>
-              <td><b>${row.viewer_id || '–'}</b></td>
-              <td><span class="pill pill-green">${row.event_type || 'redeem'}</span></td>
-              <td style="color: var(--muted); font-size: 11px; font-family: monospace;">${row.share_token || '–'}</td>
+              <td style="color: var(--muted); font-size: 12px;">${date}</td>
+              <td class="email-mono">${e.email || '–'}</td>
+              <td class="slug-mono">${e.viewer_slug || '–'}</td>
+              <td><span class="pill pill-green">${e.event_type || 'redeem'}</span></td>
+              <td style="color: var(--muted); font-size: 11px; font-family: monospace;">${e.share_token || '–'}</td>
             </tr>`;
           }).join('');
-
-          tableWrap.innerHTML = `
-            <table>
-              <thead>
-                <tr>
-                  <th>Data/Hora</th>
-                  <th>E-mail</th>
-                  <th>Prova (Slug)</th>
-                  <th>Evento</th>
-                  <th>Token</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-          `;
+          tableWrap.innerHTML = `<table>
+            <thead><tr><th>Data/Hora</th><th>E-mail</th><th>Prova (Slug)</th><th>Evento</th><th>Token</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
         }
 
-        // Render users table
-        if (usersData.length === 0) {
+        if (users.length === 0) {
           usersWrap.innerHTML = '<div class="empty-state"><div class="icon">👥</div><div>Nenhum usuário registrado ainda.</div></div>';
         } else {
-          const urows = usersData.map(u => {
+          const urows = users.map(u => {
             const date = u.created_at ? new Date(u.created_at).toLocaleString('pt-BR') : '–';
             return `<tr>
-              <td class="email-cell">${u.email || '–'}</td>
+              <td class="email-mono">${u.email || '–'}</td>
               <td><span class="pill pill-blue">${u.status || 'active'}</span></td>
               <td>${u.auth_provider || 'email'}</td>
-              <td>${date}</td>
+              <td style="color: var(--muted); font-size: 12px;">${date}</td>
             </tr>`;
           }).join('');
-
-          usersWrap.innerHTML = `
-            <table>
-              <thead>
-                <tr>
-                  <th>E-mail</th>
-                  <th>Status</th>
-                  <th>Origem</th>
-                  <th>Primeiro Acesso</th>
-                </tr>
-              </thead>
-              <tbody>${urows}</tbody>
-            </table>
-          `;
+          usersWrap.innerHTML = `<table>
+            <thead><tr><th>E-mail</th><th>Status</th><th>Origem</th><th>Primeiro Acesso</th></tr></thead>
+            <tbody>${urows}</tbody>
+          </table>`;
         }
-
       } catch (err) {
-        tableWrap.innerHTML = `<div class="empty-state" style="color: var(--red);">❌ Erro ao carregar: ${err.message}</div>`;
+        tableWrap.innerHTML = `<div class="empty-state" style="color: var(--red);">❌ Erro: ${err.message}</div>`;
       } finally {
         loadingEl.style.display = 'none';
       }
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(loadProvas, 500);
+    });
   </script>
 
 </body>
