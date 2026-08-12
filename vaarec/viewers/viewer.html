@@ -1571,6 +1571,7 @@ async function loadTrackFromContract(trackObj, defaultFilename, isGpxDefault) {
 async function startViewerApp() {
   const slug = VaarecClient.getSlugFromUrl();
   try {
+    VaarecClient.logViewEvent(slug);
     setLoadMsg('Carregando metadados da prova...');
     CONTRACT = await VaarecClient.fetchMeta(slug);
     window.CONTRACT = CONTRACT;

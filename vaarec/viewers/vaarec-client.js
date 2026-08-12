@@ -89,6 +89,53 @@
     },
 
     /**
+     * Log view event for every race load (both new & returning users)
+     */
+    async logViewEvent(slug) {
+      const email = this.getUserEmail();
+      if (!email) return;
+
+      const shareToken = this.getShareToken();
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      };
+
+      // Ensure user is in users table
+      try {
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/users?on_conflict=email`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email,
+            auth_provider: 'email',
+            status: 'active'
+          })
+        });
+      } catch (e) {
+        console.warn('[Log] Error saving user:', e);
+      }
+
+      // Log event in event_log
+      try {
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/event_log`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email,
+            viewer_slug: slug,
+            share_token: shareToken,
+            event_type: 'view'
+          })
+        });
+      } catch (e) {
+        console.warn('[Log] Error saving event_log:', e);
+      }
+    },
+
+    /**
      * Register email, record access in Supabase database, and grant instant session
      */
     async redeemShareToken(email) {
