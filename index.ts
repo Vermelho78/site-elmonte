@@ -137,6 +137,24 @@ async function startServer() {
     }
   });
 
+  app.get("/api/report/all-history", (req, res) => {
+    try {
+      const history = getAllHistory();
+      res.json({ success: true, count: history.length, data: history });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao carregar histórico completo" });
+    }
+  });
+
+  app.post("/api/report/clear", (req, res) => {
+    try {
+      clearHistory();
+      res.json({ success: true, message: "Histórico limpo com sucesso" });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao limpar histórico" });
+    }
+  });
+
   app.get("/api/report/gpx/:vesselNumber", (req, res) => {
     try {
       const vessel = getVesselHistory(req.params.vesselNumber);
