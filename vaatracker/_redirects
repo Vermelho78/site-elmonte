@@ -1,4 +1,10 @@
 # Cloudflare Pages Redirects para VAA Tracker SPA
+/vaatracker/relatorio     /vaatracker/index.html     200
+/vaatracker/relatorio/    /vaatracker/index.html     200
+/vaatracker/relatorio/*   /vaatracker/index.html     200
+/vaatracker/report        /vaatracker/index.html     200
+/vaatracker/report/       /vaatracker/index.html     200
+/vaatracker/report/*      /vaatracker/index.html     200
 /vaatracker/competitor    /vaatracker/index.html     200
 /vaatracker/competitor/   /vaatracker/index.html     200
 /vaatracker/competitor/*  /vaatracker/index.html     200
