@@ -2,12 +2,16 @@
  * Cloudflare Worker Backend for VaaTracker
  * Handles:
  * 1. REST API (/api/...) for cross-device position updates, approvals, reports, GPX export
- * 2. Real-time WebSockets (/ws & /socket.io/)
- * 3. Static Assets serving via env.ASSETS
+ * 2. Cross-isolate persistence via caches.default
+ * 3. Real-time WebSockets & Socket.IO handshake (/ws & /socket.io/)
+ * 4. Static Assets serving via env.ASSETS
  */
 
-const activeVessels = new Map();
-const positionHistory = new Map();
+const CACHE_VESSELS_URL = "https://elmonte.dev.br/__store_vessels_cache_v1__";
+const CACHE_HISTORY_URL = "https://elmonte.dev.br/__store_history_cache_v1__";
+
+const inMemoryVessels = new Map();
+const inMemoryHistory = new Map();
 const wsClients = new Set();
 
 function corsHeaders() {
@@ -41,52 +45,86 @@ function broadcast(event, payload) {
   }
 }
 
-function recordHistoryPoint(p) {
-  const numKey = (p.vesselNumber || "").toString().trim().toLowerCase();
-  if (!numKey) return;
+async function getPersistedVessels() {
+  const map = new Map(inMemoryVessels);
+  try {
+    const cache = caches.default;
+    const res = await cache.match(new Request(CACHE_VESSELS_URL));
+    if (res) {
+      const arr = await res.json();
+      if (Array.isArray(arr)) {
+        arr.forEach((v) => {
+          if (v && v.vesselNumber) {
+            const k = v.vesselNumber.trim().toLowerCase();
+            const existing = map.get(k);
+            if (!existing || (v.timestamp && v.timestamp >= (existing.timestamp || 0))) {
+              map.set(k, v);
+            }
+          }
+        });
+      }
+    }
+  } catch (e) {}
+  return map;
+}
 
-  if (!positionHistory.has(numKey)) {
-    positionHistory.set(numKey, {
-      vesselId: p.vesselId || p.vesselNumber,
-      vesselNumber: p.vesselNumber,
-      competitorName: p.competitorName || "Competidor",
-      modality: p.modality,
-      category: p.category,
-      club: p.club,
-      largadaTitle: p.largadaTitle,
-      firstSeenAt: p.timestamp || Date.now(),
-      lastSeenAt: p.timestamp || Date.now(),
-      pointsCount: 0,
-      points: [],
+async function savePersistedVessels(map) {
+  try {
+    const arr = Array.from(map.values());
+    const cache = caches.default;
+    const res = new Response(JSON.stringify(arr), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=86400, s-maxage=86400",
+      },
     });
-  }
+    await cache.put(new Request(CACHE_VESSELS_URL), res);
+  } catch (e) {}
+}
 
-  const record = positionHistory.get(numKey);
-  record.lastSeenAt = p.timestamp || Date.now();
-  if (p.competitorName && p.competitorName !== "Competidor") record.competitorName = p.competitorName;
-  if (p.modality) record.modality = p.modality;
-  if (p.category) record.category = p.category;
-  if (p.club) record.club = p.club;
-  if (p.largadaTitle) record.largadaTitle = p.largadaTitle;
+async function getPersistedHistory() {
+  const map = new Map(inMemoryHistory);
+  try {
+    const cache = caches.default;
+    const res = await cache.match(new Request(CACHE_HISTORY_URL));
+    if (res) {
+      const arr = await res.json();
+      if (Array.isArray(arr)) {
+        arr.forEach((h) => {
+          if (h && h.vesselNumber) {
+            const k = h.vesselNumber.trim().toLowerCase();
+            const existing = map.get(k);
+            if (!existing) {
+              map.set(k, h);
+            } else {
+              // Merge points
+              const ptMap = new Map();
+              (existing.points || []).forEach((p) => ptMap.set(`${p.latitude},${p.longitude}`, p));
+              (h.points || []).forEach((p) => ptMap.set(`${p.latitude},${p.longitude}`, p));
+              existing.points = Array.from(ptMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+              existing.pointsCount = existing.points.length;
+              existing.lastSeenAt = Math.max(existing.lastSeenAt || 0, h.lastSeenAt || 0);
+            }
+          }
+        });
+      }
+    }
+  } catch (e) {}
+  return map;
+}
 
-  const lat = Number(p.latitude);
-  const lng = Number(p.longitude);
-  const ts = Number(p.timestamp) || Date.now();
-
-  // Avoid duplicate points
-  const isDuplicate = record.points.some(
-    (existing) => Math.abs(existing.latitude - lat) < 0.000001 && Math.abs(existing.longitude - lng) < 0.000001 && Math.abs(existing.timestamp - ts) < 1000
-  );
-
-  if (!isDuplicate) {
-    record.points.push({
-      latitude: lat,
-      longitude: lng,
-      accuracy: p.accuracy ? Number(p.accuracy) : undefined,
-      timestamp: ts,
+async function savePersistedHistory(map) {
+  try {
+    const arr = Array.from(map.values());
+    const cache = caches.default;
+    const res = new Response(JSON.stringify(arr), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=86400, s-maxage=86400",
+      },
     });
-    record.pointsCount = record.points.length;
-  }
+    await cache.put(new Request(CACHE_HISTORY_URL), res);
+  } catch (e) {}
 }
 
 function generateGPX(record) {
@@ -98,7 +136,7 @@ function generateGPX(record) {
   if (Array.isArray(record.points)) {
     record.points.forEach((pt) => {
       const iso = new Date(pt.timestamp).toISOString();
-      trkpts += `      <trkpt lat="${pt.latitude.toFixed(6)}" lon="${pt.longitude.toFixed(6)}">
+      trkpts += `      <trkpt lat="${Number(pt.latitude).toFixed(6)}" lon="${Number(pt.longitude).toFixed(6)}">
         <time>${iso}</time>
       </trkpt>\n`;
     });
@@ -136,7 +174,8 @@ export default {
 
     // 3. GET /api/vessels
     if (pathname === "/api/vessels" && request.method === "GET") {
-      const list = Array.from(activeVessels.values());
+      const vesselsMap = await getPersistedVessels();
+      const list = Array.from(vesselsMap.values());
       return jsonResponse({ success: true, count: list.length, data: list });
     }
 
@@ -151,8 +190,10 @@ export default {
         }
 
         const numKey = vesselNumber.toString().trim().toLowerCase();
-        const existing = activeVessels.get(numKey);
+        const vesselsMap = await getPersistedVessels();
+        const historyMap = await getPersistedHistory();
 
+        const existing = vesselsMap.get(numKey);
         const approvalStatus = body.approvalStatus || existing?.approvalStatus || "pending";
         const isHidden = body.isHidden !== undefined ? body.isHidden : (existing?.isHidden || false);
         const isSos = body.isSos !== undefined ? body.isSos : (existing?.isSos || false);
@@ -176,23 +217,67 @@ export default {
           sosMessage: body.sosMessage || existing?.sosMessage,
         };
 
-        activeVessels.set(numKey, vesselData);
-        recordHistoryPoint(vesselData);
+        vesselsMap.set(numKey, vesselData);
+        inMemoryVessels.set(numKey, vesselData);
 
-        // If historical points array was provided in payload, record them too
+        // Update history
+        if (!historyMap.has(numKey)) {
+          historyMap.set(numKey, {
+            vesselId: vesselData.vesselId,
+            vesselNumber: vesselData.vesselNumber,
+            competitorName: vesselData.competitorName,
+            modality: vesselData.modality,
+            category: vesselData.category,
+            club: vesselData.club,
+            largadaTitle: vesselData.largadaTitle,
+            firstSeenAt: vesselData.timestamp,
+            lastSeenAt: vesselData.timestamp,
+            pointsCount: 0,
+            points: [],
+          });
+        }
+
+        const hist = historyMap.get(numKey);
+        hist.lastSeenAt = vesselData.timestamp;
+        if (vesselData.competitorName && vesselData.competitorName !== "Competidor") hist.competitorName = vesselData.competitorName;
+        if (vesselData.modality) hist.modality = vesselData.modality;
+        if (vesselData.category) hist.category = vesselData.category;
+        if (vesselData.club) hist.club = vesselData.club;
+        if (vesselData.largadaTitle) hist.largadaTitle = vesselData.largadaTitle;
+
+        // Add point
+        hist.points.push({
+          latitude: vesselData.latitude,
+          longitude: vesselData.longitude,
+          accuracy: vesselData.accuracy,
+          timestamp: vesselData.timestamp,
+        });
+
+        // If batch points were provided in request, merge them
         if (Array.isArray(body.points) && body.points.length > 0) {
-          body.points.forEach((pt) => {
-            if (pt && typeof pt.latitude === "number" && typeof pt.longitude === "number") {
-              recordHistoryPoint({
-                ...vesselData,
-                latitude: pt.latitude,
-                longitude: pt.longitude,
-                accuracy: pt.accuracy,
-                timestamp: pt.timestamp,
+          body.points.forEach((p) => {
+            if (p && typeof p.latitude === "number" && typeof p.longitude === "number") {
+              hist.points.push({
+                latitude: Number(p.latitude),
+                longitude: Number(p.longitude),
+                accuracy: p.accuracy ? Number(p.accuracy) : undefined,
+                timestamp: p.timestamp || Date.now(),
               });
             }
           });
         }
+
+        // Deduplicate and sort points
+        const ptMap = new Map();
+        hist.points.forEach((p) => ptMap.set(`${Number(p.latitude).toFixed(6)},${Number(p.longitude).toFixed(6)}`, p));
+        hist.points = Array.from(ptMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+        hist.pointsCount = hist.points.length;
+
+        inMemoryHistory.set(numKey, hist);
+
+        // Async save to Cloudflare Cache
+        await savePersistedVessels(vesselsMap);
+        await savePersistedHistory(historyMap);
 
         // Broadcast to WebSocket clients
         broadcast("position:updated", vesselData);
@@ -212,22 +297,27 @@ export default {
       try {
         const body = await request.json();
         const { vesselId, vesselNumber, approveAll } = body || {};
+        const vesselsMap = await getPersistedVessels();
 
         if (approveAll) {
-          for (const [k, v] of activeVessels) {
+          for (const [k, v] of vesselsMap) {
             v.approvalStatus = "approved";
+            inMemoryVessels.set(k, v);
           }
+          await savePersistedVessels(vesselsMap);
           broadcast("vessel:approved", { approveAll: true });
           return jsonResponse({ success: true, approveAll: true });
         }
 
         const key = (vesselNumber || "").toString().trim().toLowerCase();
-        for (const [k, v] of activeVessels) {
+        for (const [k, v] of vesselsMap) {
           if (k === key || (vesselId && String(v.vesselId) === String(vesselId))) {
             v.approvalStatus = "approved";
+            inMemoryVessels.set(k, v);
           }
         }
 
+        await savePersistedVessels(vesselsMap);
         broadcast("vessel:approved", { vesselId, vesselNumber });
         return jsonResponse({ success: true, vesselNumber, approvalStatus: "approved" });
       } catch (e) {
@@ -240,20 +330,25 @@ export default {
       try {
         const body = await request.json();
         const { vesselId, vesselNumber, clearAll } = body || {};
+        const vesselsMap = await getPersistedVessels();
 
         if (clearAll) {
-          activeVessels.clear();
+          vesselsMap.clear();
+          inMemoryVessels.clear();
+          await savePersistedVessels(vesselsMap);
           broadcast("vessel:removed", { clearAll: true });
           return jsonResponse({ success: true, clearAll: true });
         }
 
         const key = (vesselNumber || "").toString().trim().toLowerCase();
-        for (const [k, v] of activeVessels) {
+        for (const [k, v] of vesselsMap) {
           if (k === key || (vesselId && String(v.vesselId) === String(vesselId))) {
-            activeVessels.delete(k);
+            vesselsMap.delete(k);
+            inMemoryVessels.delete(k);
           }
         }
 
+        await savePersistedVessels(vesselsMap);
         broadcast("vessel:removed", { vesselId, vesselNumber });
         return jsonResponse({ success: true });
       } catch (e) {
@@ -267,14 +362,17 @@ export default {
         const body = await request.json();
         const { vesselNumber, vesselId, message } = body || {};
         const key = (vesselNumber || "").toString().trim().toLowerCase();
+        const vesselsMap = await getPersistedVessels();
 
-        for (const [k, v] of activeVessels) {
+        for (const [k, v] of vesselsMap) {
           if (k === key || (vesselId && String(v.vesselId) === String(vesselId))) {
             v.isSos = true;
             v.sosMessage = message || "EMERGÊNCIA ACIONADA!";
+            inMemoryVessels.set(k, v);
             broadcast("vessel:sos_alert", v);
           }
         }
+        await savePersistedVessels(vesselsMap);
         return jsonResponse({ success: true, isSos: true });
       } catch (e) {
         return jsonResponse({ error: "SOS error" }, 500);
@@ -287,14 +385,17 @@ export default {
         const body = await request.json();
         const { vesselNumber, vesselId } = body || {};
         const key = (vesselNumber || "").toString().trim().toLowerCase();
+        const vesselsMap = await getPersistedVessels();
 
-        for (const [k, v] of activeVessels) {
+        for (const [k, v] of vesselsMap) {
           if (k === key || (vesselId && String(v.vesselId) === String(vesselId))) {
             v.isSos = false;
             v.sosMessage = undefined;
+            inMemoryVessels.set(k, v);
             broadcast("vessel:sos_resolved", { vesselId, vesselNumber });
           }
         }
+        await savePersistedVessels(vesselsMap);
         return jsonResponse({ success: true });
       } catch (e) {
         return jsonResponse({ error: "SOS resolve error" }, 500);
@@ -303,19 +404,38 @@ export default {
 
     // 9. GET /api/report/all-history or /api/report/data
     if (pathname === "/api/report/all-history" || pathname === "/api/report/data") {
-      if (positionHistory.size === 0 && activeVessels.size > 0) {
-        for (const [k, v] of activeVessels) {
-          recordHistoryPoint(v);
+      const historyMap = await getPersistedHistory();
+      const vesselsMap = await getPersistedVessels();
+
+      // If history is empty but vessels exist, backfill
+      if (historyMap.size === 0 && vesselsMap.size > 0) {
+        for (const [k, v] of vesselsMap) {
+          historyMap.set(k, {
+            vesselId: v.vesselId,
+            vesselNumber: v.vesselNumber,
+            competitorName: v.competitorName,
+            modality: v.modality,
+            category: v.category,
+            club: v.club,
+            largadaTitle: v.largadaTitle,
+            firstSeenAt: v.timestamp,
+            lastSeenAt: v.timestamp,
+            pointsCount: 1,
+            points: [{ latitude: v.latitude, longitude: v.longitude, accuracy: v.accuracy, timestamp: v.timestamp }],
+          });
         }
       }
-      const records = Array.from(positionHistory.values());
+
+      const records = Array.from(historyMap.values());
       return jsonResponse({ success: true, count: records.length, data: records });
     }
 
     // 10. POST /api/report/clear
     if (pathname === "/api/report/clear" && request.method === "POST") {
-      positionHistory.clear();
-      activeVessels.clear();
+      inMemoryHistory.clear();
+      inMemoryVessels.clear();
+      await savePersistedVessels(new Map());
+      await savePersistedHistory(new Map());
       broadcast("vessel:removed", { clearAll: true });
       return jsonResponse({ success: true, message: "History cleared" });
     }
@@ -323,20 +443,14 @@ export default {
     // 11. GET /api/report/gpx/:vesselId
     if (pathname.startsWith("/api/report/gpx/")) {
       const param = decodeURIComponent(pathname.replace("/api/report/gpx/", "")).trim().toLowerCase();
+      const historyMap = await getPersistedHistory();
       let foundRecord = null;
 
-      for (const [k, record] of positionHistory) {
+      for (const [k, record] of historyMap) {
         if (k === param || String(record.vesselId).toLowerCase() === param || record.vesselNumber.toLowerCase() === param) {
           foundRecord = record;
           break;
         }
-      }
-
-      // If not in positionHistory, try activeVessels
-      if (!foundRecord && activeVessels.has(param)) {
-        const v = activeVessels.get(param);
-        recordHistoryPoint(v);
-        foundRecord = positionHistory.get(param);
       }
 
       if (!foundRecord) {
@@ -354,8 +468,22 @@ export default {
       });
     }
 
-    // 12. WebSocket Upgrade Handler (/ws or Upgrade: websocket)
-    if (request.headers.get("Upgrade") === "websocket" || pathname === "/ws") {
+    // 12. Socket.IO Handshake / Polling / WebSocket
+    if (pathname.startsWith("/socket.io/")) {
+      const transport = url.searchParams.get("transport");
+      if (transport === "polling") {
+        const sid = "vaa_" + Math.random().toString(36).substring(2, 9);
+        return new Response(`0{"sid":"${sid}","upgrades":["websocket"],"pingInterval":25000,"pingTimeout":20000}`, {
+          headers: {
+            "Content-Type": "text/plain; charset=UTF-8",
+            ...corsHeaders(),
+          },
+        });
+      }
+    }
+
+    // 13. WebSocket Upgrade Handler (/ws or Upgrade: websocket)
+    if (request.headers.get("Upgrade") === "websocket" || pathname === "/ws" || pathname.startsWith("/socket.io/")) {
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
 
@@ -363,21 +491,27 @@ export default {
       wsClients.add(server);
 
       // Send initial positions
-      const list = Array.from(activeVessels.values());
-      server.send(JSON.stringify({ type: "monitor:positions", payload: list, data: list }));
+      getPersistedVessels().then((map) => {
+        const list = Array.from(map.values());
+        try {
+          server.send(JSON.stringify({ type: "monitor:positions", payload: list, data: list }));
+        } catch (e) {}
+      });
 
-      server.addEventListener("message", (event) => {
+      server.addEventListener("message", async (event) => {
         try {
           const msg = JSON.parse(event.data);
           const type = msg.type || msg.event;
           const payload = msg.payload || msg.data;
 
           if (type === "monitor:request-positions") {
-            const currentList = Array.from(activeVessels.values());
+            const map = await getPersistedVessels();
+            const currentList = Array.from(map.values());
             server.send(JSON.stringify({ type: "monitor:positions", payload: currentList, data: currentList }));
           } else if (type === "vessel:register" && payload) {
             const key = (payload.vesselNumber || "").toString().trim().toLowerCase();
-            const existing = activeVessels.get(key);
+            const map = await getPersistedVessels();
+            const existing = map.get(key);
             const v = {
               vesselId: payload.vesselId || payload.vesselNumber,
               vesselNumber: payload.vesselNumber,
@@ -392,13 +526,15 @@ export default {
               club: payload.club,
               largadaTitle: payload.largadaTitle,
             };
-            activeVessels.set(key, v);
-            recordHistoryPoint(v);
+            map.set(key, v);
+            inMemoryVessels.set(key, v);
+            await savePersistedVessels(map);
             broadcast("vessel:registered", v);
             server.send(JSON.stringify({ type: "vessel:registered", payload: v }));
           } else if (type === "position:update" && payload) {
             const key = (payload.vesselNumber || "").toString().trim().toLowerCase();
-            const existing = activeVessels.get(key);
+            const map = await getPersistedVessels();
+            const existing = map.get(key);
             const v = {
               vesselId: payload.vesselId || existing?.vesselId || payload.vesselNumber,
               vesselNumber: payload.vesselNumber,
@@ -415,16 +551,20 @@ export default {
               largadaTitle: payload.largadaTitle || existing?.largadaTitle,
               isSos: payload.isSos !== undefined ? payload.isSos : (existing?.isSos || false),
             };
-            activeVessels.set(key, v);
-            recordHistoryPoint(v);
+            map.set(key, v);
+            inMemoryVessels.set(key, v);
+            await savePersistedVessels(map);
             broadcast("position:updated", v);
           } else if (type === "vessel:approved" && payload) {
             const key = (payload.vesselNumber || "").toString().trim().toLowerCase();
-            for (const [k, v] of activeVessels) {
+            const map = await getPersistedVessels();
+            for (const [k, v] of map) {
               if (payload.approveAll || k === key || (payload.vesselId && String(v.vesselId) === String(payload.vesselId))) {
                 v.approvalStatus = "approved";
+                inMemoryVessels.set(k, v);
               }
             }
+            await savePersistedVessels(map);
             broadcast("vessel:approved", payload);
           }
         } catch (e) {}
@@ -440,7 +580,7 @@ export default {
       });
     }
 
-    // 13. Fallback to static assets
+    // 14. Fallback to static assets
     if (env && env.ASSETS) {
       return env.ASSETS.fetch(request);
     }
