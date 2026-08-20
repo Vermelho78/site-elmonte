@@ -69,13 +69,24 @@ function recordHistoryPoint(p) {
   if (p.club) record.club = p.club;
   if (p.largadaTitle) record.largadaTitle = p.largadaTitle;
 
-  record.points.push({
-    latitude: Number(p.latitude),
-    longitude: Number(p.longitude),
-    accuracy: p.accuracy ? Number(p.accuracy) : undefined,
-    timestamp: Number(p.timestamp) || Date.now(),
-  });
-  record.pointsCount = record.points.length;
+  const lat = Number(p.latitude);
+  const lng = Number(p.longitude);
+  const ts = Number(p.timestamp) || Date.now();
+
+  // Avoid duplicate points
+  const isDuplicate = record.points.some(
+    (existing) => Math.abs(existing.latitude - lat) < 0.000001 && Math.abs(existing.longitude - lng) < 0.000001 && Math.abs(existing.timestamp - ts) < 1000
+  );
+
+  if (!isDuplicate) {
+    record.points.push({
+      latitude: lat,
+      longitude: lng,
+      accuracy: p.accuracy ? Number(p.accuracy) : undefined,
+      timestamp: ts,
+    });
+    record.pointsCount = record.points.length;
+  }
 }
 
 function generateGPX(record) {
@@ -167,6 +178,21 @@ export default {
 
         activeVessels.set(numKey, vesselData);
         recordHistoryPoint(vesselData);
+
+        // If historical points array was provided in payload, record them too
+        if (Array.isArray(body.points) && body.points.length > 0) {
+          body.points.forEach((pt) => {
+            if (pt && typeof pt.latitude === "number" && typeof pt.longitude === "number") {
+              recordHistoryPoint({
+                ...vesselData,
+                latitude: pt.latitude,
+                longitude: pt.longitude,
+                accuracy: pt.accuracy,
+                timestamp: pt.timestamp,
+              });
+            }
+          });
+        }
 
         // Broadcast to WebSocket clients
         broadcast("position:updated", vesselData);
@@ -275,8 +301,13 @@ export default {
       }
     }
 
-    // 9. GET /api/report/all-history
-    if (pathname === "/api/report/all-history") {
+    // 9. GET /api/report/all-history or /api/report/data
+    if (pathname === "/api/report/all-history" || pathname === "/api/report/data") {
+      if (positionHistory.size === 0 && activeVessels.size > 0) {
+        for (const [k, v] of activeVessels) {
+          recordHistoryPoint(v);
+        }
+      }
       const records = Array.from(positionHistory.values());
       return jsonResponse({ success: true, count: records.length, data: records });
     }
@@ -299,6 +330,13 @@ export default {
           foundRecord = record;
           break;
         }
+      }
+
+      // If not in positionHistory, try activeVessels
+      if (!foundRecord && activeVessels.has(param)) {
+        const v = activeVessels.get(param);
+        recordHistoryPoint(v);
+        foundRecord = positionHistory.get(param);
       }
 
       if (!foundRecord) {
@@ -355,6 +393,7 @@ export default {
               largadaTitle: payload.largadaTitle,
             };
             activeVessels.set(key, v);
+            recordHistoryPoint(v);
             broadcast("vessel:registered", v);
             server.send(JSON.stringify({ type: "vessel:registered", payload: v }));
           } else if (type === "position:update" && payload) {
