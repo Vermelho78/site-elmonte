@@ -5,7 +5,9 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { Server as SocketIOServer } from "socket.io";
 import { appRouter } from "./routers";
-import { setupSocketIO } from "./socketio";
+import { setupSocketIO, getActiveVessels } from "./socketio";
+import { recordPositionToHistory, getAllHistory, getVesselHistory, clearAllHistory } from "./historyStore";
+import { generateSingleGPX, generateMultiGPX } from "./lib/gpxGenerator";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -30,6 +32,17 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // CORS middleware for Express
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-session-token");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // Initialize Socket.io for real-time communication
   const io = new SocketIOServer(server, {
     cors: {
@@ -53,9 +66,13 @@ async function startServer() {
     res.json({ status: "online", service: "VaaTracker Realtime Backend", timestamp: Date.now() });
   });
 
+  app.get("/api/vessels", (req, res) => {
+    res.json({ success: true, count: getActiveVessels().length, data: getActiveVessels() });
+  });
+
   // REST Fallback for HTTP position updates from 4G/5G mobile phones
   app.post("/api/position", (req, res) => {
-    const { vesselId, vesselNumber, competitorName, latitude, longitude, accuracy, timestamp, isSos } = req.body;
+    const { vesselId, vesselNumber, competitorName, latitude, longitude, accuracy, timestamp, isSos, modality, category, club, largadaTitle, approvalStatus } = req.body;
     if (!latitude || !longitude) {
       return res.status(400).json({ error: "Missing latitude or longitude" });
     }
@@ -69,11 +86,127 @@ async function startServer() {
       accuracy: Number(accuracy) || 5,
       timestamp: Number(timestamp) || Date.now(),
       status: "active",
+      approvalStatus: approvalStatus || "pending",
       isSos: Boolean(isSos),
+      modality,
+      category,
+      club,
+      largadaTitle,
     };
 
+    recordPositionToHistory(payload);
     io.emit("position:updated", payload);
-    res.json({ success: true, timestamp: payload.timestamp });
+    res.json({ success: true, timestamp: payload.timestamp, approvalStatus: payload.approvalStatus });
+  });
+
+  // REST Approval
+  app.post("/api/vessel/approve", (req, res) => {
+    const { vesselId, vesselNumber, approveAll } = req.body;
+    if (approveAll) {
+      io.emit("vessel:approved", { approveAll: true, approvedAt: Date.now() });
+      return res.json({ success: true, approveAll: true });
+    }
+    io.emit("vessel:approved", { vesselId, vesselNumber, approvedAt: Date.now() });
+    res.json({ success: true, vesselNumber, approvalStatus: "approved" });
+  });
+
+  app.post("/api/vessel/reject", (req, res) => {
+    const { vesselId, vesselNumber } = req.body;
+    io.emit("vessel:rejected", { vesselId, vesselNumber });
+    res.json({ success: true });
+  });
+
+  app.post("/api/vessel/remove", (req, res) => {
+    const { vesselId, vesselNumber, clearAll } = req.body;
+    io.emit("vessel:removed", { vesselId, vesselNumber, clearAll });
+    res.json({ success: true });
+  });
+
+  // Report endpoints
+  app.get("/api/report/all-history", (req, res) => {
+    try {
+      const history = getAllHistory();
+      res.json({ success: true, count: history.length, data: history });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao carregar dados do relatório" });
+    }
+  });
+
+  app.get("/api/report/data", (req, res) => {
+    try {
+      const history = getAllHistory();
+      res.json({ success: true, count: history.length, data: history });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao carregar dados do relatório" });
+    }
+  });
+
+  app.post("/api/report/clear", (req, res) => {
+    try {
+      clearAllHistory();
+      res.json({ success: true, message: "Histórico limpo com sucesso" });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao limpar histórico" });
+    }
+  });
+
+  app.get("/api/report/gpx/:vesselNumber", (req, res) => {
+    try {
+      const vessel = getVesselHistory(req.params.vesselNumber);
+      if (!vessel || !vessel.points || vessel.points.length === 0) {
+        return res.status(404).send("Histórico de pontos não encontrado para esta canoa");
+      }
+      const gpxContent = generateSingleGPX({
+        vesselNumber: vessel.vesselNumber,
+        competitorName: vessel.competitorName,
+        modality: vessel.modality,
+        category: vessel.category,
+        club: vessel.club,
+        largadaTitle: vessel.largadaTitle,
+        points: vessel.points,
+      });
+      const filename = `canoa_${vessel.vesselNumber.replace(/[^a-zA-Z0-9_-]/g, "_")}.gpx`;
+      res.setHeader("Content-Type", "application/gpx+xml; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(gpxContent);
+    } catch (err) {
+      res.status(500).send("Erro ao gerar arquivo GPX");
+    }
+  });
+
+  app.get("/api/report/gpx", (req, res) => {
+    try {
+      const allHistory = getAllHistory();
+      const tracks = allHistory.map((v) => ({
+        vesselNumber: v.vesselNumber,
+        competitorName: v.competitorName,
+        modality: v.modality,
+        category: v.category,
+        club: v.club,
+        largadaTitle: v.largadaTitle,
+        points: v.points,
+      }));
+      const gpxContent = generateMultiGPX(tracks, "VaaTracker - Relatorio Geral da Prova");
+      res.setHeader("Content-Type", "application/gpx+xml; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="vaatracker_todas_canoas.gpx"`);
+      res.send(gpxContent);
+    } catch (err) {
+      res.status(500).send("Erro ao gerar arquivo GPX geral");
+    }
+  });
+
+  app.post("/api/report/sync", (req, res) => {
+    try {
+      const { items } = req.body;
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          recordPositionToHistory(item);
+        }
+      }
+      res.json({ success: true, count: items?.length || 0 });
+    } catch (err) {
+      res.status(500).json({ error: "Erro ao sincronizar pontos do relatório" });
+    }
   });
 
   app.post("/api/sos", (req, res) => {
@@ -128,8 +261,7 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`=================================================`);
     console.log(`🚀 Sistema PWA de Rastreamento ativo!`);
-    console.log(`📱 Acesso pelo Celular (Wi-Fi): http://192.168.0.229:${port}/competitor`);
-    console.log(`🖥️ Painel Organizador (Notebook): http://localhost:${port}/monitor`);
+    console.log(`📡 Backend URL: https://vaatracker-backend.onrender.com`);
     console.log(`=================================================`);
   });
 }
