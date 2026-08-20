@@ -5,7 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { Server as SocketIOServer } from "socket.io";
 import { appRouter } from "./routers";
-import { setupSocketIO, getActiveVessels } from "./socketio";
+import { setupSocketIO, getActiveVessels, updateActiveVessel, approveVesselInState, removeVesselFromState } from "./socketio";
 import { recordPositionToHistory, getAllHistory, getVesselHistory, clearAllHistory } from "./historyStore";
 import { generateSingleGPX, generateMultiGPX } from "./lib/gpxGenerator";
 
@@ -94,14 +94,17 @@ async function startServer() {
       largadaTitle,
     };
 
+    updateActiveVessel(payload as any);
     recordPositionToHistory(payload);
     io.emit("position:updated", payload);
-    res.json({ success: true, timestamp: payload.timestamp, approvalStatus: payload.approvalStatus });
+    const updatedV = getActiveVessels().find((v) => v.vesselNumber.toLowerCase() === (vesselNumber || "").toLowerCase());
+    res.json({ success: true, timestamp: payload.timestamp, approvalStatus: updatedV?.approvalStatus || payload.approvalStatus });
   });
 
   // REST Approval
   app.post("/api/vessel/approve", (req, res) => {
     const { vesselId, vesselNumber, approveAll } = req.body;
+    approveVesselInState(vesselNumber || vesselId, approveAll);
     if (approveAll) {
       io.emit("vessel:approved", { approveAll: true, approvedAt: Date.now() });
       return res.json({ success: true, approveAll: true });
@@ -112,41 +115,25 @@ async function startServer() {
 
   app.post("/api/vessel/reject", (req, res) => {
     const { vesselId, vesselNumber } = req.body;
+    removeVesselFromState(vesselNumber || vesselId);
     io.emit("vessel:rejected", { vesselId, vesselNumber });
     res.json({ success: true });
   });
 
   app.post("/api/vessel/remove", (req, res) => {
     const { vesselId, vesselNumber, clearAll } = req.body;
+    removeVesselFromState(vesselNumber || vesselId, clearAll);
     io.emit("vessel:removed", { vesselId, vesselNumber, clearAll });
     res.json({ success: true });
   });
 
   // Report endpoints
-  app.get("/api/report/all-history", (req, res) => {
-    try {
-      const history = getAllHistory();
-      res.json({ success: true, count: history.length, data: history });
-    } catch (err) {
-      res.status(500).json({ error: "Erro ao carregar dados do relatório" });
-    }
-  });
-
   app.get("/api/report/data", (req, res) => {
     try {
       const history = getAllHistory();
       res.json({ success: true, count: history.length, data: history });
     } catch (err) {
       res.status(500).json({ error: "Erro ao carregar dados do relatório" });
-    }
-  });
-
-  app.post("/api/report/clear", (req, res) => {
-    try {
-      clearAllHistory();
-      res.json({ success: true, message: "Histórico limpo com sucesso" });
-    } catch (err) {
-      res.status(500).json({ error: "Erro ao limpar histórico" });
     }
   });
 
@@ -261,7 +248,8 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`=================================================`);
     console.log(`🚀 Sistema PWA de Rastreamento ativo!`);
-    console.log(`📡 Backend URL: https://vaatracker-backend.onrender.com`);
+    console.log(`📱 Acesso pelo Celular (Wi-Fi): http://192.168.0.229:${port}/competitor`);
+    console.log(`🖥️ Painel Organizador (Notebook): http://localhost:${port}/monitor`);
     console.log(`=================================================`);
   });
 }

@@ -33,6 +33,7 @@ export function setupSocketIO(io: SocketIOServer) {
 
     /**
      * Competitor registers and starts sending positions
+     * Payload: { vesselNumber, competitorName, sessionToken, modality, category, club, largadaTitle }
      */
     socket.on("vessel:register", async (data: any) => {
       try {
@@ -129,6 +130,7 @@ export function setupSocketIO(io: SocketIOServer) {
 
     /**
      * Receive position update from competitor
+     * Payload: { latitude, longitude, accuracy, timestamp, modality, category, club, largadaTitle, isSos }
      */
     socket.on("position:update", async (data: any) => {
       try {
@@ -295,6 +297,7 @@ export function setupSocketIO(io: SocketIOServer) {
 
     /**
      * Monitor APPROVES a vessel (individual)
+     * Payload: { vesselId, vesselNumber }
      */
     socket.on("vessel:approved", (data: any) => {
       try {
@@ -481,4 +484,46 @@ export function setupSocketIO(io: SocketIOServer) {
 
 export function getActiveVessels(): VesselPosition[] {
   return Array.from(activeVessels.values());
+}
+
+export function updateActiveVessel(payload: VesselPosition) {
+  const numKey = (payload.vesselNumber || "").toString().trim().toLowerCase();
+  if (!numKey) return;
+  const existing = activeVessels.get(numKey);
+  const appStatus = payload.approvalStatus || existing?.approvalStatus || "pending";
+  activeVessels.set(numKey, {
+    ...existing,
+    ...payload,
+    approvalStatus: appStatus,
+  });
+}
+
+export function approveVesselInState(vesselNumberOrId?: string, approveAll?: boolean) {
+  if (approveAll) {
+    activeVessels.forEach((v) => {
+      v.approvalStatus = "approved";
+    });
+    return;
+  }
+  if (!vesselNumberOrId) return;
+  const key = vesselNumberOrId.toString().trim().toLowerCase();
+  activeVessels.forEach((v, k) => {
+    if (k === key || String(v.vesselId) === String(vesselNumberOrId)) {
+      v.approvalStatus = "approved";
+    }
+  });
+}
+
+export function removeVesselFromState(vesselNumberOrId?: string, clearAll?: boolean) {
+  if (clearAll) {
+    activeVessels.clear();
+    return;
+  }
+  if (!vesselNumberOrId) return;
+  const key = vesselNumberOrId.toString().trim().toLowerCase();
+  activeVessels.forEach((v, k) => {
+    if (k === key || String(v.vesselId) === String(vesselNumberOrId)) {
+      activeVessels.delete(k);
+    }
+  });
 }
