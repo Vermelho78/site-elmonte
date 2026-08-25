@@ -398,6 +398,9 @@
           <button class="btn-tool-act" onclick="applyTrimAction()" title="Cortar para faixa selecionada">
             <i class="fa-solid fa-crop-simple" style="color:var(--green)"></i> Cortar (Trim)
           </button>
+          <button class="btn-tool-act" onclick="openSmoothingModal()" title="Suavizar ruído de velocidade (relógio no pulso / oscilação de braçada)">
+            <i class="fa-solid fa-water" style="color:var(--cyan)"></i> 🌊 Suavizar
+          </button>
           <button class="btn-tool-act" onclick="openStartModal()" title="Definir largada oficial por horário ou agulha">
             <i class="fa-solid fa-flag" style="color:var(--gold)"></i> 🏁 Largada
           </button>
@@ -754,6 +757,58 @@
   </div>
 </div>
 
+<!-- Modal: Suavização & Filtro de Remada no Pulso -->
+<div class="studio-modal-overlay" id="modal-smoothing">
+  <div class="studio-modal-card">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-water" style="color:var(--cyan)"></i> Suavização &amp; Filtro de Pulso</div>
+      <button class="btn-mini" onclick="closeModal('modal-smoothing')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body">
+      <p style="color:var(--text-sec); font-size:0.85rem; line-height:1.5;">
+        Elimina oscilações periódicas geradas pelo <strong>movimento do braço do remador</strong> (relógio no pulso) e ruídos de satélite, revelando a velocidade real de deslocamento da canoa.
+      </p>
+      
+      <!-- Predefinições rápidas -->
+      <div style="display:flex; gap:6px; margin: 14px 0 10px; flex-wrap:wrap;">
+        <button type="button" class="btn-studio" onclick="setSmoothingPreset(5)" style="font-size:0.75rem; flex:1;">🟢 Leve (5s)</button>
+        <button type="button" class="btn-studio primary" onclick="setSmoothingPreset(9)" style="font-size:0.75rem; flex:1.2;">🟡 Pulso / Remada (9s)</button>
+        <button type="button" class="btn-studio" onclick="setSmoothingPreset(15)" style="font-size:0.75rem; flex:1;">🟣 Forte (15s)</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Janela de Suavização (pontos / segundos):</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="range" id="range-smooth-window" min="3" max="31" step="2" value="9" oninput="updateSmoothingSliderVal(this.value)" style="flex:1;" />
+          <strong id="val-smooth-window" style="font-family:var(--font-mono); color:var(--cyan); width:75px;">9 pts (~9s)</strong>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Aplicar em:</label>
+        <div style="display:flex; gap:12px; margin-top:4px;">
+          <label style="font-size:0.8rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="smooth-target" value="active" checked /> Trilha Selecionada
+          </label>
+          <label style="font-size:0.8rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="smooth-target" value="all" /> Todas as Trilhas
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:6px;">
+        <label style="font-size:0.8rem; display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-sec);">
+          <input type="checkbox" id="check-smooth-hr" /> Suavizar Frequência Cardíaca (FC) também
+        </label>
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio" onclick="closeModal('modal-smoothing')">Cancelar</button>
+      <button class="btn-studio primary" onclick="applySmoothingFromModal()">🌊 Aplicar Suavização</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal 4: Auto-Séries Adaptativo -->
 <div class="studio-modal-overlay" id="modal-adaptive-series">
   <div class="studio-modal-card">
@@ -876,17 +931,2278 @@
 </div>
 
 <!-- Scripts -->
-<script type="module">
-import { GPXStudioController } from './src/gpx_studio.js';
-import {
-  haversineM,
-  bearingDeg,
-  calculateBaselineEnvelope,
-  detectSegmentAnomalies,
-  calculateTwoCanoesApproachProfile,
-  detectOvertakingEvents,
-  calculateSpeedAndHRBins
-} from './src/gpx_skills.js';
+<script>
+/* === EMBEDDED GPX SKILLS ENGINE === */
+/**
+ * src/gpx_skills.js
+ * VAAREC GPX Analysis & Pre-Processing Skills Engine (JavaScript Port)
+ * 
+ * Fornece decupagem dimensional de GPX:
+ * - track_summary: cálculo de métricas estatísticas (distância, duração, FC média/máx, velocidade, tempos em movimento/parado)
+ * - segment_track: segmentação padronizada por distância (ex: a cada 500m / 1000m)
+ * - compare_two_tracks / multiTrackInterference: detecção temporal-geodésica de interferência/proximidade entre canoas
+ * - trimTrackByRange / extractSeriesFromRange: corte e composição de trechos por range nos gráficos
+ * - smoothTrackSpeed: filtro de suavização de velocidade e FC
+ * - calculateEfficiencyMetrics: zonas de FC, ritmo (pace) e eficiência da remada
+ * - autoDetectIntervalSeries: detecção automática de séries em treinos intervalados
+ */
+
+/**
+ * Calcula distância geodésica entre dois pontos usando Haversine em metros
+ */
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371008.8; // Raio médio da Terra em metros
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dp = ((lat2 - lat1) * Math.PI) / 180;
+  const dl = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1.0, Math.sqrt(a)));
+}
+
+/**
+ * Calcula o rumo (bearing / heading) em graus (0-360) entre dois pontos
+ */
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dl = ((lon2 - lon1) * Math.PI) / 180;
+
+  const y = Math.sin(dl) * Math.cos(p2);
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+/**
+ * Calcula o resumo estatístico completo de uma track GPX
+ * @param {Array} points - Array de pontos { lat, lon, t (ms ou s), spdKmh, hr, ele }
+ * @returns {Object} Resumo com distância, durações, velocidades e FC
+ */
+function calculateTrackSummary(points, name = '', source = '') {
+  if (!points || !points.length) {
+    return {
+      name,
+      source,
+      pointsCount: 0,
+      distanceM: 0,
+      durationS: 0,
+      speedAvgKmh: null,
+      speedMaxKmh: null,
+      movingTimeS: 0,
+      stoppedTimeS: 0,
+      hrAvg: null,
+      hrMax: null,
+      elevationMinM: null,
+      elevationMaxM: null
+    };
+  }
+
+  let totalDistM = 0;
+  const speeds = [];
+  const hrs = [];
+  const elevs = [];
+  let movingTimeS = 0;
+
+  const t0 = Number(points[0].t ?? points[0].timestamp ?? 0);
+  const tEnd = Number(points[points.length - 1].t ?? points[points.length - 1].timestamp ?? 0);
+  const isMs = (tEnd - t0) > 100000;
+  const totalDurationS = isMs ? (tEnd - t0) / 1000 : (tEnd - t0);
+
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (p.spdKmh != null && !isNaN(p.spdKmh) && p.spdKmh >= 0) {
+      speeds.push(Number(p.spdKmh));
+    }
+    if (p.hr != null && !isNaN(p.hr) && p.hr > 0) {
+      hrs.push(Number(p.hr));
+    }
+    const ele = p.ele ?? p.elevation;
+    if (ele != null && !isNaN(ele)) {
+      elevs.push(Number(ele));
+    }
+
+    if (i > 0) {
+      const prev = points[i - 1];
+      const d = haversineM(prev.lat, prev.lon ?? prev.lng, p.lat, p.lon ?? p.lng);
+      totalDistM += d;
+
+      const pT = Number(p.t ?? p.timestamp ?? 0);
+      const prevT = Number(prev.t ?? prev.timestamp ?? 0);
+      const dtS = isMs ? Math.max(0, (pT - prevT) / 1000) : Math.max(0, pT - prevT);
+
+      const spd = p.spdKmh != null ? Number(p.spdKmh) : (dtS > 0 ? (d / dtS) * 3.6 : 0);
+      if (spd >= 1.0) {
+        movingTimeS += dtS;
+      }
+    }
+  }
+
+  const fmean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  return {
+    name,
+    source,
+    pointsCount: points.length,
+    distanceM: Math.round(totalDistM),
+    durationS: Math.round(totalDurationS),
+    speedAvgKmh: speeds.length ? Number(fmean(speeds).toFixed(2)) : (totalDurationS > 0 ? Number(((totalDistM / totalDurationS) * 3.6).toFixed(2)) : null),
+    speedMaxKmh: speeds.length ? Number(Math.max(...speeds).toFixed(2)) : null,
+    movingTimeS: Math.round(movingTimeS),
+    stoppedTimeS: Math.round(Math.max(0, totalDurationS - movingTimeS)),
+    hrAvg: hrs.length ? Math.round(fmean(hrs)) : null,
+    hrMax: hrs.length ? Math.max(...hrs) : null,
+    elevationMinM: elevs.length ? Math.min(...elevs) : null,
+    elevationMaxM: elevs.length ? Math.max(...elevs) : null
+  };
+}
+
+/**
+ * Segmenta uma track por intervalos fixos de distância (ex: a cada 500m)
+ * @param {Array} points - Array de pontos
+ * @param {Number} intervalM - Intervalo de segmentação em metros (padrão: 500m)
+ * @returns {Array} Array de objetos Segment
+ */
+function segmentTrackByDistance(points, intervalM = 500.0, trackId = 'track') {
+  if (!points || points.length < 2) return [];
+
+  const ptsWithDist = [];
+  let accumM = 0;
+  const isMs = (points[points.length - 1].t - points[0].t) > 100000;
+
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (i > 0) {
+      const prev = points[i - 1];
+      accumM += haversineM(prev.lat, prev.lon ?? prev.lng, p.lat, p.lon ?? p.lng);
+    }
+    const tS = isMs ? (p.t / 1000) : p.t;
+    ptsWithDist.push({ ...p, distanceM: accumM, tS });
+  }
+
+  const totalDist = accumM;
+  const segments = [];
+  let endM = intervalM;
+
+  while (endM <= totalDist + 1e-5) {
+    const startM = endM - intervalM;
+    const slice = ptsWithDist.filter(p => p.distanceM >= startM && p.distanceM <= endM);
+
+    if (slice.length >= 2) {
+      const pStart = slice[0];
+      const pEnd = slice[slice.length - 1];
+      const durS = pEnd.tS - pStart.tS;
+      const actualDistM = pEnd.distanceM - pStart.distanceM;
+      
+      const speeds = slice.map(p => p.spdKmh).filter(s => s != null && !isNaN(s));
+      const hrs = slice.map(p => p.hr).filter(h => h != null && !isNaN(h) && h > 0);
+
+      const fmean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+      const avgSpd = speeds.length ? fmean(speeds) : (durS > 0 ? (actualDistM / durS) * 3.6 : 0);
+      const paceMinKm = avgSpd > 0 ? (60 / avgSpd) : 0;
+      const paceMin = Math.floor(paceMinKm);
+      const paceSec = Math.round((paceMinKm - paceMin) * 60);
+      const paceStr = `${paceMin}'${paceSec.toString().padStart(2, '0')}"`;
+
+      segments.push({
+        segmentId: `${Math.round(startM)}_${Math.round(endM)}`,
+        trackId,
+        startM: Math.round(startM),
+        endM: Math.round(endM),
+        durationS: Math.round(durS * 10) / 10,
+        distanceM: Math.round(actualDistM),
+        speedAvgKmh: Number(avgSpd.toFixed(2)),
+        paceStr,
+        hrAvg: hrs.length ? Math.round(fmean(hrs)) : null,
+        hrMax: hrs.length ? Math.max(...hrs) : null,
+        pointsCount: slice.length
+      });
+    }
+
+    endM += intervalM;
+  }
+
+  return segments;
+}
+
+/**
+ * Corta (Trim) uma trilha com base em uma faixa selecionada nos gráficos
+ * @param {Array} points - Array de pontos
+ * @param {Number} startVal - Início da faixa (em metros de distância ou tempo)
+ * @param {Number} endVal - Fim da faixa
+ * @param {String} mode - 'distance' | 'time' | 'index'
+ * @returns {Array} Trilha cortada com t normalizado a partir de 0
+ */
+function trimTrackByRange(points, startVal, endVal, mode = 'distance') {
+  if (!points || points.length < 2) return points;
+
+  let sliced = [];
+
+  if (mode === 'index') {
+    const i0 = Math.max(0, Math.min(Math.floor(startVal), points.length - 1));
+    const i1 = Math.max(i0 + 1, Math.min(Math.ceil(endVal), points.length));
+    sliced = points.slice(i0, i1);
+  } else if (mode === 'distance') {
+    // Calcular distâncias acumuladas
+    let accum = 0;
+    const ptsWithD = points.map((p, i) => {
+      if (i > 0) {
+        const prev = points[i - 1];
+        accum += haversineM(prev.lat, prev.lon ?? prev.lng, p.lat, p.lon ?? p.lng);
+      }
+      return { ...p, _d: accum };
+    });
+    sliced = ptsWithD.filter(p => p._d >= startVal && p._d <= endVal);
+  } else if (mode === 'time') {
+    sliced = points.filter(p => {
+      const t = p.t ?? p.timestamp ?? 0;
+      return t >= startVal && t <= endVal;
+    });
+  }
+
+  if (!sliced.length || sliced.length < 2) return points;
+
+  // Normalizar tempos a partir de t = 0
+  const t0 = sliced[0].t ?? sliced[0].timestamp ?? 0;
+  return sliced.map(p => ({
+    ...p,
+    t: (p.t ?? p.timestamp ?? 0) - t0,
+    absT: p.absT || (p.t ?? p.timestamp ?? 0)
+  }));
+}
+
+/**
+ * Extrai uma nova série independente a partir do trecho selecionado
+ */
+function extractSeriesFromRange(points, startVal, endVal, mode = 'distance', seriesName = 'Nova Série') {
+  const trimmed = trimTrackByRange(points, startVal, endVal, mode);
+  return {
+    name: seriesName,
+    points: trimmed,
+    summary: calculateTrackSummary(trimmed, seriesName)
+  };
+}
+
+/**
+ * Aplica filtro de suavização com ponderação triangular na velocidade e FC
+ * Ideal para eliminar ruídos de movimento de braçada (relógio no pulso) e jitter de GPS
+ */
+function smoothTrackSpeed(points, windowSize = 7, smoothHR = false) {
+  if (!points || points.length <= 2) return points;
+  const w = Math.max(3, windowSize % 2 === 0 ? windowSize + 1 : windowSize);
+  const half = Math.floor(w / 2);
+
+  // Kernel de ponderação triangular (centro com maior peso)
+  const kernel = [];
+  for (let k = -half; k <= half; k++) {
+    kernel.push(1 - Math.abs(k) / (half + 1));
+  }
+
+  return points.map((p, i) => {
+    let spdWeightSum = 0;
+    let spdSum = 0;
+    let hrWeightSum = 0;
+    let hrSum = 0;
+
+    for (let k = -half; k <= half; k++) {
+      const idx = i + k;
+      if (idx >= 0 && idx < points.length) {
+        const weight = kernel[k + half];
+        const pt = points[idx];
+        if (pt.spdKmh != null && !isNaN(pt.spdKmh)) {
+          spdSum += pt.spdKmh * weight;
+          spdWeightSum += weight;
+        }
+        if (smoothHR && pt.hr != null && !isNaN(pt.hr)) {
+          hrSum += pt.hr * weight;
+          hrWeightSum += weight;
+        }
+      }
+    }
+
+    const smoothedSpd = spdWeightSum > 0 ? spdSum / spdWeightSum : p.spdKmh;
+    const smoothedHr = (smoothHR && hrWeightSum > 0) ? Math.round(hrSum / hrWeightSum) : p.hr;
+
+    return {
+      ...p,
+      spdKmh: smoothedSpd != null ? Number(smoothedSpd.toFixed(2)) : p.spdKmh,
+      hr: smoothedHr
+    };
+  });
+}
+
+/**
+ * Calcula métricas avançadas de eficiência e zonas de FC
+ */
+function calculateEfficiencyMetrics(points) {
+  if (!points || !points.length) return null;
+
+  const zoneCounts = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
+  let hrTotal = 0;
+  let hrPoints = 0;
+  const correlationData = [];
+
+  points.forEach(p => {
+    if (p.hr && p.hr > 0) {
+      hrTotal += p.hr;
+      hrPoints++;
+      if (p.hr < 110) zoneCounts.z1++;
+      else if (p.hr < 130) zoneCounts.z2++;
+      else if (p.hr < 150) zoneCounts.z3++;
+      else if (p.hr < 165) zoneCounts.z4++;
+      else zoneCounts.z5++;
+    }
+
+    if (p.spdKmh != null && p.hr != null && p.spdKmh > 2 && p.hr > 80) {
+      correlationData.push({ x: Number(p.spdKmh.toFixed(1)), y: Math.round(p.hr) });
+    }
+  });
+
+  const zonePcts = {};
+  for (const z in zoneCounts) {
+    zonePcts[z] = hrPoints > 0 ? Number(((zoneCounts[z] / hrPoints) * 100).toFixed(1)) : 0;
+  }
+
+  return {
+    zoneCounts,
+    zonePcts,
+    hrAverage: hrPoints ? Math.round(hrTotal / hrPoints) : null,
+    correlationData
+  };
+}
+
+/**
+ * Remove um intervalo selecionado (miolo ou trecho intermediário) e reconecta a trilha
+ */
+function removeTrackInterval(points, startVal, endVal, mode = 'distance') {
+  if (!points || points.length < 4) return points;
+
+  let kept = [];
+  if (mode === 'distance') {
+    let accum = 0;
+    const ptsWithD = points.map((p, i) => {
+      if (i > 0) {
+        const prev = points[i - 1];
+        accum += haversineM(prev.lat, prev.lon ?? prev.lng, p.lat, p.lon ?? p.lng);
+      }
+      return { ...p, _d: accum };
+    });
+    kept = ptsWithD.filter(p => p._d < startVal || p._d > endVal);
+  } else if (mode === 'time') {
+    kept = points.filter(p => {
+      const t = p.t ?? p.timestamp ?? 0;
+      return t < startVal || t > endVal;
+    });
+  } else {
+    const i0 = Math.floor(startVal);
+    const i1 = Math.ceil(endVal);
+    kept = [...points.slice(0, i0), ...points.slice(i1)];
+  }
+
+  if (kept.length < 2) return points;
+
+  // Re-normalizar tempos relativos
+  const t0 = kept[0].t ?? 0;
+  return kept.map(p => ({
+    ...p,
+    t: Math.max(0, (p.t ?? 0) - t0),
+    absT: p.absT || (p.t ?? 0)
+  }));
+}
+
+/**
+ * Filtra pontos por linha de corte (limiar de velocidade mínima e/ou FC mínima)
+ */
+function filterTrackByThresholds(points, { minSpeedKmh = null, minHr = null }) {
+  if (!points || !points.length) return points;
+
+  const filtered = points.filter(p => {
+    if (minSpeedKmh != null && (p.spdKmh || 0) < minSpeedKmh) return false;
+    if (minHr != null && p.hr != null && p.hr < minHr) return false;
+    return true;
+  });
+
+  if (filtered.length < 2) return points;
+
+  const t0 = filtered[0].t ?? 0;
+  return filtered.map(p => ({
+    ...p,
+    t: Math.max(0, (p.t ?? 0) - t0),
+    absT: p.absT || (p.t ?? 0)
+  }));
+}
+
+/**
+ * Corta a trilha definindo largada por hora específica (HH:MM:SS) ou duração oficial de prova
+ */
+function cropTrackByAbsoluteTime(points, startHms = null, durationS = null) {
+  if (!points || !points.length) return points;
+
+  let startIndex = 0;
+  const isMs = (points[points.length - 1].t - points[0].t) > 100000;
+
+  if (startHms) {
+    const parts = startHms.split(':').map(Number);
+    if (parts.length >= 2) {
+      const targetH = parts[0] || 0;
+      const targetM = parts[1] || 0;
+      const targetS = parts[2] || 0;
+
+      // Buscar se temos timestamp absoluto
+      const baseAbsT = points[0].absT || (points[0].t > 1000000000 ? points[0].t : null);
+      if (baseAbsT) {
+        const d = new Date(baseAbsT);
+        d.setHours(targetH, targetM, targetS, 0);
+        const targetEpoch = d.getTime();
+
+        for (let i = 0; i < points.length; i++) {
+          const ptAbs = points[i].absT || (points[i].t > 1000000000 ? points[i].t : (baseAbsT + points[i].t));
+          if (ptAbs >= targetEpoch) {
+            startIndex = i;
+            break;
+          }
+        }
+      } else {
+        // Modo fallback por segundos do dia
+        const targetSecOfDay = targetH * 3600 + targetM * 60 + targetS;
+        for (let i = 0; i < points.length; i++) {
+          const sec = isMs ? (points[i].t / 1000) : points[i].t;
+          if (sec >= targetSecOfDay) {
+            startIndex = i;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  let endIndex = points.length - 1;
+  if (durationS != null && durationS > 0) {
+    const startSec = isMs ? (points[startIndex].t / 1000) : points[startIndex].t;
+    const targetEndSec = startSec + durationS;
+
+    for (let i = startIndex; i < points.length; i++) {
+      const sec = isMs ? (points[i].t / 1000) : points[i].t;
+      if (sec >= targetEndSec) {
+        endIndex = i;
+        break;
+      }
+    }
+  }
+
+  const cropped = points.slice(startIndex, endIndex + 1);
+  if (cropped.length < 2) return points;
+
+  const t0 = cropped[0].t ?? 0;
+  return cropped.map(p => ({
+    ...p,
+    t: Math.max(0, (p.t ?? 0) - t0),
+    absT: p.absT || (p.t ?? 0)
+  }));
+}
+
+/**
+ * Detecta automaticamente séries de tiro/intervalos de forma adaptativa
+ */
+function autoDetectIntervalSeriesAdaptive(points, config = {}) {
+  if (!points || points.length < 10) return [];
+
+  const mode = config.mode || 'speed'; // 'speed' | 'dynamic_acceleration' | 'distance' | 'time'
+  const isMs = (points[points.length - 1].t - points[0].t) > 100000;
+  const getSec = p => isMs ? (p.t / 1000) : p.t;
+
+  const series = [];
+
+  if (mode === 'distance') {
+    const stepM = config.intervalM || 1000;
+    let accum = 0;
+    let startIdx = 0;
+    let lastSplitM = 0;
+
+    for (let i = 1; i < points.length; i++) {
+      accum += haversineM(points[i - 1].lat, points[i - 1].lon, points[i].lat, points[i].lon);
+      if (accum - lastSplitM >= stepM || i === points.length - 1) {
+        const slice = trimTrackByRange(points.slice(startIdx, i + 1), 0, (i + 1 - startIdx), 'index');
+        series.push({
+          seriesIndex: series.length + 1,
+          name: `Série ${series.length + 1} (${Math.round(accum - lastSplitM)}m)`,
+          points: slice,
+          durationS: Math.round(getSec(points[i]) - getSec(points[startIdx])),
+          summary: calculateTrackSummary(slice, `Série ${series.length + 1}`)
+        });
+        startIdx = i;
+        lastSplitM = accum;
+      }
+    }
+  } else if (mode === 'time') {
+    const stepS = config.intervalS || 300; // 5 min padrão
+    let startIdx = 0;
+
+    for (let i = 1; i < points.length; i++) {
+      const dt = getSec(points[i]) - getSec(points[startIdx]);
+      if (dt >= stepS || i === points.length - 1) {
+        const slice = trimTrackByRange(points.slice(startIdx, i + 1), 0, (i + 1 - startIdx), 'index');
+        series.push({
+          seriesIndex: series.length + 1,
+          name: `Série ${series.length + 1} (${fmtSecondsShort(Math.round(dt))})`,
+          points: slice,
+          durationS: Math.round(dt),
+          summary: calculateTrackSummary(slice, `Série ${series.length + 1}`)
+        });
+        startIdx = i;
+      }
+    }
+  } else {
+    // Modo por limiar de velocidade ou aceleração
+    const minSpeedKmh = config.minSpeedKmh || 7.5;
+    const minDurationS = config.minDurationS || 20;
+    const minPauseS = config.minPauseS || 10;
+
+    let inInterval = false;
+    let startIdx = 0;
+    let pauseCount = 0;
+
+    for (let i = 0; i < points.length; i++) {
+      const spd = points[i].spdKmh || 0;
+      const isFast = spd >= minSpeedKmh;
+
+      if (isFast) {
+        if (!inInterval) {
+          inInterval = true;
+          startIdx = i;
+        }
+        pauseCount = 0;
+      } else {
+        if (inInterval) {
+          pauseCount++;
+          const dtPause = getSec(points[i]) - getSec(points[i - pauseCount]);
+          if (dtPause >= minPauseS || i === points.length - 1) {
+            const endIdx = i - pauseCount;
+            const durS = getSec(points[endIdx]) - getSec(points[startIdx]);
+            if (durS >= minDurationS && (endIdx - startIdx) >= 4) {
+              const slice = trimTrackByRange(points.slice(startIdx, endIdx + 1), 0, (endIdx + 1 - startIdx), 'index');
+              series.push({
+                seriesIndex: series.length + 1,
+                name: `Série ${series.length + 1}`,
+                points: slice,
+                durationS: Math.round(durS),
+                summary: calculateTrackSummary(slice, `Série ${series.length + 1}`)
+              });
+            }
+            inInterval = false;
+            pauseCount = 0;
+          }
+        }
+      }
+    }
+  }
+
+  return series;
+}
+
+function fmtSecondsShort(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m${s ? `${s}s` : ''}`;
+}
+
+/**
+ * Auto-detecta todos os tipos de eventos atléticos e táticos da prova
+ */
+function autoDetectAllRaceEvents(tracks, options = {}) {
+  if (!tracks || !tracks.length) return [];
+
+  const events = [];
+  let eventCounter = 0;
+
+  // 1. Eventos de Combate/Interferência entre Pares
+  if (tracks.length >= 2) {
+    const interferences = multiTrackInterference(tracks, options.interferenceThresholdM || 5.0, 4.0);
+    interferences.forEach(inf => {
+      eventCounter++;
+      events.push({
+        id: `evt-${eventCounter}`,
+        type: 'COMBAT',
+        typeLabel: 'Combate / Proximidade',
+        icon: 'fa-swords',
+        color: '#EF4444',
+        name: `${inf.canoeA} ⚔ ${inf.canoeB}`,
+        timeMs: inf.startTimeMs,
+        durationS: inf.durationS,
+        distM: inf.minDistanceM,
+        details: `Distância mínima: ${inf.minDistanceM}m durante ${inf.durationS}s`
+      });
+    });
+
+    const overtakes = detectOvertakingEvents(tracks[0].points, tracks[1].points, tracks[0].name, tracks[1].name);
+    overtakes.forEach(ov => {
+      eventCounter++;
+      events.push({
+        id: `evt-${eventCounter}`,
+        type: 'OVERTAKE',
+        typeLabel: 'Ultrapassagem',
+        icon: 'fa-flag-checkered',
+        color: '#F59E0B',
+        name: `${ov.newLeader} assumiu liderança`,
+        timeMs: ov.timeMs,
+        durationS: 0,
+        distM: ov.distBetweenM,
+        lat: ov.lat,
+        lon: ov.lon,
+        details: `Ultrapassagem sobre ${ov.previousLeader} com delta de ${ov.distBetweenM}m`
+      });
+    });
+  }
+
+  // 2. Eventos Individuais por Trilha (Sprints, Curvas de Bóia, Quedas de Ritmo, Picos Cardíacos)
+  tracks.forEach((track, tIdx) => {
+    const pts = track.points || [];
+    if (pts.length < 10) return;
+
+    let accum = 0;
+    for (let i = 3; i < pts.length - 3; i++) {
+      const prev3 = pts[i - 3];
+      const cur = pts[i];
+      const next3 = pts[i + 3];
+
+      accum += haversineM(pts[i - 1].lat, pts[i - 1].lon, cur.lat, cur.lon);
+
+      // Curva de Boia / Guinada Angular (Mudança brusca de rumo >= 45°)
+      if (prev3.heading != null && next3.heading != null) {
+        let diff = Math.abs(next3.heading - prev3.heading);
+        if (diff > 180) diff = 360 - diff;
+        if (diff >= 50) {
+          eventCounter++;
+          events.push({
+            id: `evt-${eventCounter}`,
+            type: 'BUOY_TURN',
+            typeLabel: 'Curva de Boia / Guinada',
+            icon: 'fa-location-arrow',
+            color: '#A78BFA',
+            name: `Curva de Boia (${track.name})`,
+            canoeName: track.name,
+            timeMs: cur.t,
+            distanceM: Math.round(accum),
+            lat: cur.lat,
+            lon: cur.lon,
+            details: `Variação de proa de ${diff.toFixed(0)}°`
+          });
+          i += 10; // Pular pontos adjacentes da mesma curva
+          continue;
+        }
+      }
+
+      // Ataque / Sprint (Aceleração sustentada)
+      if (cur.spdKmh && prev3.spdKmh && (cur.spdKmh - prev3.spdKmh) >= 2.2) {
+        eventCounter++;
+        events.push({
+          id: `evt-${eventCounter}`,
+          type: 'SPRINT',
+          typeLabel: 'Ataque / Sprint',
+          icon: 'fa-bolt',
+          color: '#00F2FE',
+          name: `Ataque / Sprint (${track.name})`,
+          canoeName: track.name,
+          timeMs: cur.t,
+          distanceM: Math.round(accum),
+          lat: cur.lat,
+          lon: cur.lon,
+          details: `Aceleração para ${cur.spdKmh.toFixed(1)} km/h (+${(cur.spdKmh - prev3.spdKmh).toFixed(1)} km/h)`
+        });
+        i += 15;
+        continue;
+      }
+
+      // Queda Brusca de Ritmo
+      if (cur.spdKmh && prev3.spdKmh && (prev3.spdKmh - cur.spdKmh) >= 2.5 && cur.spdKmh < 9.0) {
+        eventCounter++;
+        events.push({
+          id: `evt-${eventCounter}`,
+          type: 'PACE_DROP',
+          typeLabel: 'Queda de Ritmo',
+          icon: 'fa-arrow-trend-down',
+          color: '#F43F5E',
+          name: `Queda de Ritmo (${track.name})`,
+          canoeName: track.name,
+          timeMs: cur.t,
+          distanceM: Math.round(accum),
+          lat: cur.lat,
+          lon: cur.lon,
+          details: `Velocidade caiu para ${cur.spdKmh.toFixed(1)} km/h (-${(prev3.spdKmh - cur.spdKmh).toFixed(1)} km/h)`
+        });
+        i += 15;
+        continue;
+      }
+
+      // Pico Cardíaco (FC >= 178 bpm)
+      if (cur.hr && cur.hr >= 178) {
+        eventCounter++;
+        events.push({
+          id: `evt-${eventCounter}`,
+          type: 'HR_SPIKE',
+          typeLabel: 'Pico Cardíaco Z5',
+          icon: 'fa-heart-pulse',
+          color: '#EF4444',
+          name: `Pico FC (${track.name})`,
+          canoeName: track.name,
+          timeMs: cur.t,
+          distanceM: Math.round(accum),
+          lat: cur.lat,
+          lon: cur.lon,
+          details: `Frequência cardíaca atingiu ${cur.hr} bpm`
+        });
+        i += 20;
+        continue;
+      }
+    }
+  });
+
+  return events.sort((a, b) => (a.timeMs || 0) - (b.timeMs || 0));
+}
+
+/**
+ * Backward compatibility alias para autoDetectIntervalSeries
+ */
+function autoDetectIntervalSeries(points, minSpeedKmh = 8.0, minDurationS = 25, minPauseS = 15) {
+  return autoDetectIntervalSeriesAdaptive(points, { mode: 'speed', minSpeedKmh, minDurationS, minPauseS });
+}
+
+/**
+ * Interpolação linear de um ponto no tempo t
+ */
+function interpolatePointAtTime(points, t, isMs = false) {
+  if (!points || !points.length) return null;
+  const tField = (p) => isMs ? (p.t ?? p.timestamp ?? 0) : ((p.t ?? p.timestamp ?? 0) * (p.t > 100000 ? 1 : 1000));
+  
+  const tStart = tField(points[0]);
+  const tEnd = tField(points[points.length - 1]);
+
+  if (t <= tStart) return points[0];
+  if (t >= tEnd) return points[points.length - 1];
+
+  let lo = 0, hi = points.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (tField(points[mid]) <= t) lo = mid;
+    else hi = mid;
+  }
+
+  const pA = points[lo];
+  const pB = points[hi];
+  const tA = tField(pA);
+  const tB = tField(pB);
+  const factor = (tB === tA) ? 0 : Math.max(0, Math.min(1, (t - tA) / (tB - tA)));
+
+  return {
+    lat: pA.lat + (pB.lat - pA.lat) * factor,
+    lon: (pA.lon ?? pA.lng) + ((pB.lon ?? pB.lng) - (pA.lon ?? pA.lng)) * factor,
+    spdKmh: (pA.spdKmh || 0) + ((pB.spdKmh || 0) - (pA.spdKmh || 0)) * factor,
+    hr: pA.hr && pB.hr ? Math.round(pA.hr + (pB.hr - pA.hr) * factor) : (pA.hr || pB.hr || null)
+  };
+}
+
+/**
+ * Detecta eventos de proximidade / interferência entre duas canoas ao longo do tempo
+ */
+function detectInterferenceEvents(pointsA, pointsB, thresholdM = 5.0, minDurationS = 4.0, stepS = 2.0) {
+  if (!pointsA || !pointsB || pointsA.length < 2 || pointsB.length < 2) return [];
+
+  const isMsA = (pointsA[pointsA.length - 1].t - pointsA[0].t) > 100000;
+  const isMsB = (pointsB[pointsB.length - 1].t - pointsB[0].t) > 100000;
+
+  const getAbsT = (p, isMs) => isMs ? p.t : (p.t * 1000);
+
+  const startMs = Math.max(getAbsT(pointsA[0], isMsA), getAbsT(pointsB[0], isMsB));
+  const endMs = Math.min(getAbsT(pointsA[pointsA.length - 1], isMsA), getAbsT(pointsB[pointsB.length - 1], isMsB));
+
+  if (endMs <= startMs) return [];
+
+  const stepMs = stepS * 1000;
+  const samples = [];
+
+  for (let t = startMs; t <= endMs; t += stepMs) {
+    const ptA = interpolatePointAtTime(pointsA, t, true);
+    const ptB = interpolatePointAtTime(pointsB, t, true);
+
+    if (ptA && ptB) {
+      const dist = haversineM(ptA.lat, ptA.lon, ptB.lat, ptB.lon);
+      samples.push({ t, dist, ptA, ptB });
+    }
+  }
+
+  const events = [];
+  let inEvent = false;
+  let eventStart = 0;
+  let minD = Infinity;
+  let count = 0;
+  let eid = 0;
+
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    const isClose = s.dist <= thresholdM;
+
+    if (isClose) {
+      if (!inEvent) {
+        inEvent = true;
+        eventStart = s.t;
+        minD = s.dist;
+        count = 1;
+      } else {
+        if (s.dist < minD) minD = s.dist;
+        count++;
+      }
+    } else {
+      if (inEvent) {
+        const durS = (samples[i - 1].t - eventStart) / 1000;
+        if (durS >= minDurationS) {
+          eid++;
+          events.push({
+            eventId: `evt-int-${eid.toString().padStart(3, '0')}`,
+            eventType: 'possible_interference',
+            startTimeMs: eventStart,
+            endTimeMs: samples[i - 1].t,
+            durationS: Math.round(durS * 10) / 10,
+            minDistanceM: Math.round(minD * 10) / 10,
+            confidence: minD < 2.5 ? 0.95 : 0.75,
+            details: {
+              thresholdM,
+              sampleCount: count
+            }
+          });
+        }
+        inEvent = false;
+      }
+    }
+  }
+
+  if (inEvent) {
+    const lastSample = samples[samples.length - 1];
+    const durS = (lastSample.t - eventStart) / 1000;
+    if (durS >= minDurationS) {
+      eid++;
+      events.push({
+        eventId: `evt-int-${eid.toString().padStart(3, '0')}`,
+        eventType: 'possible_interference',
+        startTimeMs: eventStart,
+        endTimeMs: lastSample.t,
+        durationS: Math.round(durS * 10) / 10,
+        minDistanceM: Math.round(minD * 10) / 10,
+        confidence: minD < 2.5 ? 0.95 : 0.75,
+        details: {
+          thresholdM,
+          sampleCount: count
+        }
+      });
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Analisa múltiplos pares de tracks para detecção de interferência
+ */
+function multiTrackInterference(tracks, thresholdM = 5.0, minDurationS = 4.0) {
+  if (!tracks || tracks.length < 2) return [];
+
+  const allEvents = [];
+  for (let i = 0; i < tracks.length; i++) {
+    for (let j = i + 1; j < tracks.length; j++) {
+      const ptsA = tracks[i].points || tracks[i].pts || tracks[i].data || [];
+      const ptsB = tracks[j].points || tracks[j].pts || tracks[j].data || [];
+
+      const pairEvents = detectInterferenceEvents(ptsA, ptsB, thresholdM, minDurationS);
+      pairEvents.forEach(evt => {
+        allEvents.push({
+          ...evt,
+          canoeA: tracks[i].name || `Canoa ${i + 1}`,
+          canoeB: tracks[j].name || `Canoa ${j + 1}`,
+          canoeIdxA: i,
+          canoeIdxB: j
+        });
+      });
+    }
+  }
+
+  return allEvents;
+}
+
+/**
+ * Calcula o Envelope Estatístico (Baseline) entre múltiplas trilhas/dias
+ * @param {Array} tracks - Array de tracks com points/segments
+ * @param {Number} intervalM - Intervalo em metros (padrão: 500m)
+ * @returns {Object} { summaries, segments, baseline, parameters }
+ */
+function calculateBaselineEnvelope(tracks, intervalM = 500.0) {
+  if (!tracks || !tracks.length) return { summaries: [], segments: [], baseline: [], parameters: { intervalM } };
+
+  const summaries = [];
+  const allSegments = [];
+  const segmentsBySid = new Map();
+
+  tracks.forEach((t, tIdx) => {
+    const pts = t.points || t.pts || [];
+    const name = t.name || `Trilha ${tIdx + 1}`;
+    const fileId = t.fileName || t.name || `track_${tIdx + 1}`;
+    
+    const summ = calculateTrackSummary(pts, name, fileId);
+    summaries.push(summ);
+
+    const segs = segmentTrackByDistance(pts, intervalM, fileId);
+    segs.forEach(s => {
+      allSegments.push(s);
+      if (!segmentsBySid.has(s.segmentId)) {
+        segmentsBySid.set(s.segmentId, []);
+      }
+      segmentsBySid.get(s.segmentId).push(s);
+    });
+  });
+
+  const median = arr => {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  const stdev = arr => {
+    if (arr.length < 2) return 0;
+    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const sqDiff = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (arr.length - 1);
+    return Math.sqrt(sqDiff);
+  };
+
+  const baseline = [];
+  segmentsBySid.forEach((rs, sid) => {
+    const getVals = key => rs.map(r => r[key]).filter(v => v != null && !isNaN(v));
+
+    const durs = getVals('durationS');
+    const spds = getVals('speedAvgKmh');
+    const hrs = getVals('hrAvg');
+    const hrMaxs = getVals('hrMax');
+
+    baseline.push({
+      segmentId: sid,
+      nFiles: rs.length,
+      duration_s_median: median(durs),
+      duration_s_min: durs.length ? Math.min(...durs) : null,
+      duration_s_max: durs.length ? Math.max(...durs) : null,
+      duration_s_stdev: stdev(durs),
+      speed_avg_kmh_median: median(spds),
+      speed_avg_kmh_min: spds.length ? Math.min(...spds) : null,
+      speed_avg_kmh_max: spds.length ? Math.max(...spds) : null,
+      speed_avg_kmh_stdev: stdev(spds),
+      hr_avg_median: median(hrs),
+      hr_avg_min: hrs.length ? Math.min(...hrs) : null,
+      hr_avg_max: hrs.length ? Math.max(...hrs) : null,
+      hr_avg_stdev: stdev(hrs),
+      hr_max_median: median(hrMaxs),
+      hr_max_min: hrMaxs.length ? Math.min(...hrMaxs) : null,
+      hr_max_max: hrMaxs.length ? Math.max(...hrMaxs) : null
+    });
+  });
+
+  return {
+    summaries,
+    segments: allSegments,
+    baseline,
+    parameters: { intervalM }
+  };
+}
+
+/**
+ * Detecta anomalias de desempenho de uma trilha em relação à baseline
+ */
+function detectSegmentAnomalies(trackSegments, baselineList) {
+  if (!trackSegments || !baselineList) return [];
+  const baseMap = new Map(baselineList.map(b => [b.segmentId, b]));
+  const anomalies = [];
+
+  trackSegments.forEach(seg => {
+    const base = baseMap.get(seg.segmentId);
+    if (!base || base.speed_avg_kmh_median == null) return;
+
+    const spdMed = base.speed_avg_kmh_median;
+    const spdDev = base.speed_avg_kmh_stdev || (spdMed * 0.1);
+    const dropKmh = spdMed - seg.speedAvgKmh;
+
+    if (dropKmh > Math.max(1.5, spdDev * 1.5)) {
+      anomalies.push({
+        segmentId: seg.segmentId,
+        type: 'SPEED_DROP',
+        severity: dropKmh > 3.0 ? 'CRITICAL' : 'WARNING',
+        message: `Queda de velocidade no split ${seg.segmentId}: ${seg.speedAvgKmh} km/h (esperado: ${spdMed.toFixed(1)} ± ${spdDev.toFixed(1)} km/h)`,
+        actualSpeed: seg.speedAvgKmh,
+        expectedSpeed: spdMed,
+        delta: Number((-dropKmh).toFixed(2))
+      });
+    }
+
+    if (seg.hrAvg && base.hr_avg_median) {
+      const hrMed = base.hr_avg_median;
+      const hrDev = base.hr_avg_stdev || 8;
+      const hrDiff = seg.hrAvg - hrMed;
+
+      if (hrDiff > Math.max(12, hrDev * 1.8)) {
+        anomalies.push({
+          segmentId: seg.segmentId,
+          type: 'HR_SPIKE',
+          severity: hrDiff > 20 ? 'CRITICAL' : 'WARNING',
+          message: `Pico anormal de frequência cardíaca no split ${seg.segmentId}: ${seg.hrAvg} bpm (mediana: ${hrMed.toFixed(0)} bpm)`,
+          actualHr: seg.hrAvg,
+          expectedHr: hrMed,
+          delta: Number(hrDiff.toFixed(0))
+        });
+      }
+    }
+  });
+
+  return anomalies;
+}
+
+/**
+ * Calcula o perfil contínuo de distância relativa entre duas canoas e taxa de aproximação
+ */
+function calculateTwoCanoesApproachProfile(pointsA, pointsB, stepS = 2.0) {
+  if (!pointsA || !pointsB || pointsA.length < 2 || pointsB.length < 2) return [];
+
+  const isMsA = (pointsA[pointsA.length - 1].t - pointsA[0].t) > 100000;
+  const isMsB = (pointsB[pointsB.length - 1].t - pointsB[0].t) > 100000;
+
+  const getAbsT = (p, isMs) => isMs ? p.t : (p.t * 1000);
+
+  const startMs = Math.max(getAbsT(pointsA[0], isMsA), getAbsT(pointsB[0], isMsB));
+  const endMs = Math.min(getAbsT(pointsA[pointsA.length - 1], isMsA), getAbsT(pointsB[pointsB.length - 1], isMsB));
+
+  if (endMs <= startMs) return [];
+
+  const stepMs = stepS * 1000;
+  const profile = [];
+  let prevDist = null;
+
+  for (let t = startMs; t <= endMs; t += stepMs) {
+    const ptA = interpolatePointAtTime(pointsA, t, true);
+    const ptB = interpolatePointAtTime(pointsB, t, true);
+
+    if (ptA && ptB) {
+      const dist = haversineM(ptA.lat, ptA.lon, ptB.lat, ptB.lon);
+      const rateOfApproach = prevDist != null ? ((prevDist - dist) / stepS) : 0; // m/s (>0 aproximação, <0 afastamento)
+
+      let trend = 'stable';
+      if (dist <= 5.0) trend = 'critical_proximity';
+      else if (rateOfApproach > 0.4) trend = 'approaching';
+      else if (rateOfApproach < -0.4) trend = 'separating';
+
+      profile.push({
+        timeMs: t - startMs,
+        absTimeMs: t,
+        distanceM: Number(dist.toFixed(1)),
+        rateOfApproach: Number(rateOfApproach.toFixed(2)),
+        trend,
+        latA: ptA.lat,
+        lonA: ptA.lon,
+        latB: ptB.lat,
+        lonB: ptB.lon,
+        spdA: ptA.spdKmh,
+        spdB: ptB.spdKmh
+      });
+
+      prevDist = dist;
+    }
+  }
+
+  return profile;
+}
+
+/**
+ * Detecta eventos de ultrapassagem e inversão de liderança
+ */
+function detectOvertakingEvents(pointsA, pointsB, nameA = 'Canoa A', nameB = 'Canoa B') {
+  if (!pointsA || !pointsB || pointsA.length < 2 || pointsB.length < 2) return [];
+
+  const isMsA = (pointsA[pointsA.length - 1].t - pointsA[0].t) > 100000;
+  const isMsB = (pointsB[pointsB.length - 1].t - pointsB[0].t) > 100000;
+
+  const getAbsT = (p, isMs) => isMs ? p.t : (p.t * 1000);
+  const startMs = Math.max(getAbsT(pointsA[0], isMsA), getAbsT(pointsB[0], isMsB));
+  const endMs = Math.min(getAbsT(pointsA[pointsA.length - 1], isMsA), getAbsT(pointsB[pointsB.length - 1], isMsB));
+
+  if (endMs <= startMs) return [];
+
+  const stepMs = 3000; // 3s
+  const overtakes = [];
+  let currentLeader = null;
+
+  // Calcular distâncias acumuladas para A e B
+  for (let t = startMs; t <= endMs; t += stepMs) {
+    const ptA = interpolatePointAtTime(pointsA, t, true);
+    const ptB = interpolatePointAtTime(pointsB, t, true);
+
+    if (ptA && ptB) {
+      const distBetween = haversineM(ptA.lat, ptA.lon, ptB.lat, ptB.lon);
+      
+      // Determinar quem está na frente baseado na projeção de avanço ou velocidade relativa
+      const leader = (ptA.spdKmh || 0) >= (ptB.spdKmh || 0) ? nameA : nameB;
+
+      if (currentLeader == null) {
+        currentLeader = leader;
+      } else if (leader !== currentLeader && distBetween <= 25.0) {
+        overtakes.push({
+          timeMs: t - startMs,
+          absTimeMs: t,
+          previousLeader: currentLeader,
+          newLeader: leader,
+          distBetweenM: Number(distBetween.toFixed(1)),
+          lat: ptA.lat,
+          lon: ptA.lon
+        });
+        currentLeader = leader;
+      }
+    }
+  }
+
+  return overtakes;
+}
+
+/**
+ * Calcula a distribuição em Bins de Velocidade e Bins de Frequência Cardíaca
+ */
+function calculateSpeedAndHRBins(points) {
+  if (!points || !points.length) return null;
+
+  const isMs = (points[points.length - 1].t - points[0].t) > 100000;
+
+  const speedBins = {
+    '0-10 km/h': { count: 0, distM: 0, timeS: 0, color: '#38BDF8' },
+    '10-12 km/h': { count: 0, distM: 0, timeS: 0, color: '#10B981' },
+    '12-14 km/h': { count: 0, distM: 0, timeS: 0, color: '#F59E0B' },
+    '14-16 km/h': { count: 0, distM: 0, timeS: 0, color: '#F97316' },
+    '16+ km/h': { count: 0, distM: 0, timeS: 0, color: '#EF4444' }
+  };
+
+  const hrBins = {
+    '< 120 bpm': { count: 0, distM: 0, timeS: 0, color: '#06B6D4' },
+    '120-139 bpm': { count: 0, distM: 0, timeS: 0, color: '#10B981' },
+    '140-159 bpm': { count: 0, distM: 0, timeS: 0, color: '#F59E0B' },
+    '160-179 bpm': { count: 0, distM: 0, timeS: 0, color: '#F97316' },
+    '180+ bpm': { count: 0, distM: 0, timeS: 0, color: '#EF4444' }
+  };
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const dM = haversineM(prev.lat, prev.lon ?? prev.lng, cur.lat, cur.lon ?? cur.lng);
+    const dtS = isMs ? ((cur.t - prev.t) / 1000) : (cur.t - prev.t);
+    const spd = cur.spdKmh || 0;
+    const hr = cur.hr;
+
+    // Speed bin
+    if (spd < 10) { speedBins['0-10 km/h'].count++; speedBins['0-10 km/h'].distM += dM; speedBins['0-10 km/h'].timeS += dtS; }
+    else if (spd < 12) { speedBins['10-12 km/h'].count++; speedBins['10-12 km/h'].distM += dM; speedBins['10-12 km/h'].timeS += dtS; }
+    else if (spd < 14) { speedBins['12-14 km/h'].count++; speedBins['12-14 km/h'].distM += dM; speedBins['12-14 km/h'].timeS += dtS; }
+    else if (spd < 16) { speedBins['14-16 km/h'].count++; speedBins['14-16 km/h'].distM += dM; speedBins['14-16 km/h'].timeS += dtS; }
+    else { speedBins['16+ km/h'].count++; speedBins['16+ km/h'].distM += dM; speedBins['16+ km/h'].timeS += dtS; }
+
+    // HR bin
+    if (hr) {
+      if (hr < 120) { hrBins['< 120 bpm'].count++; hrBins['< 120 bpm'].distM += dM; hrBins['< 120 bpm'].timeS += dtS; }
+      else if (hr < 140) { hrBins['120-139 bpm'].count++; hrBins['120-139 bpm'].distM += dM; hrBins['120-139 bpm'].timeS += dtS; }
+      else if (hr < 160) { hrBins['140-159 bpm'].count++; hrBins['140-159 bpm'].distM += dM; hrBins['140-159 bpm'].timeS += dtS; }
+      else if (hr < 180) { hrBins['160-179 bpm'].count++; hrBins['160-179 bpm'].distM += dM; hrBins['160-179 bpm'].timeS += dtS; }
+      else { hrBins['180+ bpm'].count++; hrBins['180+ bpm'].distM += dM; hrBins['180+ bpm'].timeS += dtS; }
+    }
+  }
+
+  return { speedBins, hrBins };
+}
+
+
+/* === EMBEDDED GPX STUDIO CONTROLLER === */
+/**
+ * src/gpx_studio.js
+ * VAAREC GPX Skills Studio Controller Engine
+ * 
+ * Gerencia o estado completo do GPX Studio:
+ * - Ingestão multi-formato (GPX, Garmin JSON/TXT, JSON, FIT)
+ * - Composição de camadas de tracks (cores, visibilidade, solo/mute)
+ * - Gráficos multidimensionais sincronizados (Velocidade, FC, Altimetria, Cadência, Duelo, Splits, Dispersão)
+ * - Seleção interativa por range brush com ferramentas de Trim, Nova Série e Zoom
+ * - Sincronização em tempo real entre Gráficos, Mapa Leaflet e HUD
+ * - Decupagem dimensional (Tabela de Splits) e Matriz de Eventos de Combate/Interferência
+ * - Exportação para Contrato VAAREC, GPX limpo, CSV e Viewers
+ */
+
+
+
+class GPXStudioController {
+  constructor(options = {}) {
+    this.tracks = []; // Array de { id, name, color, originalPoints, points, visible, summary, efficiency, segments }
+    this.activeTrackIdx = 0;
+    this.rangeSelection = null; // { startM, endM, startT, endT, startIdx, endIdx, mode: 'distance' }
+    this.activeChartTab = 'speed'; // 'speed' | 'hr' | 'ele' | 'heading' | 'temp' | 'duel' | 'splits' | 'baseline' | 'proximity' | 'bins' | 'efficiency' | 'scatter'
+    this.chartLayoutMode = 'single'; // 'single' | 'dual' | 'stacked'
+    this.splitIntervalM = 500;
+    this.interferenceThresholdM = 5.0;
+    this.historyStack = []; // Undo stack for trimming
+    this.customEvents = []; // Eventos manuais e automáticos cadastrados
+    
+    // Zoom State nos Gráficos (Sincronizado e com suporte a Wheel / Brush)
+    this.chartZoom = {
+      minFrac: 0.0,
+      maxFrac: 1.0,
+      isZoomed: false
+    };
+
+    // Engine de Reprodução e Playhead (Timeline DAW / CapCut)
+    this.playback = {
+      isPlaying: false,
+      currentTimeMs: 0,
+      speedMultiplier: 1.0,
+      loop: false,
+      timerId: null,
+      lastTickTime: 0
+    };
+
+    this.map = null;
+    this.mapLayers = {
+      tracks: new Map(),
+      canoeMarkers: new Map(),
+      eventMarkers: new Map(),
+      selectionHighlight: null,
+      marker: null,
+      courseElements: null
+    };
+
+    this.chartInstances = {};
+    this.onStateChangeCallbacks = [];
+  }
+
+  /* ------------------------------------------------------------------
+   * Inicialização e Bind com UI & Mapa
+   * ------------------------------------------------------------------ */
+
+  initMap(mapElementId = 'studio-map') {
+    if (typeof L === 'undefined') return;
+    const el = document.getElementById(mapElementId);
+    if (!el) return;
+
+    if (this.map) {
+      try { this.map.remove(); } catch(e) {}
+    }
+
+    this.map = L.map(mapElementId, { zoomControl: false, attributionControl: true })
+      .setView([-27.43, -48.48], 13);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20,
+      attribution: '© Esri'
+    }).addTo(this.map);
+
+    this.mapLayers.courseElements = L.featureGroup().addTo(this.map);
+  }
+
+  subscribe(callback) {
+    if (typeof callback === 'function') {
+      this.onStateChangeCallbacks.push(callback);
+    }
+  }
+
+  _notify(changeType = 'update') {
+    this.onStateChangeCallbacks.forEach(cb => cb(changeType, this));
+  }
+
+  /* ------------------------------------------------------------------
+   * Ingestão e Gerenciamento de Trilhas
+   * ------------------------------------------------------------------ */
+
+  addTrack(name, rawPoints, color = null, fileName = '') {
+    if (!rawPoints || rawPoints.length < 2) return null;
+
+    const STUDIO_COLORS = ['#00F2FE', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#F43F5E', '#3B82F6', '#EC4899'];
+    const trackColor = color || STUDIO_COLORS[this.tracks.length % STUDIO_COLORS.length];
+    const id = `track_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+    // Normalizar pontos com distâncias e rumos
+    const points = this._normalizePoints(rawPoints);
+    const summary = calculateTrackSummary(points, name, fileName);
+    const efficiency = calculateEfficiencyMetrics(points);
+    const segments = segmentTrackByDistance(points, this.splitIntervalM, id);
+
+    const trackObj = {
+      id,
+      name,
+      fileName,
+      color: trackColor,
+      originalPoints: [...points],
+      points: [...points],
+      visible: true,
+      summary,
+      efficiency,
+      segments
+    };
+
+    this.tracks.push(trackObj);
+    this.activeTrackIdx = this.tracks.length - 1;
+
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('track-added');
+
+    return trackObj;
+  }
+
+  removeTrack(idx) {
+    if (idx >= 0 && idx < this.tracks.length) {
+      const removed = this.tracks.splice(idx, 1)[0];
+      if (this.mapLayers.tracks.has(removed.id)) {
+        this.map.removeLayer(this.mapLayers.tracks.get(removed.id));
+        this.mapLayers.tracks.delete(removed.id);
+      }
+      this.activeTrackIdx = Math.max(0, Math.min(this.activeTrackIdx, this.tracks.length - 1));
+      this._updateMapTrackLayers();
+      this._notify('track-removed');
+    }
+  }
+
+  setActiveTrack(idx) {
+    if (idx >= 0 && idx < this.tracks.length) {
+      this.activeTrackIdx = idx;
+      this.clearRangeSelection();
+      this._notify('active-track-changed');
+    }
+  }
+
+  toggleTrackVisibility(idx) {
+    if (this.tracks[idx]) {
+      this.tracks[idx].visible = !this.tracks[idx].visible;
+      this._updateMapTrackLayers();
+      this._notify('track-visibility-changed');
+    }
+  }
+
+  setTrackColor(idx, color) {
+    if (this.tracks[idx]) {
+      this.tracks[idx].color = color;
+      this._updateMapTrackLayers();
+      this._notify('track-color-changed');
+    }
+  }
+
+  getActiveTrack() {
+    return this.tracks[this.activeTrackIdx] || null;
+  }
+
+  /* ------------------------------------------------------------------
+   * Ferramentas de Seleção de Range & Trimming nos Gráficos
+   * ------------------------------------------------------------------ */
+
+  setRangeSelection(startM, endM) {
+    const track = this.getActiveTrack();
+    if (!track || !track.points.length) return;
+
+    const minM = Math.max(0, Math.min(startM, endM));
+    const maxM = Math.min(track.summary.distanceM, Math.max(startM, endM));
+
+    if (maxM - minM < 5) {
+      this.clearRangeSelection();
+      return;
+    }
+
+    // Achar índices e tempos correspondentes
+    let startIdx = 0, endIdx = track.points.length - 1;
+    let startT = 0, endT = 0;
+
+    let accum = 0;
+    for (let i = 0; i < track.points.length; i++) {
+      if (i > 0) {
+        const prev = track.points[i - 1];
+        accum += haversineM(prev.lat, prev.lon ?? prev.lng, track.points[i].lat, track.points[i].lon ?? track.points[i].lng);
+      }
+      if (accum <= minM) {
+        startIdx = i;
+        startT = track.points[i].t;
+      }
+      if (accum <= maxM) {
+        endIdx = i;
+        endT = track.points[i].t;
+      }
+    }
+
+    this.rangeSelection = {
+      startM: Math.round(minM),
+      endM: Math.round(maxM),
+      startT,
+      endT,
+      startIdx,
+      endIdx,
+      mode: 'distance'
+    };
+
+    this._updateMapRangeHighlight();
+    this._notify('range-selection-changed');
+  }
+
+  clearRangeSelection() {
+    this.rangeSelection = null;
+    if (this.mapLayers.selectionHighlight) {
+      this.map.removeLayer(this.mapLayers.selectionHighlight);
+      this.mapLayers.selectionHighlight = null;
+    }
+    this._notify('range-selection-cleared');
+  }
+
+  applyTrimToSelection() {
+    const track = this.getActiveTrack();
+    if (!track || !this.rangeSelection) return false;
+
+    // Salvar estado atual no histórico de Undo
+    this.historyStack.push({
+      trackId: track.id,
+      points: [...track.points]
+    });
+
+    const trimmed = trimTrackByRange(track.points, this.rangeSelection.startM, this.rangeSelection.endM, 'distance');
+    track.points = this._normalizePoints(trimmed);
+    track.summary = calculateTrackSummary(track.points, track.name, track.fileName);
+    track.efficiency = calculateEfficiencyMetrics(track.points);
+    track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+
+    this.clearRangeSelection();
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('track-trimmed');
+    return true;
+  }
+
+  extractNewSeriesFromSelection(seriesName = null) {
+    const track = this.getActiveTrack();
+    if (!track || !this.rangeSelection) return null;
+
+    const defaultName = seriesName || `${track.name} (Série ${this.tracks.length + 1})`;
+    const trimmed = trimTrackByRange(track.points, this.rangeSelection.startM, this.rangeSelection.endM, 'distance');
+    
+    return this.addTrack(defaultName, trimmed, null, track.fileName);
+  }
+
+  resetTrackToOriginal(idx = this.activeTrackIdx) {
+    const track = this.tracks[idx];
+    if (!track) return;
+
+    track.points = [...track.originalPoints];
+    track.summary = calculateTrackSummary(track.points, track.name, track.fileName);
+    track.efficiency = calculateEfficiencyMetrics(track.points);
+    track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+
+    this.clearRangeSelection();
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('track-reset');
+  }
+
+  applySmoothing(idx = this.activeTrackIdx, windowSize = 7, smoothHR = false, allTracks = false) {
+    const targetTracks = allTracks ? this.tracks : [this.tracks[idx]].filter(Boolean);
+    if (!targetTracks.length) return;
+
+    targetTracks.forEach(track => {
+      this.historyStack.push({
+        trackId: track.id,
+        points: [...track.points]
+      });
+
+      track.points = smoothTrackSpeed(track.points, windowSize, smoothHR);
+      track.summary = calculateTrackSummary(track.points, track.name, track.fileName);
+      track.efficiency = calculateEfficiencyMetrics(track.points);
+      track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+    });
+
+    this._updateMapTrackLayers();
+    this._notify('track-smoothed');
+  }
+
+  /* ------------------------------------------------------------------
+   * Definição de Largada & Chegada Oficial (Race Timing)
+   * ------------------------------------------------------------------ */
+
+  setRaceStartByTime(hms, allTracks = true) {
+    const targetTracks = allTracks ? this.tracks : [this.getActiveTrack()].filter(Boolean);
+    if (!targetTracks.length) return;
+
+    targetTracks.forEach(t => {
+      this.historyStack.push({ trackId: t.id, points: [...t.points] });
+      t.points = cropTrackByAbsoluteTime(t.points, hms, null);
+      t.summary = calculateTrackSummary(t.points, t.name, t.fileName);
+      t.efficiency = calculateEfficiencyMetrics(t.points);
+      t.segments = segmentTrackByDistance(t.points, this.splitIntervalM, t.id);
+    });
+
+    this.clearRangeSelection();
+    this.seekTimeMs(0);
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('race-start-set');
+  }
+
+  setRaceStartAtPlayhead(allTracks = true) {
+    const targetTracks = allTracks ? this.tracks : [this.getActiveTrack()].filter(Boolean);
+    if (!targetTracks.length) return;
+
+    const playheadMs = this.playback.currentTimeMs;
+    targetTracks.forEach(t => {
+      this.historyStack.push({ trackId: t.id, points: [...t.points] });
+      const pts = t.points;
+      const isMs = (pts[pts.length - 1].t - pts[0].t) > 100000;
+      const targetT = isMs ? playheadMs : (playheadMs / 1000);
+      
+      let sIdx = 0;
+      for (let i = 0; i < pts.length; i++) {
+        if (pts[i].t >= targetT) { sIdx = i; break; }
+      }
+      const cropped = pts.slice(sIdx);
+      t.points = this._normalizePoints(cropped);
+      t.summary = calculateTrackSummary(t.points, t.name, t.fileName);
+      t.efficiency = calculateEfficiencyMetrics(t.points);
+      t.segments = segmentTrackByDistance(t.points, this.splitIntervalM, t.id);
+    });
+
+    this.clearRangeSelection();
+    this.seekTimeMs(0);
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('race-start-set');
+  }
+
+  setRaceFinishByDuration(durationS, allTracks = true) {
+    const targetTracks = allTracks ? this.tracks : [this.getActiveTrack()].filter(Boolean);
+    if (!targetTracks.length) return;
+
+    targetTracks.forEach(t => {
+      this.historyStack.push({ trackId: t.id, points: [...t.points] });
+      t.points = cropTrackByAbsoluteTime(t.points, null, durationS);
+      t.summary = calculateTrackSummary(t.points, t.name, t.fileName);
+      t.efficiency = calculateEfficiencyMetrics(t.points);
+      t.segments = segmentTrackByDistance(t.points, this.splitIntervalM, t.id);
+    });
+
+    this.clearRangeSelection();
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('race-finish-set');
+  }
+
+  setRaceFinishAtPlayhead(allTracks = true) {
+    const targetTracks = allTracks ? this.tracks : [this.getActiveTrack()].filter(Boolean);
+    if (!targetTracks.length) return;
+
+    const playheadMs = this.playback.currentTimeMs;
+    targetTracks.forEach(t => {
+      this.historyStack.push({ trackId: t.id, points: [...t.points] });
+      const pts = t.points;
+      const isMs = (pts[pts.length - 1].t - pts[0].t) > 100000;
+      const targetT = isMs ? playheadMs : (playheadMs / 1000);
+      
+      let eIdx = pts.length - 1;
+      for (let i = 0; i < pts.length; i++) {
+        if (pts[i].t >= targetT) { eIdx = i; break; }
+      }
+      const cropped = pts.slice(0, eIdx + 1);
+      t.points = this._normalizePoints(cropped);
+      t.summary = calculateTrackSummary(t.points, t.name, t.fileName);
+      t.efficiency = calculateEfficiencyMetrics(t.points);
+      t.segments = segmentTrackByDistance(t.points, this.splitIntervalM, t.id);
+    });
+
+    this.clearRangeSelection();
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('race-finish-set');
+  }
+
+  /* ------------------------------------------------------------------
+   * Eliminação de Trechos & Linhas de Corte por Limiar
+   * ------------------------------------------------------------------ */
+
+  removeSelectedInterval() {
+    const track = this.getActiveTrack();
+    if (!track || !this.rangeSelection) return false;
+
+    this.historyStack.push({ trackId: track.id, points: [...track.points] });
+    track.points = removeTrackInterval(track.points, this.rangeSelection.startM, this.rangeSelection.endM, 'distance');
+    track.summary = calculateTrackSummary(track.points, track.name, track.fileName);
+    track.efficiency = calculateEfficiencyMetrics(track.points);
+    track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+
+    this.clearRangeSelection();
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('track-range-removed');
+    return true;
+  }
+
+  filterByThresholds(minSpeedKmh = null, minHr = null) {
+    const track = this.getActiveTrack();
+    if (!track) return false;
+
+    this.historyStack.push({ trackId: track.id, points: [...track.points] });
+    track.points = filterTrackByThresholds(track.points, { minSpeedKmh, minHr });
+    track.summary = calculateTrackSummary(track.points, track.name, track.fileName);
+    track.efficiency = calculateEfficiencyMetrics(track.points);
+    track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('track-filtered');
+    return true;
+  }
+
+  /* ------------------------------------------------------------------
+   * Auto-Séries Adaptativo
+   * ------------------------------------------------------------------ */
+
+  autoDetectSeriesAdaptive(config = {}) {
+    const track = this.getActiveTrack();
+    if (!track) return [];
+
+    const detected = autoDetectIntervalSeriesAdaptive(track.points, config);
+    if (!detected.length) {
+      alert("Nenhum intervalo detectado com os parâmetros informados. Tente ajustar o limiar de velocidade ou usar fatiamento por distância/tempo.");
+      return [];
+    }
+
+    detected.forEach((ser) => {
+      this.addTrack(`${track.name} - ${ser.name}`, ser.points, null, track.fileName);
+    });
+
+    this._notify('auto-series-created');
+    return detected;
+  }
+
+  /* ------------------------------------------------------------------
+   * Eventos Manuais e Auto-Detecção Completa
+   * ------------------------------------------------------------------ */
+
+  addCustomEvent(evtObj) {
+    const eventId = evtObj.id || `evt-usr-${Date.now()}`;
+    const newEvt = {
+      id: eventId,
+      type: evtObj.type || 'NOTE',
+      typeLabel: evtObj.typeLabel || 'Nota / Marcador',
+      icon: evtObj.icon || 'fa-tag',
+      color: evtObj.color || '#00F2FE',
+      name: evtObj.name || 'Evento Marcado',
+      details: evtObj.details || '',
+      timeMs: evtObj.timeMs ?? this.playback.currentTimeMs,
+      distanceM: evtObj.distanceM ?? (this.getActiveTrack()?.summary.distanceM * (this.playback.currentTimeMs / this.getMaxDurationMs())),
+      lat: evtObj.lat,
+      lon: evtObj.lon
+    };
+
+    this.customEvents.push(newEvt);
+    this._updateMapEventMarkers();
+    this._notify('event-added');
+    return newEvt;
+  }
+
+  removeCustomEvent(eventId) {
+    this.customEvents = this.customEvents.filter(e => e.id !== eventId);
+    this._updateMapEventMarkers();
+    this._notify('event-removed');
+  }
+
+  autoDetectAllEvents() {
+    const autoEvents = autoDetectAllRaceEvents(this.tracks, {
+      interferenceThresholdM: this.interferenceThresholdM
+    });
+
+    // Mesclar mantendo eventos manuais
+    const manualOnly = this.customEvents.filter(e => e.id.startsWith('evt-usr-'));
+    this.customEvents = [...autoEvents, ...manualOnly];
+
+    this._updateMapEventMarkers();
+    this._notify('events-detected');
+    return this.customEvents;
+  }
+
+  _updateMapEventMarkers() {
+    if (!this.map) return;
+    this.mapLayers.eventMarkers.forEach(m => this.map.removeLayer(m));
+    this.mapLayers.eventMarkers.clear();
+
+    this.customEvents.forEach(evt => {
+      if (evt.lat && evt.lon) {
+        const icon = L.divIcon({
+          className: 'event-map-icon',
+          html: `
+            <div style="width:24px; height:24px; background:${evt.color}; border:2px solid #fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px ${evt.color}; cursor:pointer;" title="${evt.name}">
+              <i class="fa-solid ${evt.icon || 'fa-tag'}" style="color:#000; font-size:11px;"></i>
+            </div>
+          `,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        const m = L.marker([evt.lat, evt.lon], { icon }).addTo(this.map);
+        m.bindPopup(`<strong>${evt.name}</strong><br><span style="font-size:11px; color:#94A3B8;">${evt.details || evt.typeLabel}</span>`);
+        this.mapLayers.eventMarkers.set(evt.id, m);
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------
+   * Zoom nos Gráficos (Sincronizado e com MouseWheel / Brush)
+   * ------------------------------------------------------------------ */
+
+  zoomChart(factor, centerFrac = 0.5) {
+    const currentSpan = this.chartZoom.maxFrac - this.chartZoom.minFrac;
+    const newSpan = Math.max(0.05, Math.min(1.0, currentSpan * factor));
+
+    const currentCenter = this.chartZoom.minFrac + (currentSpan * centerFrac);
+    let newMin = currentCenter - (newSpan * centerFrac);
+    let newMax = currentCenter + (newSpan * (1 - centerFrac));
+
+    if (newMin < 0) {
+      newMax = Math.min(1.0, newMax - newMin);
+      newMin = 0;
+    }
+    if (newMax > 1.0) {
+      newMin = Math.max(0, newMin - (newMax - 1.0));
+      newMax = 1.0;
+    }
+
+    this.chartZoom.minFrac = newMin;
+    this.chartZoom.maxFrac = newMax;
+    this.chartZoom.isZoomed = (newMin > 0 || newMax < 1.0);
+
+    this._notify('chart-zoom-changed');
+  }
+
+  resetChartZoom() {
+    this.chartZoom.minFrac = 0.0;
+    this.chartZoom.maxFrac = 1.0;
+    this.chartZoom.isZoomed = false;
+    this._notify('chart-zoom-changed');
+  }
+
+  undoLastTrim() {
+    if (!this.historyStack.length) return false;
+    const last = this.historyStack.pop();
+    const track = this.tracks.find(t => t.id === last.trackId);
+    if (track) {
+      track.points = [...last.points];
+      track.summary = calculateTrackSummary(track.points, track.name, track.fileName);
+      track.efficiency = calculateEfficiencyMetrics(track.points);
+      track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+
+      this.clearRangeSelection();
+      this._updateMapTrackLayers();
+      this._fitMapBounds();
+      this._notify('track-undo');
+      return true;
+    }
+    return false;
+  }
+
+  /* ------------------------------------------------------------------
+   * Engine de Reprodução e Timeline DAW / CapCut
+   * ------------------------------------------------------------------ */
+
+  getMaxDurationMs() {
+    let maxMs = 0;
+    this.tracks.forEach(t => {
+      if (t.points.length > 1) {
+        const span = t.points[t.points.length - 1].t - t.points[0].t;
+        if (span > maxMs) maxMs = span;
+      }
+    });
+    return maxMs || 1000;
+  }
+
+  play() {
+    if (this.playback.isPlaying) return;
+    this.playback.isPlaying = true;
+    this.playback.lastTickTime = performance.now();
+    
+    const maxDur = this.getMaxDurationMs();
+    if (this.playback.currentTimeMs >= maxDur) {
+      this.playback.currentTimeMs = 0;
+    }
+
+    const tick = () => {
+      if (!this.playback.isPlaying) return;
+      const now = performance.now();
+      const dtReal = now - this.playback.lastTickTime;
+      this.playback.lastTickTime = now;
+
+      const dtSim = dtReal * this.playback.speedMultiplier;
+      this.playback.currentTimeMs += dtSim;
+
+      const maxD = this.getMaxDurationMs();
+      if (this.playback.currentTimeMs >= maxD) {
+        if (this.playback.loop) {
+          this.playback.currentTimeMs = 0;
+        } else {
+          this.playback.currentTimeMs = maxD;
+          this.pause();
+          return;
+        }
+      }
+
+      this._syncPlayheadPosition();
+      this.playback.timerId = requestAnimationFrame(tick);
+    };
+
+    this.playback.timerId = requestAnimationFrame(tick);
+    this._notify('playback-play');
+  }
+
+  pause() {
+    if (!this.playback.isPlaying) return;
+    this.playback.isPlaying = false;
+    if (this.playback.timerId) {
+      cancelAnimationFrame(this.playback.timerId);
+      this.playback.timerId = null;
+    }
+    this._notify('playback-pause');
+  }
+
+  togglePlay() {
+    if (this.playback.isPlaying) this.pause();
+    else this.play();
+  }
+
+  seekTimeMs(timeMs) {
+    const maxD = this.getMaxDurationMs();
+    this.playback.currentTimeMs = Math.max(0, Math.min(maxD, timeMs));
+    this._syncPlayheadPosition();
+    this._notify('playback-seek');
+  }
+
+  setPlaybackSpeed(multiplier) {
+    this.playback.speedMultiplier = Math.max(0.25, Math.min(64.0, multiplier));
+    this._notify('playback-speed-changed');
+  }
+
+  splitTrackAtPlayhead(idx = this.activeTrackIdx) {
+    const track = this.tracks[idx];
+    if (!track || track.points.length < 4) return false;
+
+    const playheadT = this.playback.currentTimeMs;
+    const pts = track.points;
+    const isMs = (pts[pts.length - 1].t - pts[0].t) > 100000;
+    const t0 = pts[0].t;
+    const targetAbsT = isMs ? (t0 + playheadT) : (t0 + (playheadT / 1000));
+
+    let splitIdx = -1;
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].t >= targetAbsT) {
+        splitIdx = i;
+        break;
+      }
+    }
+
+    if (splitIdx <= 2 || splitIdx >= pts.length - 2) {
+      alert("A agulha deve estar dentro do corpo da trilha para realizar o corte (Razor Cut).");
+      return false;
+    }
+
+    // Salvar no histórico de Undo
+    this.historyStack.push({
+      trackId: track.id,
+      points: [...track.points]
+    });
+
+    const ptsA = pts.slice(0, splitIdx + 1);
+    const ptsB = pts.slice(splitIdx);
+
+    // Ajustar a trilha original como Parte A
+    track.points = this._normalizePoints(ptsA);
+    track.summary = calculateTrackSummary(track.points, `${track.name} (Pt 1)`, track.fileName);
+    track.efficiency = calculateEfficiencyMetrics(track.points);
+    track.segments = segmentTrackByDistance(track.points, this.splitIntervalM, track.id);
+    track.name = `${track.name} [A]`;
+
+    // Criar a nova trilha como Parte B
+    this.addTrack(`${track.name.replace(' [A]', '')} [B]`, ptsB, null, track.fileName);
+
+    this._updateMapTrackLayers();
+    this._fitMapBounds();
+    this._notify('track-split');
+    return true;
+  }
+
+  _syncPlayheadPosition() {
+    if (!this.map) return;
+    const playheadT = this.playback.currentTimeMs;
+
+    this.tracks.forEach((track) => {
+      if (!track.visible || !track.points.length) {
+        if (this.mapLayers.canoeMarkers.has(track.id)) {
+          this.map.removeLayer(this.mapLayers.canoeMarkers.get(track.id));
+          this.mapLayers.canoeMarkers.delete(track.id);
+        }
+        return;
+      }
+      const pts = track.points;
+      const isMs = (pts[pts.length - 1].t - pts[0].t) > 100000;
+      const t0 = pts[0].t;
+      const targetAbsT = isMs ? (t0 + playheadT) : (t0 + (playheadT / 1000));
+
+      let p = null;
+      if (targetAbsT <= pts[0].t) p = pts[0];
+      else if (targetAbsT >= pts[pts.length - 1].t) p = pts[pts.length - 1];
+      else {
+        for (let i = 1; i < pts.length; i++) {
+          if (pts[i].t >= targetAbsT) {
+            const prev = pts[i - 1];
+            const cur = pts[i];
+            const f = (cur.t - prev.t) > 0 ? (targetAbsT - prev.t) / (cur.t - prev.t) : 0;
+            p = {
+              lat: prev.lat + (cur.lat - prev.lat) * f,
+              lon: prev.lon + (cur.lon - prev.lon) * f,
+              spdKmh: prev.spdKmh != null ? prev.spdKmh + ((cur.spdKmh || prev.spdKmh) - prev.spdKmh) * f : null,
+              hr: prev.hr,
+              heading: cur.heading || prev.heading
+            };
+            break;
+          }
+        }
+      }
+
+      if (p) {
+        if (!this.mapLayers.canoeMarkers.has(track.id)) {
+          const customIcon = L.divIcon({
+            className: 'canoe-live-marker',
+            html: `
+              <div style="width:26px; height:26px; background:${track.color}; border:2px solid #fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 12px ${track.color}; transform:rotate(${(p.heading || 0) - 90}deg);">
+                <i class="fa-solid fa-location-arrow" style="color:#000; font-size:13px;"></i>
+              </div>
+            `,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          });
+          const marker = L.marker([p.lat, p.lon], { icon: customIcon }).addTo(this.map);
+          this.mapLayers.canoeMarkers.set(track.id, marker);
+        } else {
+          const marker = this.mapLayers.canoeMarkers.get(track.id);
+          marker.setLatLng([p.lat, p.lon]);
+          const el = marker.getElement();
+          if (el) {
+            const inner = el.querySelector('div');
+            if (inner) inner.style.transform = `rotate(${(p.heading || 0) - 90}deg)`;
+          }
+        }
+      }
+    });
+
+    this._notify('playhead-tick');
+  }
+
+  hoverPointAtDistance(distM) {
+    const track = this.getActiveTrack();
+    if (!track || !track.points.length || !this.map) return;
+
+    let accum = 0;
+    let targetP = track.points[0];
+
+    for (let i = 0; i < track.points.length; i++) {
+      if (i > 0) {
+        const prev = track.points[i - 1];
+        accum += haversineM(prev.lat, prev.lon ?? prev.lng, track.points[i].lat, track.points[i].lon ?? track.points[i].lng);
+      }
+      if (accum >= distM) {
+        targetP = track.points[i];
+        break;
+      }
+    }
+
+    this._updateMapHoverMarker(targetP, track);
+  }
+
+  _updateMapHoverMarker(p, track) {
+    if (!p || !this.map) return;
+
+    if (!this.mapLayers.marker) {
+      const icon = L.divIcon({
+        className: 'studio-cursor-icon',
+        html: `<div style="position:relative; width:24px; height:24px;">
+          <div style="width:14px; height:14px; border-radius:50%; background:${track.color}; border:2px solid #fff; box-shadow:0 0 12px ${track.color}; position:absolute; top:5px; left:5px;"></div>
+        </div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+      this.mapLayers.marker = L.marker([p.lat, p.lon ?? p.lng], { icon, zIndexOffset: 2000 }).addTo(this.map);
+    } else {
+      this.mapLayers.marker.setLatLng([p.lat, p.lon ?? p.lng]);
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * Atualização de Camadas no Mapa Leaflet
+   * ------------------------------------------------------------------ */
+
+  _updateMapTrackLayers() {
+    if (!this.map) return;
+
+    // Remover camadas desativadas
+    this.mapLayers.tracks.forEach((layer, id) => {
+      if (!this.tracks.find(t => t.id === id && t.visible)) {
+        this.map.removeLayer(layer);
+        this.mapLayers.tracks.delete(id);
+      }
+    });
+
+    // Atualizar ou criar camadas ativas
+    this.tracks.forEach((track, idx) => {
+      if (!track.visible) return;
+
+      const latLngs = track.points.map(p => [p.lat, p.lon ?? p.lng]);
+      const isSelected = (idx === this.activeTrackIdx);
+
+      if (this.mapLayers.tracks.has(track.id)) {
+        const layer = this.mapLayers.tracks.get(track.id);
+        layer.setLatLngs(latLngs);
+        layer.setStyle({
+          color: track.color,
+          weight: isSelected ? 4 : 2,
+          opacity: isSelected ? 0.9 : 0.4
+        });
+      } else {
+        const layer = L.polyline(latLngs, {
+          color: track.color,
+          weight: isSelected ? 4 : 2,
+          opacity: isSelected ? 0.9 : 0.4
+        }).addTo(this.map);
+        this.mapLayers.tracks.set(track.id, layer);
+      }
+    });
+
+    this._updateMapRangeHighlight();
+  }
+
+  _updateMapRangeHighlight() {
+    if (!this.map) return;
+
+    if (this.mapLayers.selectionHighlight) {
+      this.map.removeLayer(this.mapLayers.selectionHighlight);
+      this.mapLayers.selectionHighlight = null;
+    }
+
+    const track = this.getActiveTrack();
+    if (!track || !this.rangeSelection) return;
+
+    const slice = track.points.slice(this.rangeSelection.startIdx, this.rangeSelection.endIdx + 1);
+    if (slice.length >= 2) {
+      const latLngs = slice.map(p => [p.lat, p.lon ?? p.lng]);
+      this.mapLayers.selectionHighlight = L.polyline(latLngs, {
+        color: '#FFFFFF',
+        weight: 6,
+        opacity: 0.9,
+        dashArray: '6 6'
+      }).addTo(this.map);
+    }
+  }
+
+  _fitMapBounds() {
+    if (!this.map) return;
+    const allCoords = [];
+    this.tracks.filter(t => t.visible).forEach(t => {
+      t.points.forEach(p => allCoords.push([p.lat, p.lon ?? p.lng]));
+    });
+    if (allCoords.length) {
+      this.map.fitBounds(allCoords, { padding: [30, 30] });
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * Exportação e Composição de Contratos
+   * ------------------------------------------------------------------ */
+
+  generateVAARECContract(contractName = 'Sessão GPX Studio') {
+    const tracksExport = this.tracks.map((t, i) => ({
+      id: t.id || `canoe_${i + 1}`,
+      name: t.name,
+      color: t.color,
+      fileName: t.fileName,
+      points: t.points,
+      summary: t.summary,
+      segments: t.segments
+    }));
+
+    const interferenceEvents = multiTrackInterference(this.tracks.map(t => ({
+      name: t.name,
+      points: t.points
+    })), this.interferenceThresholdM, 4.0);
+
+    return {
+      version: '2.0',
+      generator: 'VAAREC GPX Skills Studio',
+      name: contractName,
+      date: new Date().toLocaleDateString('pt-BR'),
+      createdAt: new Date().toISOString(),
+      sportPackage: {
+        tracks: tracksExport
+      },
+      events: {
+        interference: interferenceEvents,
+        custom: this.customEvents,
+        all: [...interferenceEvents, ...this.customEvents]
+      }
+    };
+  }
+
+  exportCSVData(trackIdx = this.activeTrackIdx) {
+    const track = this.tracks[trackIdx];
+    if (!track || !track.segments.length) return '';
+
+    const headers = ['Segmento', 'Dist_Inicio_m', 'Dist_Fim_m', 'Duracao_s', 'Distancia_m', 'Vel_Media_kmh', 'Pace', 'FC_Media', 'FC_Max'];
+    const rows = track.segments.map(s => [
+      s.segmentId,
+      s.startM,
+      s.endM,
+      s.durationS,
+      s.distanceM,
+      s.speedAvgKmh,
+      s.paceStr || '',
+      s.hrAvg || '',
+      s.hrMax || ''
+    ]);
+
+    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  }
+
+  generateComparisonJSON() {
+    return calculateBaselineEnvelope(this.tracks.map(t => ({
+      name: t.name,
+      fileName: t.fileName,
+      points: t.points
+    })), this.splitIntervalM);
+  }
+
+  generateEventsJSON() {
+    const interference = multiTrackInterference(this.tracks.map(t => ({
+      name: t.name,
+      points: t.points
+    })), this.interferenceThresholdM, 4.0);
+
+    let overtakes = [];
+    let approach = [];
+    if (this.tracks.length >= 2) {
+      overtakes = detectOvertakingEvents(this.tracks[0].points, this.tracks[1].points, this.tracks[0].name, this.tracks[1].name);
+      approach = calculateTwoCanoesApproachProfile(this.tracks[0].points, this.tracks[1].points, 3.0);
+    }
+
+    return {
+      interference,
+      overtakes,
+      approachSummary: {
+        totalSamples: approach.length,
+        criticalProximitySamples: approach.filter(a => a.trend === 'critical_proximity').length,
+        minDistanceM: approach.length ? Math.min(...approach.map(a => a.distanceM)) : null
+      }
+    };
+  }
+
+  exportGPXXML(trackIdx = this.activeTrackIdx) {
+    const track = this.tracks[trackIdx];
+    if (!track || !track.points.length) return '';
+
+    const pts = track.points;
+    const baseTime = pts[0].absT || Date.now();
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<gpx version="1.1" creator="VAAREC GPX Skills Studio" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">\n`;
+    xml += `  <metadata><name>${track.name}</name><time>${new Date(baseTime).toISOString()}</time></metadata>\n`;
+    xml += `  <trk><name>${track.name}</name><trkseg>\n`;
+
+    pts.forEach(p => {
+      const timeIso = new Date(p.absT || (baseTime + p.t)).toISOString();
+      xml += `    <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`;
+      if (p.ele != null) xml += `<ele>${p.ele.toFixed(2)}</ele>`;
+      xml += `<time>${timeIso}</time>`;
+      if (p.hr != null || p.spdKmh != null || p.cadence != null) {
+        xml += `<extensions><gpxtpx:TrackPointExtension>`;
+        if (p.hr != null) xml += `<gpxtpx:hr>${p.hr}</gpxtpx:hr>`;
+        if (p.spdKmh != null) xml += `<gpxtpx:speed>${(p.spdKmh / 3.6).toFixed(2)}</gpxtpx:speed>`;
+        if (p.cadence != null) xml += `<gpxtpx:cad>${p.cadence}</gpxtpx:cad>`;
+        xml += `</gpxtpx:TrackPointExtension></extensions>`;
+      }
+      xml += `</trkpt>\n`;
+    });
+
+    xml += `  </trkseg></trk>\n</gpx>`;
+    return xml;
+  }
+
+  /* ------------------------------------------------------------------
+   * Utilitários Internos
+   * ------------------------------------------------------------------ */
+
+  _normalizePoints(pts) {
+    if (!pts || !pts.length) return [];
+    const t0 = Number(pts[0].t ?? pts[0].timestamp ?? 0);
+    const tEnd = Number(pts[pts.length - 1].t ?? pts[pts.length - 1].timestamp ?? 0);
+    const isMs = (tEnd - t0) > 100000 || t0 > 1000000000;
+
+    const rawNorm = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const lat = Number(p.lat ?? p.latitude);
+      const lon = Number(p.lon ?? p.lng ?? p.longitude);
+      const absT = Number(p.t ?? p.timestamp ?? 0);
+      const t = isMs ? (absT - t0) : ((absT - t0) * 1000);
+      
+      let spdKmh = p.spdKmh != null ? Number(p.spdKmh) : (p.speedKmh != null ? Number(p.speedKmh) : null);
+      
+      // Se não veio velocidade explícita no arquivo ou veio zerada, calcula da distância / tempo
+      if (spdKmh == null || isNaN(spdKmh) || (spdKmh === 0 && i > 0)) {
+        if (i > 0) {
+          const prev = rawNorm[i - 1];
+          const dist = haversineM(prev.lat, prev.lon, lat, lon);
+          const dtS = isMs ? (absT - prev.absT) / 1000 : (absT - prev.absT);
+          spdKmh = (dtS > 0 && dtS < 120) ? (dist / dtS) * 3.6 : 0;
+          if (spdKmh > 55) spdKmh = prev.spdKmh; // Filtro de glitch de teletransporte de GPS
+        } else {
+          spdKmh = 0;
+        }
+      }
+
+      const hr = p.hr != null ? Number(p.hr) : (p.heartRate != null ? Number(p.heartRate) : null);
+      const ele = p.ele != null ? Number(p.ele) : (p.altitude != null ? Number(p.altitude) : null);
+      const cadence = p.cadence != null ? Number(p.cadence) : null;
+
+      rawNorm.push({ lat, lon, t, absT, spdKmh: Number(spdKmh.toFixed(2)), hr, ele, cadence });
+    }
+
+    // Suavização leve (janela de 3 pontos) para remover jitter de discretização de 1s do GPS
+    const smoothed = rawNorm.map((p, i) => {
+      if (i === 0 || i === rawNorm.length - 1) return p;
+      const prev = rawNorm[i - 1];
+      const next = rawNorm[i + 1];
+      const avgSpd = (prev.spdKmh * 0.25) + (p.spdKmh * 0.5) + (next.spdKmh * 0.25);
+      return { ...p, spdKmh: Number(avgSpd.toFixed(2)) };
+    });
+
+    // Calcular headings
+    for (let j = 0; j < smoothed.length; j++) {
+      let lookAhead = smoothed[Math.min(j + 3, smoothed.length - 1)];
+      let dist = haversineM(smoothed[j].lat, smoothed[j].lon, lookAhead.lat, lookAhead.lon);
+      if (dist < 0.2 && j < smoothed.length - 1) {
+        lookAhead = smoothed[j + 1];
+        dist = haversineM(smoothed[j].lat, smoothed[j].lon, lookAhead.lat, lookAhead.lon);
+      }
+      if (dist >= 0.2) {
+        smoothed[j].heading = bearingDeg(smoothed[j].lat, smoothed[j].lon, lookAhead.lat, lookAhead.lon);
+      } else if (j > 0) {
+        smoothed[j].heading = smoothed[j - 1].heading;
+      } else {
+        smoothed[j].heading = 0;
+      }
+    }
+
+    return smoothed;
+  }
+}
+
 
 // Instância Global do Controller
 const studio = new GPXStudioController();
@@ -1516,6 +3832,39 @@ window.applyThresholdFilter = function() {
   const hr = hrVal > 0 ? hrVal : null;
   studio.filterByThresholds(spd, hr);
   closeModal('modal-threshold-filter');
+};
+
+window.openSmoothingModal = function() {
+  if (!studio.tracks.length) {
+    showToast('Nenhuma trilha carregada para suavizar.', 'error');
+    return;
+  }
+  openModal('modal-smoothing');
+};
+
+window.setSmoothingPreset = function(val) {
+  const range = document.getElementById('range-smooth-window');
+  if (range) {
+    range.value = val;
+    updateSmoothingSliderVal(val);
+  }
+};
+
+window.updateSmoothingSliderVal = function(val) {
+  const el = document.getElementById('val-smooth-window');
+  if (el) el.textContent = `${val} pts (~${val}s)`;
+};
+
+window.applySmoothingFromModal = function() {
+  const windowSize = parseInt(document.getElementById('range-smooth-window')?.value || '9', 10);
+  const targetAll = document.querySelector('input[name="smooth-target"]:checked')?.value === 'all';
+  const smoothHR = !!document.getElementById('check-smooth-hr')?.checked;
+
+  studio.applySmoothing(studio.activeTrackIdx, windowSize, smoothHR, targetAll);
+  closeModal('modal-smoothing');
+
+  const targetName = targetAll ? 'todas as trilhas' : `trilha "${studio.getActiveTrack()?.name}"`;
+  showToast(`✓ Suavização (${windowSize} pts) aplicada em ${targetName}.`, 'success');
 };
 
 window.updateSeriesModalFields = function(val) {
