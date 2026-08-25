@@ -48,8 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
           slugInput.value = sanitizeSlug(json.slug || file.name.replace(/\.json$/i, ''));
         }
 
-        let detectedTemplate = 'viewer-desafio.html';
-        if (json.context === 'desafio' || json.template === 'viewer-desafio.html') {
+        let detectedTemplate = 'viewer-slim.html';
+        if (json.context === 'slim' || json.template === 'viewer-slim.html') {
+          detectedTemplate = 'viewer-slim.html';
+        } else if (json.context === 'desafio' || json.template === 'viewer-desafio.html') {
           detectedTemplate = 'viewer-desafio.html';
         } else if (json.context === 'treino-raia' || json.template === 'viewer-treino-raia.html') {
           detectedTemplate = 'viewer-treino-raia.html';
@@ -216,7 +218,8 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
             Template Principal Ativo: <b style="color: var(--accent);">${selectedTemplate}</b>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <a href="${targetUrl}" target="_blank" class="btn btn-cyan" style="text-decoration:none; padding:8px 14px; font-size:12px;">🚀 Abrir Viewer Selecionado</a>
+            <a href="${targetUrl}" target="_blank" class="btn btn-cyan" style="text-decoration:none; padding:8px 14px; font-size:12px;">✨ Abrir Viewer Selecionado</a>
+            <a href="https://elmonte.dev.br/vaarec/viewers/viewer-slim.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#0e7490;">✨ Abrir no Slim</a>
             <a href="https://elmonte.dev.br/vaarec/viewers/viewer-desafio.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#0891b2;">🚀 Abrir no Desafio</a>
             <a href="https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#1d4ed8;">🏄 Abrir no Padrão</a>
             <a href="https://elmonte.dev.br/vaarec/viewers/viewer-treino-raia.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#7c3aed;">🏁 Abrir na Raia</a>

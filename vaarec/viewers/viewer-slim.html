@@ -1,0 +1,2773 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>VAAREC Slim — Replay Minimalista de Alta Performance</title>
+  <meta name="description" content="Visualizador Minimalista de Canoagem Oceânica VAAREC Slim com Mapa Fullscreen, Timeline Vertical e Câmera Drone">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./vaarec-client.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+
+/**
+ * audio-engine.js — VAAREC Procedural Ocean Soundtrack & Race Audio Director
+ * Motor de Áudio 100% Nativo (Web Audio API) para Replay de Canoagem Oceânica / Va'a.
+ * Zero arquivos MP3 pesados ou dependências externas — Síntese em tempo real com alta fidelidade!
+ * Suporta aceleração de tempo sincronizada (1x, 5x, 10x, 30x).
+ */
+
+(function (global) {
+  'use strict';
+
+  class VaarecAudioEngine {
+    constructor() {
+      this.ctx = null;
+      this.masterGain = null;
+      this.bgmGain = null;
+      this.sfxGain = null;
+      this.isMuted = false;
+      this.volume = 0.4; // Padrão 40%
+      this.isPlayingBGM = false;
+      this.bgmTimer = null;
+      this.bgmStep = 0;
+      this.lastLeaderIdx = null;
+      this.buoysSounded = new Set();
+      this.startHornTriggered = false;
+      this.finishFanfareTriggered = false;
+      this.lastKmSounded = 0;
+      this.lastKmSounded = 0;
+      this.baseBpm = 118;
+      this.tempoBpm = 118;
+      this.speedMultiplier = 1;
+      this.oceanNoiseNode = null;
+      this.oceanFilterNode = null;
+      this.oceanGainNode = null;
+      this.oceanLfo = null;
+    }
+
+    /**
+     * Inicializa e desbloqueia o AudioContext no primeiro clique/interação
+     */
+    init() {
+      if (this.ctx && this.ctx.state !== 'closed') {
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+        return;
+      }
+
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtxClass) {
+        console.warn('Web Audio API não suportada neste navegador.');
+        return;
+      }
+
+      this.ctx = new AudioCtxClass();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+      this.masterGain.connect(this.ctx.destination);
+
+      // Canal BGM (Trilha Sonora)
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.setValueAtTime(0.55, this.ctx.currentTime);
+      this.bgmGain.connect(this.masterGain);
+
+      // Canal SFX (Efeitos Sonoros)
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
+      this.sfxGain.connect(this.masterGain);
+
+      this._initOceanSwell();
+    }
+
+    /**
+     * Ajusta a velocidade de reprodução da trilha sonora dinamicamente (1x, 5x, 10x, 30x)
+     */
+    setPlaybackSpeed(speed) {
+      const s = Math.max(0.5, Math.min(50, Number(speed) || 1));
+      this.speedMultiplier = s;
+
+      // Escalação progressiva do BPM para acompanhar o ritmo da aceleração
+      // 1x -> 118 BPM, 5x -> ~245 BPM, 10x -> ~335 BPM, 30x -> ~545 BPM
+      this.tempoBpm = Math.round(this.baseBpm * Math.pow(s, 0.45));
+
+      // Acelera a modulação da ondulação do oceano
+      if (this.oceanFilterNode && this.ctx) {
+        const targetCutoff = Math.min(1100, 320 + (s - 1) * 26);
+        this.oceanFilterNode.frequency.setTargetAtTime(targetCutoff, this.ctx.currentTime, 0.1);
+      }
+      if (this.oceanLfo && this.ctx) {
+        const targetLfoFreq = Math.min(1.6, 0.18 * Math.pow(s, 0.4));
+        this.oceanLfo.frequency.setTargetAtTime(targetLfoFreq, this.ctx.currentTime, 0.1);
+      }
+    }
+
+    /**
+     * Gera som contínuo e orgânico de ondulação do oceano / esteira na água
+     */
+    _initOceanSwell() {
+      if (!this.ctx) return;
+      const bufferSize = this.ctx.sampleRate * 2;
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+
+      // Gerador de Pink/Brown Noise (som natural de água/vento)
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        output[i] = (b0 + b1 + b2 + b3) * 0.06;
+      }
+
+      const whiteNoise = this.ctx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+      whiteNoise.loop = true;
+
+      // Filtro Low-Pass ressonante simulando fluxo de água
+      this.oceanFilterNode = this.ctx.createBiquadFilter();
+      this.oceanFilterNode.type = 'lowpass';
+      this.oceanFilterNode.frequency.setValueAtTime(320, this.ctx.currentTime);
+      this.oceanFilterNode.Q.setValueAtTime(3.0, this.ctx.currentTime);
+
+      // Ganho da Ambiência
+      this.oceanGainNode = this.ctx.createGain();
+      this.oceanGainNode.gain.setValueAtTime(0.001, this.ctx.currentTime);
+
+      // LFO para ondulação lenta (maré/ondas)
+      this.oceanLfo = this.ctx.createOscillator();
+      this.oceanLfo.frequency.setValueAtTime(0.18, this.ctx.currentTime);
+      const lfoGain = this.ctx.createGain();
+      lfoGain.gain.setValueAtTime(140, this.ctx.currentTime);
+      this.oceanLfo.connect(lfoGain);
+      lfoGain.connect(this.oceanFilterNode.frequency);
+      this.oceanLfo.start();
+
+      whiteNoise.connect(this.oceanFilterNode);
+      this.oceanFilterNode.connect(this.oceanGainNode);
+      this.oceanGainNode.connect(this.bgmGain);
+      whiteNoise.start();
+      this.oceanNoiseNode = whiteNoise;
+    }
+
+    setVolume(val) {
+      this.volume = Math.max(0, Math.min(1, Number(val) || 0));
+      if (this.masterGain && this.ctx && !this.isMuted) {
+        this.masterGain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.05);
+      }
+    }
+
+    setMuted(muted) {
+      this.isMuted = !!muted;
+      if (this.masterGain && this.ctx) {
+        this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime, 0.05);
+      }
+    }
+
+    toggleMute() {
+      this.setMuted(!this.isMuted);
+      return this.isMuted;
+    }
+
+    // ==========================================
+    // 🎵 TRILHA SONORA DO PERCURSO (PROCEDURAL THEME)
+    // ==========================================
+
+    playBGM() {
+      this.init();
+      if (this.isPlayingBGM) return;
+      this.isPlayingBGM = true;
+
+      // Ativar ambiência do oceano
+      if (this.oceanGainNode && this.ctx) {
+        this.oceanGainNode.gain.setTargetAtTime(0.18, this.ctx.currentTime, 0.5);
+      }
+
+      this._scheduleNextBeat();
+    }
+
+    pauseBGM() {
+      this.isPlayingBGM = false;
+      if (this.bgmTimer) {
+        clearTimeout(this.bgmTimer);
+        this.bgmTimer = null;
+      }
+      if (this.oceanGainNode && this.ctx) {
+        this.oceanGainNode.gain.setTargetAtTime(0.001, this.ctx.currentTime, 0.4);
+      }
+    }
+
+    stopBGM() {
+      this.pauseBGM();
+      this.bgmStep = 0;
+      this.buoysSounded.clear();
+      this.startHornTriggered = false;
+      this.finishFanfareTriggered = false;
+      this.lastLeaderIdx = null;
+    }
+
+    _scheduleNextBeat() {
+      if (!this.isPlayingBGM || !this.ctx) return;
+
+      const stepIntervalMs = (60 / this.tempoBpm / 4) * 1000; // semicolcheias
+      this._playBeatStep(this.bgmStep);
+      this.bgmStep = (this.bgmStep + 1) % 32;
+
+      this.bgmTimer = setTimeout(() => {
+        this._scheduleNextBeat();
+      }, stepIntervalMs);
+    }
+
+    /**
+     * Sequenciador Polinésio / Percussão de Remada & Sintetizador de Corrida
+     */
+    _playBeatStep(step) {
+      if (!this.ctx || this.ctx.state !== 'running') return;
+      const t = this.ctx.currentTime;
+      const durScale = Math.max(0.18, 1 / (1 + (this.speedMultiplier - 1) * 0.28));
+
+      // 1. Log Drum / Pahu Bass (Batida da Remada Principal nos tempos 0, 8, 16, 24)
+      if (step % 8 === 0) {
+        this._synthLogDrum(t, step === 0 ? 82 : 74, 0.28, durScale);
+      } else if (step === 6 || step === 14 || step === 22 || step === 30) {
+        // Contra-tempo sutil da remada
+        this._synthLogDrum(t, 98, 0.16, durScale);
+      }
+
+      // 2. To'ere / Toque de Madeira (Canoe Gunwale Click nos passos 4, 12, 20, 28)
+      if (step % 4 === 2) {
+        this._synthWoodClick(t, 0.14, durScale);
+      }
+
+      // 3. Spray de Água / Shaker rítmico contínuo
+      if (step % 2 === 0) {
+        this._synthWaterSpray(t, step % 4 === 0 ? 0.08 : 0.04, durScale);
+      }
+
+      // 4. Harmonia Pentatônica Heroica (Ocean Lead Synth)
+      const pentatonicNotes = [220, 246.94, 277.18, 329.63, 369.99, 440, 493.88, 554.37];
+      if (step === 0 || step === 12 || step === 18 || step === 26) {
+        const noteIdx = (Math.floor(step / 4) + Math.floor(this.bgmStep / 16)) % pentatonicNotes.length;
+        this._synthArpNote(t, pentatonicNotes[noteIdx], 0.12, durScale);
+      }
+    }
+
+    _synthLogDrum(time, freq, gainVal, durScale = 1) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const dur = 0.35 * durScale;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq * 1.6, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.08 * durScale);
+      osc.frequency.exponentialRampToValueAtTime(30, time + dur);
+
+      gain.gain.setValueAtTime(gainVal, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc.connect(gain);
+      gain.connect(this.bgmGain);
+      osc.start(time);
+      osc.stop(time + dur + 0.01);
+    }
+
+    _synthWoodClick(time, gainVal, durScale = 1) {
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+      const dur = 0.035 * durScale;
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(950, time);
+      osc.frequency.exponentialRampToValueAtTime(350, time + dur);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400, time);
+      filter.Q.setValueAtTime(6.0, time);
+
+      gain.gain.setValueAtTime(gainVal, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.bgmGain);
+      osc.start(time);
+      osc.stop(time + dur + 0.005);
+    }
+
+    _synthWaterSpray(time, gainVal, durScale = 1) {
+      const dur = 0.03 * durScale;
+      const node = this.ctx.createBufferSource();
+      const buffer = this.ctx.createBuffer(1, Math.max(64, Math.floor(this.ctx.sampleRate * dur)), this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      node.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(4500, time);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(gainVal, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      node.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.bgmGain);
+      node.start(time);
+      node.stop(time + dur + 0.002);
+    }
+
+    _synthArpNote(time, freq, gainVal, durScale = 1) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const dur = 0.45 * durScale;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, time);
+
+      gain.gain.setValueAtTime(gainVal, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc.connect(gain);
+      gain.connect(this.bgmGain);
+      osc.start(time);
+      osc.stop(time + dur + 0.01);
+    }
+
+    // ==========================================
+    // 🔊 EFEITOS SONOROS DE PROVA (RACE SOUND FX)
+    // ==========================================
+
+    /**
+     * 🏁 Buzina Oficial de Regata / Largada Náutica
+     */
+    playStartHorn() {
+      this.init();
+      if (!this.ctx || this.isMuted) return;
+      const t = this.ctx.currentTime;
+
+      // 3 Bips preparatórios
+      [0, 0.25, 0.5].forEach(dt => {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, t + dt);
+        g.gain.setValueAtTime(0.18, t + dt);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dt + 0.12);
+        osc.connect(g);
+        g.connect(this.sfxGain);
+        osc.start(t + dt);
+        osc.stop(t + dt + 0.13);
+      });
+
+      // Buzina Longa de Largada (Air Horn ressonante a t + 0.85s)
+      const hornTime = t + 0.85;
+      const f1 = 220, f2 = 277.18;
+      [f1, f2].forEach(freq => {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, hornTime);
+
+        g.gain.setValueAtTime(0, hornTime);
+        g.gain.linearRampToValueAtTime(0.35, hornTime + 0.06);
+        g.gain.setValueAtTime(0.35, hornTime + 1.2);
+        g.gain.exponentialRampToValueAtTime(0.001, hornTime + 1.6);
+
+        osc.connect(g);
+        g.connect(this.sfxGain);
+        osc.start(hornTime);
+        osc.stop(hornTime + 1.65);
+      });
+    }
+
+    /**
+     * 🚩 Sino / Beacon Náutico ao contornar boias
+     */
+    
+    /**
+     * 🚩 Sinal de Split / Marco a Cada Km Percorrido
+     */
+    playKmSplitChime(km) {
+      this.init();
+      if (!this.ctx || this.isMuted) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const t = this.ctx.currentTime;
+
+      // Acorde de sino duplo cristalino ascendente (E5 -> B5 / 659.25Hz -> 987.77Hz)
+      const tones = [
+        { freq: 659.25, time: t, dur: 0.45, gain: 0.28 },
+        { freq: 987.77, time: t + 0.11, dur: 0.75, gain: 0.35 }
+      ];
+
+      tones.forEach(tone => {
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'triangle';
+        osc1.frequency.setValueAtTime(tone.freq, tone.time);
+        osc2.frequency.setValueAtTime(tone.freq * 2, tone.time);
+
+        gain.gain.setValueAtTime(0, tone.time);
+        gain.gain.linearRampToValueAtTime(tone.gain, tone.time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, tone.time + tone.dur);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.sfxGain);
+
+        osc1.start(tone.time);
+        osc2.start(tone.time);
+        osc1.stop(tone.time + tone.dur + 0.02);
+        osc2.stop(tone.time + tone.dur + 0.02);
+      });
+    }
+
+    playBuoyChime() {
+      this.init();
+      if (!this.ctx || this.isMuted) return;
+      const t = this.ctx.currentTime;
+
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(1174.66, t);
+      osc2.frequency.setValueAtTime(2349.32, t);
+
+      gain.gain.setValueAtTime(0.32, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.sfxGain);
+
+      osc1.start(t);
+      osc2.start(t);
+      osc1.stop(t + 0.82);
+      osc2.stop(t + 0.82);
+    }
+
+    /**
+     * ⚔️ Whoosh / Duelo Dinâmico na Troca de Liderança
+     */
+    playOvertakeWhoosh() {
+      this.init();
+      if (!this.ctx || this.isMuted) return;
+      const t = this.ctx.currentTime;
+
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(130, t);
+      osc.frequency.exponentialRampToValueAtTime(420, t + 0.25);
+      osc.frequency.exponentialRampToValueAtTime(110, t + 0.55);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(600, t);
+      filter.frequency.exponentialRampToValueAtTime(1800, t + 0.25);
+      filter.frequency.exponentialRampToValueAtTime(400, t + 0.55);
+      filter.Q.setValueAtTime(4.0, t);
+
+      gain.gain.setValueAtTime(0.01, t);
+      gain.gain.linearRampToValueAtTime(0.28, t + 0.22);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.58);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.sfxGain);
+
+      osc.start(t);
+      osc.stop(t + 0.6);
+    }
+
+    /**
+     * 🏆 Fanfarra Triunfal & Foghorn de Chegada
+     */
+        /**
+     * 🏆 Fanfarra Triunfal & Foghorn de Chegada
+     */
+    playFinishCelebration() {
+      this.init();
+      if (!this.ctx || this.isMuted) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const t = this.ctx.currentTime;
+
+      // 1. Fanfarra Triunfal Ascendente (C4 -> E4 -> G4 -> C5)
+      const notes = [
+        { f: 261.63, delay: 0.0, dur: 0.35 },  // C4
+        { f: 329.63, delay: 0.16, dur: 0.35 }, // E4
+        { f: 392.00, delay: 0.32, dur: 0.35 }, // G4
+        { f: 523.25, delay: 0.48, dur: 1.4 }   // C5
+      ];
+
+      notes.forEach(n => {
+        const osc = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc2.type = 'sawtooth';
+        osc.frequency.setValueAtTime(n.f, t + n.delay);
+        osc2.frequency.setValueAtTime(n.f, t + n.delay);
+
+        g.gain.setValueAtTime(0, t + n.delay);
+        g.gain.linearRampToValueAtTime(0.35, t + n.delay + 0.03);
+        g.gain.setValueAtTime(0.35, t + n.delay + n.dur * 0.6);
+        g.gain.exponentialRampToValueAtTime(0.001, t + n.delay + n.dur);
+
+        osc.connect(g);
+        osc2.connect(g);
+        g.connect(this.sfxGain);
+
+        osc.start(t + n.delay);
+        osc2.start(t + n.delay);
+        osc.stop(t + n.delay + n.dur + 0.05);
+        osc2.stop(t + n.delay + n.dur + 0.05);
+      });
+
+      // 2. Air Horn / Buzina Naval de Vitória (aos 0.85s)
+      const hornTime = t + 0.85;
+      [261.63, 329.63].forEach(freq => {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, hornTime);
+
+        g.gain.setValueAtTime(0, hornTime);
+        g.gain.linearRampToValueAtTime(0.32, hornTime + 0.05);
+        g.gain.setValueAtTime(0.32, hornTime + 1.2);
+        g.gain.exponentialRampToValueAtTime(0.001, hornTime + 1.8);
+
+        osc.connect(g);
+        g.connect(this.sfxGain);
+        osc.start(hornTime);
+        osc.stop(hornTime + 1.85);
+      });
+    }
+
+    /**
+     * 🎥 Swoosh / Vento para transições rápidas de Drone e QuickShots
+     */
+    playDroneWhoosh() {
+      this.init();
+      if (!this.ctx || this.isMuted) return;
+      const t = this.ctx.currentTime;
+
+      const node = this.ctx.createBufferSource();
+      const buffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.4), this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      node.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(500, t);
+      filter.frequency.exponentialRampToValueAtTime(2200, t + 0.18);
+      filter.frequency.exponentialRampToValueAtTime(400, t + 0.38);
+      filter.Q.setValueAtTime(3.5, t);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.01, t);
+      gain.gain.linearRampToValueAtTime(0.2, t + 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+      node.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.sfxGain);
+
+      node.start(t);
+      node.stop(t + 0.4);
+    }
+  }
+
+  global.VaarecAudio = new VaarecAudioEngine();
+})(typeof window !== 'undefined' ? window : this);
+
+  
+  </script>
+  <script>
+/**
+ * drone-camera-skills.js — VAAREC Generalized Cinematic Drone Camera Director
+ * Motor de Câmera Virtual Drone com Damping Gimbal Ultra-Suave, Fila de Empilhamento (MasterShots),
+ * Transições 100% Fluidas (Zero Piscar/Flicker de Tiles) e Cadência Adaptativa Invariante à Velocidade (1x a 30x).
+ */
+
+(function (global) {
+  'use strict';
+
+  function clamp(val, min, max) {
+    return Math.max(min, Math.min(max, val));
+  }
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function validPoint(lat, lon) {
+    return lat != null && lon != null && !isNaN(Number(lat)) && !isNaN(Number(lon)) && isFinite(Number(lat)) && isFinite(Number(lon));
+  }
+
+  function computeLookAhead(lat, lon, headingDeg, meters) {
+    if (!validPoint(lat, lon)) return null;
+    const nLat = Number(lat);
+    const nLon = Number(lon);
+    const h = Number(headingDeg) || 0;
+    const rad = (h * Math.PI) / 180;
+    const dLat = (Number(meters) * Math.cos(rad)) / 111320;
+    const cosLat = Math.cos((nLat * Math.PI) / 180) || 1;
+    const dLon = (Number(meters) * Math.sin(rad)) / (111320 * cosLat);
+    return [nLat + dLat, nLon + dLon];
+  }
+
+  function computeCentroid(points) {
+    const valid = points.filter(p => p && validPoint(p[0], p[1]));
+    if (!valid.length) return null;
+    const lat = valid.reduce((sum, p) => sum + Number(p[0]), 0) / valid.length;
+    const lon = valid.reduce((sum, p) => sum + Number(p[1]), 0) / valid.length;
+    return [lat, lon];
+  }
+
+  function haversineDistM(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (Number(lat2) - Number(lat1)) * Math.PI / 180;
+    const dLon = (Number(lon2) - Number(lon1)) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(Number(lat1) * Math.PI / 180) * Math.cos(Number(lat2) * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  class DroneCameraSkills {
+    constructor(options = {}) {
+      if (!options.map) {
+        throw new Error('DroneCameraSkills: informe a instância Leaflet em options.map');
+      }
+
+      this.map = options.map;
+      this.getEntities = options.getEntities || (() => []);
+      this.getContract = options.getContract || (() => global.CONTRACT || {});
+
+      this.config = {
+        defaultDuration: 1000,
+        followZoom: 18.5, // Padrão Cinemático
+        detailZoom: 19.5,
+        twoCanoesZoom: 17.5,
+        packZoom: 16.5,
+        minZoom: 13,
+        maxZoom: 20.5,
+        padding: [40, 40],
+        futureMeters: 18,
+        zoomOffset: 0,
+        altitudePreset: 'close', // 'close' (~30m), 'normal' (~60m), 'panoramic' (~150m)
+        easing: easeInOutCubic,
+        damping: 0.075, // Fator de amortecimento contínuo de voo (Gimbal Smoothing)
+        zoomDamping: 0.045, // Transição de zoom ultra-suave sem flashes
+        ...options.config
+      };
+
+      this.state = {
+        mode: options.mode || 'auto', // 'auto', 'follow-leader', 'follow-canoe', 'follow-all', 'manual', 'overview', 'focustrack', 'quickshot', 'queue'
+        targetCanoeIdx: 0,
+        running: false,
+        lastSimTime: 0,
+        userInteracting: false,
+        userInteractTimeout: null
+      };
+
+      // Gimbal Smoothing Filter (Estado físico contínuo do Drone)
+      this._smoothDrone = {
+        currentLat: null,
+        currentLon: null,
+        currentZoom: null,
+        initialized: false
+      };
+
+      // Auto Director com cadência baseada em tempo real (Wall-Clock Time)
+      const nowReal = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      this._autoDirector = {
+        phase: 'LEADER_LOOKAHEAD',
+        phaseStartRealTime: nowReal,
+        phaseDurationRealMs: 12000,
+        flybyIdx: 0,
+        lastFlybySwitchRealTime: nowReal,
+        isTransitioning: false
+      };
+
+      // QuickShots Engine
+      this._djiQuickShot = {
+        active: false,
+        type: null,
+        targetCanoeIdx: 0,
+        startRealTime: nowReal,
+        durationRealMs: 8000,
+        initialZoom: 18.5,
+        initialHeading: 0,
+        previousMode: 'auto',
+        progress: 0
+      };
+
+      // FocusTrack Engine
+      this._djiFocusTrack = {
+        active: false,
+        mode: 'activetrack',
+        subMode: 'trace',
+        orbitAngle: 0,
+        orbitRadiusM: 45,
+        orbitSpeedDegPerSec: 25,
+        targetCanoeIdx: 0,
+        lastRealTimeMs: nowReal
+      };
+
+      // Fila de Empilhamento (MasterShots Storyboard Queue)
+      this._shotQueue = {
+        active: false,
+        items: [],
+        currentIndex: 0,
+        itemStartRealTime: nowReal,
+        loop: false,
+        initialZoom: 18.5
+      };
+
+      // Inter-Shot / Inter-Phase Smooth Transition Blender (Anti-Flicker & Zero Screen Blinking)
+      this._shotTransition = {
+        active: false,
+        fromLat: null,
+        fromLon: null,
+        fromZoom: null,
+        startRealTime: nowReal,
+        durationMs: 1200
+      };
+
+      this._loadDefaultQueue();
+      this._isProgrammaticMovement = false;
+      this._bindUserInteractionEvents();
+    }
+
+    _loadDefaultQueue() {
+      this._shotQueue.items = [
+        { id: 'shot-1', type: 'quickshot', subType: 'dronie', name: 'Dronie (Abertura)', icon: '🚀', durationMs: 7500, targetCanoeIdx: 0 },
+        { id: 'shot-2', type: 'focustrack', subType: 'activetrack', subMode: 'parallel', name: 'ActiveTrack Lateral', icon: '↔️', durationMs: 9000, targetCanoeIdx: 0 },
+        { id: 'shot-3', type: 'quickshot', subType: 'helix', name: 'Helix (Espiral)', icon: '🌀', durationMs: 10000, targetCanoeIdx: 0 },
+        { id: 'shot-4', type: 'director', subType: 'follow-leader', name: 'Look-Ahead Líder', icon: '👑', durationMs: 8000, targetCanoeIdx: 0 },
+        { id: 'shot-5', type: 'quickshot', subType: 'asteroid', name: 'Asteroid (Clímax)', icon: '🪐', durationMs: 10500, targetCanoeIdx: 0 }
+      ];
+    }
+
+    _bindUserInteractionEvents() {
+      const container = this.map.getContainer();
+      if (!container) return;
+
+      const onUserInteraction = () => {
+        if (this._isProgrammaticMovement) return;
+        this.state.userInteracting = true;
+        if (this.state.userInteractTimeout) clearTimeout(this.state.userInteractTimeout);
+        this.state.userInteractTimeout = setTimeout(() => {
+          this.state.userInteracting = false;
+        }, 3500);
+      };
+
+      container.addEventListener('mousedown', onUserInteraction, { passive: true });
+      container.addEventListener('touchstart', onUserInteraction, { passive: true });
+      container.addEventListener('wheel', onUserInteraction, { passive: true });
+    }
+
+    // ==========================================
+    // ALTITUDE E CONTROLE DE ZOOM
+    // ==========================================
+
+    
+    _startShotTransition(durationMs = 1200) {
+      if (!this._smoothDrone.initialized || this._smoothDrone.currentLat == null) return;
+      const nowReal = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      this._shotTransition = {
+        active: true,
+        fromLat: this._smoothDrone.currentLat,
+        fromLon: this._smoothDrone.currentLon,
+        fromZoom: this._smoothDrone.currentZoom,
+        startRealTime: nowReal,
+        durationMs: Math.max(400, Number(durationMs) || 1200)
+      };
+    }
+
+    setAltitudePreset(preset) {
+      this.state.userInteracting = false;
+      if (preset === 'close') {
+        this.config.altitudePreset = 'close';
+        this.config.followZoom = 18.5;
+        this.config.detailZoom = 19.5;
+        this.config.twoCanoesZoom = 17.5;
+        this.config.packZoom = 16.5;
+        this.config.futureMeters = 16;
+      } else if (preset === 'normal') {
+        this.config.altitudePreset = 'normal';
+        this.config.followZoom = 17.5;
+        this.config.detailZoom = 18.5;
+        this.config.twoCanoesZoom = 16.5;
+        this.config.packZoom = 15.5;
+        this.config.futureMeters = 24;
+      } else if (preset === 'panoramic') {
+        this.config.altitudePreset = 'panoramic';
+        this.config.followZoom = 15.5;
+        this.config.detailZoom = 16.5;
+        this.config.twoCanoesZoom = 14.5;
+        this.config.packZoom = 13.5;
+        this.config.futureMeters = 38;
+      }
+      if (typeof this.config.onAltitudePresetChange === 'function') {
+        this.config.onAltitudePresetChange(preset, this.config.followZoom);
+      }
+    }
+
+    adjustZoomOffset(delta) {
+      this.state.userInteracting = false;
+      this.config.zoomOffset = clamp((this.config.zoomOffset || 0) + delta, -4, 4);
+    }
+
+    // ==========================================
+    // QUICKSHOTS & FOCUSTRACK
+    // ==========================================
+
+    triggerQuickShot(type, params = {}) {
+      this.state.userInteracting = false;
+      this._shotQueue.active = false;
+      const entities = this.getEntities();
+      if (!entities.length) return false;
+
+      const targetIdx = params.canoeIdx != null ? params.canoeIdx : (this.state.mode === 'follow-canoe' ? this.state.targetCanoeIdx : this._findLeaderIdx(entities));
+      const target = entities[targetIdx] || entities[0];
+      const tHeading = Number(target.heading ?? target.currentHeading ?? target._currentHeading ?? 0);
+      const nowReal = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+      const durations = {
+        dronie: 7500,
+        rocket: 6500,
+        circle: 8500,
+        helix: 10500,
+        boomerang: 9500,
+        asteroid: 11000
+      };
+
+      this._djiQuickShot = {
+        active: true,
+        type: type,
+        targetCanoeIdx: targetIdx,
+        startRealTime: nowReal,
+        durationRealMs: params.duration || durations[type] || 8000,
+        initialZoom: this._smoothDrone.currentZoom || this.config.followZoom,
+        initialHeading: tHeading,
+        previousMode: (this.state.mode === 'quickshot' || this.state.mode === 'queue') ? 'auto' : this.state.mode,
+        progress: 0
+      };
+
+      this._startShotTransition(1000);
+      this.state.mode = 'quickshot';
+      if (typeof this.config.onQuickShotStart === 'function') {
+        this.config.onQuickShotStart(type, this._djiQuickShot);
+      }
+      return true;
+    }
+
+    cancelQuickShot() {
+      if (this._djiQuickShot.active) {
+        this._djiQuickShot.active = false;
+        this._startShotTransition(800);
+        const prev = this._djiQuickShot.previousMode || 'auto';
+        this.setMode(prev);
+      }
+    }
+
+    setFocusTrack(mode = 'activetrack', subMode = 'trace', params = {}) {
+      this.state.userInteracting = false;
+      this._djiQuickShot.active = false;
+      this._shotQueue.active = false;
+      const entities = this.getEntities();
+
+      const targetIdx = params.canoeIdx != null ? params.canoeIdx : (this.state.mode === 'follow-canoe' ? this.state.targetCanoeIdx : this._findLeaderIdx(entities));
+      const target = entities[targetIdx] || entities[0];
+      const tHeading = Number(target.heading ?? target.currentHeading ?? target._currentHeading ?? 0);
+      const nowReal = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+      this._djiFocusTrack = {
+        active: true,
+        mode: mode,
+        subMode: subMode || 'trace',
+        orbitAngle: tHeading,
+        orbitRadiusM: params.radiusM || 42,
+        orbitSpeedDegPerSec: params.speedDeg || 28,
+        targetCanoeIdx: targetIdx,
+        lastRealTimeMs: nowReal
+      };
+
+      this._startShotTransition(1000);
+      this.state.mode = 'focustrack';
+      this.state.targetCanoeIdx = targetIdx;
+
+      if (typeof this.config.onFocusTrackChange === 'function') {
+        this.config.onFocusTrackChange(mode, subMode, this._djiFocusTrack);
+      }
+      return true;
+    }
+
+    // ==========================================
+    // EMPILHAMENTO DE MOVIMENTOS (MASTERSHOTS STORYBOARD QUEUE)
+    // ==========================================
+
+    getQueue() {
+      return this._shotQueue.items;
+    }
+
+    addShotToQueue(shot) {
+      const id = 'shot-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const newShot = {
+        id,
+        type: shot.type || 'quickshot',
+        subType: shot.subType || shot.type || 'dronie',
+        subMode: shot.subMode || null,
+        name: shot.name || 'Movimento',
+        icon: shot.icon || '🎥',
+        durationMs: Number(shot.durationMs) || 8000,
+        targetCanoeIdx: Number(shot.targetCanoeIdx) || 0
+      };
+      this._shotQueue.items.push(newShot);
+      if (typeof this.config.onQueueUpdate === 'function') {
+        this.config.onQueueUpdate(this._shotQueue);
+      }
+      return newShot;
+    }
+
+    removeShotFromQueue(index) {
+      if (index >= 0 && index < this._shotQueue.items.length) {
+        this._shotQueue.items.splice(index, 1);
+        if (typeof this.config.onQueueUpdate === 'function') {
+          this.config.onQueueUpdate(this._shotQueue);
+        }
+      }
+    }
+
+    clearQueue() {
+      this._shotQueue.items = [];
+      this._shotQueue.active = false;
+      if (typeof this.config.onQueueUpdate === 'function') {
+        this.config.onQueueUpdate(this._shotQueue);
+      }
+    }
+
+    moveQueueItem(fromIdx, toIdx) {
+      if (fromIdx < 0 || fromIdx >= this._shotQueue.items.length || toIdx < 0 || toIdx >= this._shotQueue.items.length) return;
+      const item = this._shotQueue.items.splice(fromIdx, 1)[0];
+      this._shotQueue.items.splice(toIdx, 0, item);
+      if (typeof this.config.onQueueUpdate === 'function') {
+        this.config.onQueueUpdate(this._shotQueue);
+      }
+    }
+
+    loadPresetQueue(presetName) {
+      this._shotQueue.active = false;
+      if (presetName === 'epic_mastershot' || presetName === 'epico') {
+        this._shotQueue.items = [
+          { id: 'm1', type: 'quickshot', subType: 'dronie', name: 'Dronie (Abertura)', icon: '🚀', durationMs: 7500, targetCanoeIdx: 0 },
+          { id: 'm2', type: 'focustrack', subType: 'activetrack', subMode: 'parallel', name: 'ActiveTrack Lateral', icon: '↔️', durationMs: 9000, targetCanoeIdx: 0 },
+          { id: 'm3', type: 'quickshot', subType: 'helix', name: 'Helix (Espiral)', icon: '🌀', durationMs: 10000, targetCanoeIdx: 0 },
+          { id: 'm4', type: 'director', subType: 'follow-leader', name: 'Look-Ahead Líder', icon: '👑', durationMs: 8000, targetCanoeIdx: 0 },
+          { id: 'm5', type: 'quickshot', subType: 'asteroid', name: 'Asteroid (Clímax)', icon: '🪐', durationMs: 10500, targetCanoeIdx: 0 }
+        ];
+      } else if (presetName === 'duel_combat' || presetName === 'duelo') {
+        this._shotQueue.items = [
+          { id: 'd1', type: 'director', subType: 'follow-leader', name: 'Líder na Proa', icon: '👑', durationMs: 8000, targetCanoeIdx: 0 },
+          { id: 'd2', type: 'focustrack', subType: 'activetrack', subMode: 'parallel', name: 'Viga Lateral', icon: '↔️', durationMs: 8000, targetCanoeIdx: 0 },
+          { id: 'd3', type: 'director', subType: 'chaser', name: 'Close Perseguidor 2º', icon: '⚔️', durationMs: 9000, targetCanoeIdx: 1 },
+          { id: 'd4', type: 'quickshot', subType: 'boomerang', name: 'Boomerang Rasante', icon: '🪃', durationMs: 9000, targetCanoeIdx: 0 }
+        ];
+      } else if (presetName === 'start_tour' || presetName === 'largada') {
+        this._shotQueue.items = [
+          { id: 's1', type: 'quickshot', subType: 'rocket', name: 'Rocket Zenital 90°', icon: '⚡', durationMs: 7000, targetCanoeIdx: 0 },
+          { id: 's2', type: 'focustrack', subType: 'poi', name: 'POI Órbita 360°', icon: '🔄', durationMs: 9000, targetCanoeIdx: 0 },
+          { id: 's3', type: 'director', subType: 'follow-all', name: 'Pelotão Geral', icon: '👁️', durationMs: 8500, targetCanoeIdx: 0 },
+          { id: 's4', type: 'focustrack', subType: 'activetrack', subMode: 'lead', name: 'Enquadramento Frontal', icon: '⬆️', durationMs: 8500, targetCanoeIdx: 0 }
+        ];
+      }
+      if (typeof this.config.onQueueUpdate === 'function') {
+        this.config.onQueueUpdate(this._shotQueue);
+      }
+    }
+
+    startQueue(startIndex = 0) {
+      if (!this._shotQueue.items.length) {
+        this._loadDefaultQueue();
+      }
+      this.state.userInteracting = false;
+      this._djiQuickShot.active = false;
+      this._djiFocusTrack.active = false;
+
+      const nowReal = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      this._shotQueue.active = true;
+      this._shotQueue.currentIndex = clamp(startIndex, 0, this._shotQueue.items.length - 1);
+      this._shotQueue.itemStartRealTime = nowReal;
+      this._shotQueue.initialZoom = this._smoothDrone.currentZoom || this.config.followZoom;
+
+      this._startShotTransition(1000);
+      this.state.mode = 'queue';
+
+      if (typeof this.config.onQueueStart === 'function') {
+        this.config.onQueueStart(this._shotQueue);
+      }
+      return true;
+    }
+
+    stopQueue() {
+      this._shotQueue.active = false;
+      this.setMode('auto');
+      if (typeof this.config.onQueueEnd === 'function') {
+        this.config.onQueueEnd();
+      }
+    }
+
+    // ==========================================
+    // CONTROLE DE MODOS & COMANDOS
+    // ==========================================
+
+    setMode(mode, params = {}) {
+      this._djiQuickShot.active = false;
+      this._djiFocusTrack.active = false;
+      this._shotQueue.active = false;
+      this._startShotTransition(1000);
+      this.state.mode = mode;
+      this.state.userInteracting = false;
+      if (params.canoeIdx != null) this.state.targetCanoeIdx = params.canoeIdx;
+      if (params.canoe != null) this.state.targetCanoeIdx = params.canoe;
+
+      const nowReal = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (mode === 'auto' || mode === 'smart') {
+        this.state.mode = 'auto';
+        this._autoDirector.phase = 'LEADER_LOOKAHEAD';
+        this._autoDirector.phaseStartRealTime = nowReal;
+        this._autoDirector.phaseDurationRealMs = 12000;
+        this._autoDirector.isTransitioning = false;
+      }
+    }
+
+    stop() {
+      this.state.running = false;
+    }
+
+    // ==========================================
+    // REPLAY ENGINE UPDATE (CHAMADO A CADA FRAME)
+    // ==========================================
+
+    update(currentTimeMs, force = false) {
+      this.state.lastSimTime = currentTimeMs;
+      if (this.state.userInteracting && !force) return;
+      if (this.state.mode === 'manual') return;
+
+      const entities = this.getEntities();
+      if (!entities.length) return;
+
+      const realNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      let targetCenter = null;
+      let targetZoom = null;
+
+      // ==========================================
+      // 1. FILA DE EMPILHAMENTO (MASTERSHOTS STORYBOARD QUEUE)
+      // ==========================================
+      if (this.state.mode === 'queue' && this._shotQueue.active && this._shotQueue.items.length) {
+        const queue = this._shotQueue;
+        const currentShot = queue.items[queue.currentIndex];
+        const realElapsed = realNow - queue.itemStartRealTime;
+        const u = clamp(realElapsed / currentShot.durationMs, 0, 1);
+
+        const targetIdx = currentShot.targetCanoeIdx != null ? currentShot.targetCanoeIdx : this._findLeaderIdx(entities);
+        const target = entities[targetIdx] || entities[0];
+        const tLat = Number(target.lat ?? target.latitude ?? target.currentPos?.lat);
+        const tLon = Number(target.lon ?? target.lng ?? target.longitude ?? target.currentPos?.lon);
+        const tHeading = Number(target.heading ?? target.currentHeading ?? target._currentHeading ?? 0);
+        const cosLat = Math.cos((tLat * Math.PI) / 180) || 1;
+        const baseZ = queue.initialZoom || this.config.followZoom;
+
+        const shotKind = currentShot.subType || currentShot.type;
+
+        if (shotKind === 'dronie') {
+          const backDist = -(12 + 95 * u);
+          targetCenter = computeLookAhead(tLat, tLon, tHeading, backDist) || [tLat, tLon];
+          targetZoom = baseZ - 2.8 * u;
+        } else if (shotKind === 'rocket') {
+          targetCenter = [tLat, tLon];
+          targetZoom = baseZ - 3.8 * Math.sin(u * Math.PI * 0.5);
+        } else if (shotKind === 'circle') {
+          const angleDeg = tHeading + 360 * u;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 42;
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = baseZ;
+        } else if (shotKind === 'helix') {
+          const angleDeg = tHeading + 540 * u;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 25 + 90 * u;
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = baseZ - 2.6 * u;
+        } else if (shotKind === 'boomerang') {
+          const angleDeg = tHeading + 360 * u;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 30 + 80 * Math.sin(u * Math.PI);
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = baseZ - 2.0 * Math.sin(u * Math.PI);
+        } else if (shotKind === 'asteroid') {
+          if (u < 0.6) {
+            const f = u / 0.6;
+            targetCenter = computeLookAhead(tLat, tLon, tHeading, -(15 + 120 * f)) || [tLat, tLon];
+            targetZoom = baseZ - 3.8 * f;
+          } else {
+            const f = (u - 0.6) / 0.4;
+            targetCenter = computeLookAhead(tLat, tLon, tHeading, -135 * (1 - f)) || [tLat, tLon];
+            targetZoom = (baseZ - 3.8) + 3.8 * f;
+          }
+        } else if (shotKind === 'spotlight') {
+          targetCenter = computeLookAhead(tLat, tLon, tHeading, 10) || [tLat, tLon];
+          targetZoom = baseZ;
+        } else if (shotKind === 'poi') {
+          const angleDeg = (tHeading + (realElapsed / 1000) * 28) % 360;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 45;
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = baseZ;
+        } else if (shotKind === 'activetrack') {
+          const subM = currentShot.subMode || 'trace';
+          if (subM === 'parallel') targetCenter = computeLookAhead(tLat, tLon, (tHeading + 90) % 360, 32) || [tLat, tLon];
+          else if (subM === 'lead') targetCenter = computeLookAhead(tLat, tLon, tHeading, 35) || [tLat, tLon];
+          else targetCenter = computeLookAhead(tLat, tLon, tHeading, -25) || [tLat, tLon];
+          targetZoom = baseZ;
+        } else if (shotKind === 'chaser') {
+          const sorted = [...entities].sort((a, b) => (b.accDist ?? 0) - (a.accDist ?? 0));
+          const chaser = sorted[1] || sorted[0];
+          const cLat = Number(chaser.lat ?? chaser.currentPos?.lat);
+          const cLon = Number(chaser.lon ?? chaser.currentPos?.lon);
+          const cH = Number(chaser.heading ?? chaser.currentHeading ?? 0);
+          targetCenter = computeLookAhead(cLat, cLon, cH, 12) || [cLat, cLon];
+          targetZoom = baseZ;
+        } else if (shotKind === 'follow-all') {
+          const pts = entities.map(e => [e.lat ?? e.currentPos?.lat, e.lon ?? e.currentPos?.lon]).filter(p => validPoint(p[0], p[1]));
+          targetCenter = computeCentroid(pts) || [tLat, tLon];
+          targetZoom = this._calculateGroupZoom(pts);
+        } else {
+          targetCenter = computeLookAhead(tLat, tLon, tHeading, this.config.futureMeters || 16) || [tLat, tLon];
+          targetZoom = baseZ;
+        }
+
+        if (typeof this.config.onQueueProgress === 'function') {
+          this.config.onQueueProgress(queue.currentIndex, queue.items.length, u, currentShot);
+        }
+
+        if (u >= 1) {
+          queue.currentIndex++;
+          queue.itemStartRealTime = realNow;
+          this._startShotTransition(1200);
+          if (queue.currentIndex >= queue.items.length) {
+            if (queue.loop) {
+              queue.currentIndex = 0;
+            } else {
+              this.stopQueue();
+              return;
+            }
+          }
+          if (typeof this.config.onQueueNextShot === 'function') {
+            this.config.onQueueNextShot(queue.currentIndex, queue.items[queue.currentIndex]);
+          }
+        }
+      }
+
+      // ==========================================
+      // 2. QUICKSHOTS EXECUTION ENGINE (INDIVIDUAL)
+      // ==========================================
+      else if (this.state.mode === 'quickshot' && this._djiQuickShot.active) {
+        const qs = this._djiQuickShot;
+        const realElapsed = realNow - qs.startRealTime;
+        const u = clamp(realElapsed / qs.durationRealMs, 0, 1);
+        qs.progress = u;
+
+        const target = entities[qs.targetCanoeIdx] || entities[0];
+        const tLat = Number(target.lat ?? target.latitude ?? target.currentPos?.lat);
+        const tLon = Number(target.lon ?? target.lng ?? target.longitude ?? target.currentPos?.lon);
+        const tHeading = Number(target.heading ?? target.currentHeading ?? target._currentHeading ?? 0);
+        const cosLat = Math.cos((tLat * Math.PI) / 180) || 1;
+
+        if (qs.type === 'dronie') {
+          const backDist = -(12 + 100 * u);
+          targetCenter = computeLookAhead(tLat, tLon, tHeading, backDist) || [tLat, tLon];
+          targetZoom = qs.initialZoom - 3.0 * u;
+        } else if (qs.type === 'rocket') {
+          targetCenter = [tLat, tLon];
+          targetZoom = qs.initialZoom - 4.0 * Math.sin(u * Math.PI * 0.5);
+        } else if (qs.type === 'circle') {
+          const angleDeg = qs.initialHeading + 360 * u;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 42;
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = qs.initialZoom;
+        } else if (qs.type === 'helix') {
+          const angleDeg = qs.initialHeading + 540 * u;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 25 + 95 * u;
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = qs.initialZoom - 2.8 * u;
+        } else if (qs.type === 'boomerang') {
+          const angleDeg = qs.initialHeading + 360 * u;
+          const rad = (angleDeg * Math.PI) / 180;
+          const R = 30 + 85 * Math.sin(u * Math.PI);
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = qs.initialZoom - 2.2 * Math.sin(u * Math.PI);
+        } else if (qs.type === 'asteroid') {
+          if (u < 0.6) {
+            const f = u / 0.6;
+            targetCenter = computeLookAhead(tLat, tLon, tHeading, -(15 + 130 * f)) || [tLat, tLon];
+            targetZoom = qs.initialZoom - 4.0 * f;
+          } else if (u < 0.8) {
+            const f = (u - 0.6) / 0.2;
+            const angleDeg = (tHeading + 180) + 180 * f;
+            const rad = (angleDeg * Math.PI) / 180;
+            const R = 145;
+            targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+            targetZoom = qs.initialZoom - 4.0;
+          } else {
+            const f = (u - 0.8) / 0.2;
+            targetCenter = computeLookAhead(tLat, tLon, tHeading, -145 * (1 - f)) || [tLat, tLon];
+            targetZoom = (qs.initialZoom - 4.0) + 4.0 * f;
+          }
+        }
+
+        if (typeof this.config.onQuickShotProgress === 'function') {
+          this.config.onQuickShotProgress(qs.type, u);
+        }
+
+        if (u >= 1) {
+          qs.active = false;
+          if (typeof this.config.onQuickShotEnd === 'function') {
+            this.config.onQuickShotEnd(qs.type);
+          }
+          this.setMode(qs.previousMode || 'auto');
+          return;
+        }
+      }
+
+      // ==========================================
+      // 3. FOCUSTRACK EXECUTION ENGINE
+      // ==========================================
+      else if (this.state.mode === 'focustrack' && this._djiFocusTrack.active) {
+        const ft = this._djiFocusTrack;
+        const target = entities[ft.targetCanoeIdx] || entities[0];
+        const tLat = Number(target.lat ?? target.latitude ?? target.currentPos?.lat);
+        const tLon = Number(target.lon ?? target.lng ?? target.longitude ?? target.currentPos?.lon);
+        const tHeading = Number(target.heading ?? target.currentHeading ?? target._currentHeading ?? 0);
+        const cosLat = Math.cos((tLat * Math.PI) / 180) || 1;
+
+        if (ft.mode === 'spotlight') {
+          targetCenter = computeLookAhead(tLat, tLon, tHeading, 10) || [tLat, tLon];
+          targetZoom = this.config.followZoom;
+        } else if (ft.mode === 'poi') {
+          const dtSec = Math.max(0, (realNow - (ft.lastRealTimeMs || realNow)) / 1000);
+          ft.orbitAngle = (ft.orbitAngle + ft.orbitSpeedDegPerSec * dtSec) % 360;
+          ft.lastRealTimeMs = realNow;
+
+          const rad = (ft.orbitAngle * Math.PI) / 180;
+          const R = ft.orbitRadiusM || 45;
+          targetCenter = [tLat + (R * Math.cos(rad)) / 111320, tLon + (R * Math.sin(rad)) / (111320 * cosLat)];
+          targetZoom = this.config.followZoom;
+        } else if (ft.mode === 'activetrack') {
+          if (ft.subMode === 'parallel') {
+            targetCenter = computeLookAhead(tLat, tLon, (tHeading + 90) % 360, 32) || [tLat, tLon];
+          } else if (ft.subMode === 'lead') {
+            targetCenter = computeLookAhead(tLat, tLon, tHeading, 35) || [tLat, tLon];
+          } else {
+            targetCenter = computeLookAhead(tLat, tLon, tHeading, -25) || [tLat, tLon];
+          }
+          targetZoom = this.config.followZoom;
+        }
+      }
+
+      // ==========================================
+      // 4. AUTO CINEMÁTICO ADAPTADO A QUALQUER VELOCIDADE
+      // ==========================================
+      else if (this.state.mode === 'auto' || this.state.mode === 'smart') {
+        const pts = entities
+          .map(e => [e.lat ?? e.latitude ?? e.currentPos?.lat, e.lon ?? e.lng ?? e.longitude ?? e.currentPos?.lon])
+          .filter(p => validPoint(p[0], p[1]))
+          .map(p => [Number(p[0]), Number(p[1])]);
+
+        const leaderIdx = this._findLeaderIdx(entities);
+        const leader = entities[leaderIdx];
+        const dir = this._autoDirector;
+        const realElapsed = realNow - dir.phaseStartRealTime;
+
+        if (realElapsed > dir.phaseDurationRealMs && !dir.isTransitioning) {
+          dir.phaseStartRealTime = realNow;
+          this._startShotTransition(1400);
+          if (dir.phase === 'LEADER_LOOKAHEAD') {
+            dir.phase = pts.length > 1 ? 'PELOTAO' : 'SCOUT_BOIA';
+            dir.phaseDurationRealMs = 10000;
+          } else if (dir.phase === 'PELOTAO') {
+            dir.phase = 'SCOUT_BOIA';
+            dir.phaseDurationRealMs = 8000;
+          } else if (dir.phase === 'SCOUT_BOIA') {
+            dir.phase = 'FLYBY_RETURN';
+            dir.phaseDurationRealMs = Math.max(10000, entities.length * 3500);
+            dir.flybyIdx = 0;
+            dir.lastFlybySwitchRealTime = realNow;
+          } else if (dir.phase === 'FLYBY_RETURN') {
+            dir.phase = (entities.length > 1) ? 'CHASER_DUEL' : 'LEADER_LOOKAHEAD';
+            dir.phaseDurationRealMs = 9000;
+          } else {
+            dir.phase = 'LEADER_LOOKAHEAD';
+            dir.phaseDurationRealMs = 12000;
+          }
+        }
+
+        const currentTarget = this._getAutoPhaseTarget(dir.phase, entities, leader, pts, realNow);
+        if (currentTarget) {
+          targetCenter = currentTarget.center;
+          targetZoom = currentTarget.zoom;
+        }
+      }
+
+      // 5. SEGUIR LÍDER
+      else if (this.state.mode === 'follow-leader' || this.state.mode === 'leader') {
+        const leaderIdx = this._findLeaderIdx(entities);
+        targetCenter = this._getEntityLookAhead(entities[leaderIdx]);
+        targetZoom = this.config.followZoom;
+      }
+
+      // 6. SEGUIR CANOA ESPECÍFICA
+      else if (this.state.mode === 'follow-canoe' || this.state.mode === 'canoe') {
+        const idx = clamp(this.state.targetCanoeIdx, 0, entities.length - 1);
+        targetCenter = this._getEntityLookAhead(entities[idx]);
+        targetZoom = this.config.followZoom;
+      }
+
+      // 7. SEGUIR TODAS AS CANOAS (PELOTÃO)
+      else if (this.state.mode === 'follow-all' || this.state.mode === 'all') {
+        const pts = entities
+          .map(e => [e.lat ?? e.latitude ?? e.currentPos?.lat, e.lon ?? e.lng ?? e.longitude ?? e.currentPos?.lon])
+          .filter(p => validPoint(p[0], p[1]))
+          .map(p => [Number(p[0]), Number(p[1])]);
+
+        if (pts.length > 1) {
+          targetCenter = computeCentroid(pts);
+          targetZoom = this._calculateGroupZoom(pts);
+        } else if (pts.length === 1) {
+          targetCenter = this._getEntityLookAhead(entities[0]);
+          targetZoom = this.config.followZoom;
+        }
+      }
+
+      // 8. VISÃO GERAL (OVERVIEW)
+      else if (this.state.mode === 'overview') {
+        const contract = this.getContract();
+        if (contract?.viewport20km?.bounds) {
+          const b = contract.viewport20km.bounds;
+          targetCenter = [(Number(b.south) + Number(b.north)) / 2, (Number(b.west) + Number(b.east)) / 2];
+          targetZoom = 13.5;
+        } else {
+          const pts = entities
+            .map(e => [e.lat ?? e.latitude ?? e.currentPos?.lat, e.lon ?? e.lng ?? e.longitude ?? e.currentPos?.lon])
+            .filter(p => validPoint(p[0], p[1]))
+            .map(p => [Number(p[0]), Number(p[1])]);
+          targetCenter = computeCentroid(pts) || [-27.43, -48.48];
+          targetZoom = 14;
+        }
+      }
+
+      
+      // ==========================================
+      // INTER-SHOT SMOOTH TRANSITION BLENDER (ANTI-BLINKING)
+      // ==========================================
+      if (targetCenter && validPoint(targetCenter[0], targetCenter[1]) && this._shotTransition.active && validPoint(this._shotTransition.fromLat, this._shotTransition.fromLon)) {
+        const tElapsed = realNow - this._shotTransition.startRealTime;
+        const tFrac = clamp(tElapsed / this._shotTransition.durationMs, 0, 1);
+        const blend = easeInOutCubic(tFrac);
+
+        targetCenter = [
+          this._shotTransition.fromLat + (targetCenter[0] - this._shotTransition.fromLat) * blend,
+          this._shotTransition.fromLon + (targetCenter[1] - this._shotTransition.fromLon) * blend
+        ];
+        if (this._shotTransition.fromZoom != null && targetZoom != null) {
+          targetZoom = this._shotTransition.fromZoom + (targetZoom - this._shotTransition.fromZoom) * blend;
+        }
+
+        if (tFrac >= 1) {
+          this._shotTransition.active = false;
+        }
+      }
+
+      // ==========================================
+      // GIMBAL DAMPING INTERPOLATOR (ZERO FLICKER / ZERO BLACK TILES)
+      // ==========================================
+      if (targetCenter && validPoint(targetCenter[0], targetCenter[1])) {
+        const finalZoom = clamp((targetZoom || this.config.followZoom) + (this.config.zoomOffset || 0), this.config.minZoom, this.config.maxZoom);
+
+        if (force || !this._smoothDrone.initialized) {
+          this._smoothDrone.currentLat = targetCenter[0];
+          this._smoothDrone.currentLon = targetCenter[1];
+          this._smoothDrone.currentZoom = finalZoom;
+          this._smoothDrone.initialized = true;
+          this._isProgrammaticMovement = true;
+          this.map.setView(targetCenter, finalZoom, { animate: false });
+          setTimeout(() => { this._isProgrammaticMovement = false; }, 40);
+        } else {
+          const dmpPos = clamp(this.config.damping || 0.075, 0.02, 0.25);
+          const dmpZoom = clamp(this.config.zoomDamping || 0.045, 0.01, 0.15);
+
+          this._smoothDrone.currentLat += (targetCenter[0] - this._smoothDrone.currentLat) * dmpPos;
+          this._smoothDrone.currentLon += (targetCenter[1] - this._smoothDrone.currentLon) * dmpPos;
+          this._smoothDrone.currentZoom += (finalZoom - this._smoothDrone.currentZoom) * dmpZoom;
+
+          this._isProgrammaticMovement = true;
+          // Chamada limpa do Leaflet com animate: false para tracking físico sem transições CSS conflitantes
+          this.map.setView(
+            [this._smoothDrone.currentLat, this._smoothDrone.currentLon],
+            this._smoothDrone.currentZoom,
+            { animate: false }
+          );
+          this._isProgrammaticMovement = false;
+          if (typeof this.config.onZoomUpdate === 'function') {
+            this.config.onZoomUpdate(this._smoothDrone.currentZoom);
+          }
+        }
+      }
+    }
+
+    _getAutoPhaseTarget(phase, entities, leader, pts, realNow) {
+      if (!leader) return null;
+      const lLat = leader.lat ?? leader.latitude ?? leader.currentPos?.lat;
+      const lLon = leader.lon ?? leader.lng ?? leader.longitude ?? leader.currentPos?.lon;
+      const lHeading = leader.heading ?? leader.currentHeading ?? leader._currentHeading ?? 0;
+
+      if (phase === 'LEADER_LOOKAHEAD') {
+        return {
+          center: computeLookAhead(lLat, lLon, lHeading, this.config.futureMeters || 16) || [Number(lLat), Number(lLon)],
+          zoom: this.config.followZoom
+        };
+      }
+
+      if (phase === 'PELOTAO') {
+        if (pts.length > 1) {
+          return {
+            center: computeCentroid(pts),
+            zoom: this._calculateGroupZoom(pts)
+          };
+        }
+        return {
+          center: computeLookAhead(lLat, lLon, lHeading, 20) || [Number(lLat), Number(lLon)],
+          zoom: this.config.followZoom - 0.8
+        };
+      }
+
+      if (phase === 'SCOUT_BOIA') {
+        const nextBuoyPos = this._findNextBuoyAhead(lLat, lLon, lHeading);
+        const scoutTarget = nextBuoyPos || computeLookAhead(lLat, lLon, lHeading, 60) || [Number(lLat), Number(lLon)];
+        return {
+          center: scoutTarget,
+          zoom: this.config.followZoom - 0.6
+        };
+      }
+
+      if (phase === 'FLYBY_RETURN') {
+        const dir = this._autoDirector;
+        const subInterval = Math.max(2600, Math.floor(dir.phaseDurationRealMs / Math.max(1, entities.length)));
+        const flybyElapsed = realNow - dir.lastFlybySwitchRealTime;
+
+        if (flybyElapsed > subInterval) {
+          dir.flybyIdx = (dir.flybyIdx + 1) % entities.length;
+          dir.lastFlybySwitchRealTime = realNow;
+        }
+
+        const sortedEntities = [...entities].sort((a, b) => {
+          const dA = a.accDist ?? a.currentDist ?? a.currentProg ?? 0;
+          const dB = b.accDist ?? b.currentDist ?? b.currentProg ?? 0;
+          return dB - dA;
+        });
+
+        const targetEnt = sortedEntities[dir.flybyIdx] || leader;
+        const eLat = targetEnt.lat ?? targetEnt.latitude ?? targetEnt.currentPos?.lat;
+        const eLon = targetEnt.lon ?? targetEnt.lng ?? targetEnt.longitude ?? targetEnt.currentPos?.lon;
+        const eH = targetEnt.heading ?? targetEnt.currentHeading ?? targetEnt._currentHeading ?? 0;
+
+        return {
+          center: computeLookAhead(eLat, eLon, eH, 10) || [Number(eLat), Number(eLon)],
+          zoom: this.config.followZoom - 0.3
+        };
+      }
+
+      if (phase === 'CHASER_DUEL') {
+        if (entities.length > 1) {
+          const sorted = [...entities].sort((a, b) => {
+            const dA = a.accDist ?? a.currentDist ?? a.currentProg ?? 0;
+            const dB = b.accDist ?? b.currentDist ?? b.currentProg ?? 0;
+            return dB - dA;
+          });
+          const chaser = sorted[1] || sorted[0];
+          const cLat = chaser.lat ?? chaser.latitude ?? chaser.currentPos?.lat;
+          const cLon = chaser.lon ?? chaser.lng ?? chaser.longitude ?? chaser.currentPos?.lon;
+          const cH = chaser.heading ?? chaser.currentHeading ?? chaser._currentHeading ?? 0;
+          return {
+            center: computeLookAhead(cLat, cLon, cH, 12) || [Number(cLat), Number(cLon)],
+            zoom: this.config.followZoom
+          };
+        }
+        return {
+          center: computeLookAhead(lLat, lLon, lHeading, this.config.futureMeters || 16) || [Number(lLat), Number(lLon)],
+          zoom: this.config.followZoom
+        };
+      }
+
+      return {
+        center: [Number(lLat), Number(lLon)],
+        zoom: this.config.followZoom
+      };
+    }
+
+    _findNextBuoyAhead(lat, lon, headingDeg) {
+      const contract = this.getContract();
+      const buoys = contract.buoys || contract.sportPackage?.buoys || [];
+      if (!buoys.length) return null;
+
+      let bestBuoy = null;
+      let minAheadDist = Infinity;
+      const h = Number(headingDeg) || 0;
+
+      buoys.forEach(b => {
+        const bLat = b.lat ?? b.latitude;
+        const bLon = b.lon ?? b.lng ?? b.longitude;
+        if (!validPoint(bLat, bLon)) return;
+
+        const d = haversineDistM(lat, lon, bLat, bLon);
+        if (d >= 40 && d <= 350) {
+          const bearing = (Math.atan2(
+            (Number(bLon) - Number(lon)) * Math.cos(Number(lat) * Math.PI / 180),
+            Number(bLat) - Number(lat)
+          ) * 180 / Math.PI + 360) % 360;
+          let diff = Math.abs(h - bearing) % 360;
+          if (diff > 180) diff = 360 - diff;
+          if (diff <= 65 && d < minAheadDist) {
+            minAheadDist = d;
+            bestBuoy = [Number(bLat), Number(bLon)];
+          }
+        }
+      });
+
+      return bestBuoy;
+    }
+
+    _getEntityLookAhead(entity, futureM = null) {
+      if (!entity) return null;
+      const lat = entity.lat ?? entity.latitude ?? entity.currentPos?.lat;
+      const lon = entity.lon ?? entity.lng ?? entity.longitude ?? entity.currentPos?.lon;
+      const h = entity.heading ?? entity.currentHeading ?? entity._currentHeading ?? 0;
+      const m = futureM ?? this.config.futureMeters ?? 18;
+      return computeLookAhead(lat, lon, h, m) || (validPoint(lat, lon) ? [Number(lat), Number(lon)] : null);
+    }
+
+    _findLeaderIdx(entities) {
+      let maxDist = -1;
+      let leaderIdx = 0;
+      entities.forEach((e, idx) => {
+        const dist = e.accDist ?? e.currentDist ?? e.currentProg ?? e.prog ?? 0;
+        if (dist > maxDist) {
+          maxDist = dist;
+          leaderIdx = idx;
+        }
+      });
+      return leaderIdx;
+    }
+
+    _calculateGroupZoom(points) {
+      if (points.length < 2) return this.config.followZoom;
+      const bounds = L.latLngBounds(points);
+      const dist = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+      if (dist < 40) return this.config.detailZoom;
+      if (dist < 100) return this.config.followZoom;
+      if (dist < 220) return this.config.twoCanoesZoom;
+      if (dist < 450) return this.config.packZoom;
+      return this.config.packZoom - 0.8;
+    }
+  }
+
+  global.DroneCameraSkills = DroneCameraSkills;
+})(typeof window !== 'undefined' ? window : this);
+
+  </script>
+  <style>
+    /* ===== SLIM THEME & RESET ===== */
+    :root {
+      --bg: #07090e;
+      --bg-glass: rgba(10, 18, 30, 0.78);
+      --border-glass: rgba(0, 242, 254, 0.25);
+      --accent: #00F2FE;
+      --accent-glow: rgba(0, 242, 254, 0.4);
+      --gold: #F59E0B;
+      --green: #10B981;
+      --red: #EF4444;
+      --purple: #8B5CF6;
+      --text: #F8FAFC;
+      --text-sec: #94A3B8;
+      --font-title: 'Rajdhani', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100vw; height: 100vh; height: 100dvh; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow: hidden; }
+
+    #app { position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
+
+    /* Map Fullscreen */
+    #map-wrap { position: absolute; inset: 0; z-index: 1; }
+    #map { width: 100%; height: 100%; background: #080d16; }
+
+    /* Leaflet overrides */
+    .leaflet-control-zoom { border: 1px solid var(--border-glass) !important; background: var(--bg-glass) !important; border-radius: 8px !important; overflow: hidden; }
+    .leaflet-control-zoom a { background: transparent !important; color: #fff !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+    .leaflet-control-zoom a:hover { background: rgba(0,242,254,0.15) !important; color: var(--accent) !important; }
+
+    /* Overlay Controls Auto-Hide */
+    .slim-overlay-control {
+      position: absolute;
+      z-index: 1000;
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    body.idle .slim-overlay-control {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: scale(0.96);
+    }
+
+    /* Fixed Centered VAAREC Logo (Req 9 - Never Hidden) */
+    .slim-fixed-header {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1100;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(12px);
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-family: var(--font-title);
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      user-select: none;
+      pointer-events: none;
+    }
+    .slim-badge-sub {
+      font-size: 0.65rem;
+      color: var(--accent);
+      background: rgba(0,242,254,0.12);
+      border: 1px solid var(--accent);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    /* Fixed Elapsed Time Top-Right (Req 4.1) */
+    .slim-fixed-timer {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      z-index: 1100;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(12px);
+      padding: 6px 14px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    #slim-elapsed-time {
+      font-family: var(--font-mono);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    /* Vertical Timeline on Left Side (Bottom to Top) (Req 4.1) */
+    #slim-vertical-timeline-wrap {
+      left: 20px;
+      top: 90px;
+      bottom: 90px;
+      width: 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .slim-timeline-indicator {
+      font-family: var(--font-title);
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-sec);
+      background: var(--bg-glass);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(8px);
+      padding: 2px 6px;
+      border-radius: 6px;
+      user-select: none;
+    }
+    .slim-timeline-rail {
+      position: relative;
+      flex: 1;
+      width: 6px;
+      margin: 8px 0;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 99px;
+      cursor: pointer;
+      overflow: visible;
+      transition: width 0.15s ease;
+    }
+    .slim-timeline-rail:hover {
+      width: 10px;
+    }
+    .slim-timeline-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 0%;
+      background: linear-gradient(0deg, #00F2FE, #3B82F6, #F59E0B);
+      border-radius: 99px;
+      box-shadow: 0 0 12px var(--accent-glow);
+      pointer-events: none;
+    }
+    .slim-timeline-bead {
+      position: absolute;
+      left: 50%;
+      bottom: 0%;
+      transform: translate(-50%, 50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid var(--accent);
+      box-shadow: 0 0 16px var(--accent), 0 2px 8px rgba(0,0,0,0.8);
+      cursor: grab;
+      pointer-events: none;
+      transition: transform 0.05s ease;
+    }
+    .slim-timeline-rail:hover .slim-timeline-bead {
+      transform: translate(-50%, 50%) scale(1.2);
+    }
+
+    /* Floating Center Playback Capsule (Req 4) */
+    #slim-playback-capsule {
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(16px);
+      padding: 6px 14px;
+      border-radius: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(0,242,254,0.1);
+    }
+    .slim-ctrl-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .slim-ctrl-btn:hover {
+      background: rgba(0,242,254,0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+      transform: scale(1.06);
+    }
+    .slim-ctrl-btn:active { transform: scale(0.94); }
+    .slim-ctrl-btn.play-btn {
+      width: 52px;
+      height: 52px;
+      font-size: 1.3rem;
+      background: linear-gradient(135deg, rgba(0,242,254,0.25), rgba(59,130,246,0.25));
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .slim-speed-btn {
+      font-family: var(--font-title);
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 0 14px;
+      height: 40px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .slim-speed-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      box-shadow: 0 0 14px rgba(245,158,11,0.3);
+    }
+
+    /* Single Drone Camera Button & Menu (Req 5) */
+    #slim-drone-control {
+      top: 14px;
+      left: 16px;
+      z-index: 1000;
+    }
+    .slim-cam-btn {
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(12px);
+      padding: 6px 14px;
+      border-radius: 12px;
+      color: #fff;
+      font-family: var(--font-title);
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      transition: all 0.15s;
+    }
+    .slim-cam-btn:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+    .slim-cam-popover {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      background: rgba(10, 18, 30, 0.95);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(16px);
+      border-radius: 12px;
+      padding: 6px;
+      min-width: 220px;
+      max-height: 380px;
+      overflow-y: auto;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.8);
+    }
+    .slim-cam-popover.show { display: block; }
+    .slim-cam-item {
+      padding: 8px 12px;
+      font-family: var(--font-title);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-sec);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.12s;
+    }
+    .slim-cam-item:hover { background: rgba(0,242,254,0.12); color: #fff; }
+    .slim-cam-item.active { background: rgba(0,242,254,0.2); color: var(--accent); }
+    .slim-cam-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 0; }
+
+    /* Focused Canoe Floating Card (Top-Left) (Req 8) */
+    #slim-focused-canoe-card {
+      top: 64px;
+      left: 16px;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(16px);
+      padding: 14px 18px;
+      border-radius: 16px;
+      width: 230px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.7), 0 0 20px rgba(0,242,254,0.1);
+      pointer-events: auto;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .focused-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .focused-card-name {
+      font-family: var(--font-title);
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .focused-card-rank {
+      font-family: var(--font-title);
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(245,158,11,0.2);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+    }
+    .focused-card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .focused-stat-box { display: flex; flex-direction: column; }
+    .focused-stat-lbl { font-size: 0.65rem; color: var(--text-sec); text-transform: uppercase; font-weight: 600; }
+    .focused-stat-val { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: var(--accent); }
+
+    /* Simplified Marker Tooltip (Req 6 - Name & Avg Speed only, no emoji, no hr) */
+    .slim-marker-tip {
+      background: rgba(8, 14, 24, 0.88);
+      border: 1px solid rgba(0,242,254,0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-title);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .slim-tip-spd {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent);
+    }
+
+    /* Auth Gate */
+    #auth-gate {
+      position: fixed; inset: 0; background: rgba(7,5,10,0.95); backdrop-filter: blur(16px);
+      z-index: 88888; display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .auth-card {
+      background: #0d131f; border: 1px solid var(--border-glass); border-radius: 20px;
+      width: 100%; max-width: 400px; padding: 32px; text-align: center;
+      box-shadow: 0 0 60px rgba(0,242,254,0.1), 0 20px 50px rgba(0,0,0,0.8);
+    }
+    .auth-icon { font-size: 44px; margin-bottom: 12px; }
+    .auth-card h2 { font-family: var(--font-title); font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .auth-card p { font-size: 13px; color: var(--text-sec); margin-bottom: 24px; line-height: 1.6; }
+    .auth-input {
+      width: 100%; padding: 13px 16px; background: #121b2d; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; color: #fff; font-size: 14px; outline: none; margin-bottom: 4px;
+    }
+    .auth-input:focus { border-color: var(--accent); }
+    .auth-label { font-size: 12px; font-weight: 600; color: var(--text-sec); display: block; text-align: left; margin-bottom: 6px; }
+    .auth-btn {
+      width: 100%; padding: 14px; margin-top: 12px;
+      background: linear-gradient(135deg, #00F2FE, #3B82F6);
+      border: none; border-radius: 12px; color: #07090e; font-weight: 800; font-size: 15px;
+      font-family: var(--font-title); letter-spacing: 1px; cursor: pointer; transition: all 0.2s;
+    }
+    .auth-btn:hover { box-shadow: 0 0 24px var(--accent-glow); }
+    .auth-status { margin-top: 14px; font-size: 13px; font-weight: 600; display: none; }
+
+    /* Results Modal */
+    #modal-result {
+      position: fixed; inset: 0; background: rgba(7,5,10,0.85); backdrop-filter: blur(12px);
+      z-index: 99999; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .result-card {
+      background: #0d131f; border: 1px solid var(--border-glass); border-radius: 20px;
+      width: 100%; max-width: 520px; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+      max-height: 90vh; overflow-y: auto; text-align: center;
+    }
+    .result-rank-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+    .result-rank-table th { padding: 8px 10px; color: var(--text-sec); border-bottom: 1px solid rgba(255,255,255,0.1); text-transform: uppercase; font-size: 11px; }
+    .result-rank-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+    /* Confetti */
+    #confetti-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 100000; overflow: hidden; }
+    .conf-particle { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: confFall linear forwards; }
+    @keyframes confFall { 0% { transform: translateY(-20px) rotate(0); opacity: 1; } 100% { transform: translateY(105vh) rotate(720deg); opacity: 0; } }
+
+    /* Loading Spinner */
+    #loading {
+      position: fixed; inset: 0; background: #07090e; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    }
+    .spinner { width: 44px; height: 44px; border: 3px solid rgba(0,242,254,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-family:var(--font-title); font-size:0.95rem; font-weight:700; color:var(--text-sec); letter-spacing:1px">VAAREC SLIM · CARREGANDO...</div>
+</div>
+
+<!-- Auth Gate -->
+<div id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-icon">🏆</div>
+    <h2>Acesso ao VAAREC Slim</h2>
+    <p>Este replay minimalista é protegido. Insira seu e-mail para assistir à transmissão com áudio imersivo e câmera drone.</p>
+    <label class="auth-label">Seu E-mail</label>
+    <input type="email" id="auth-email" class="auth-input" placeholder="seu@email.com" autocomplete="off">
+    <button class="auth-btn" id="auth-btn" onclick="handleAuth()">Assistir ao Replay 🔥</button>
+    <div class="auth-status" id="auth-status"></div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+
+  <!-- Fullscreen Map Wrap -->
+  <div id="map-wrap">
+    <div id="map"></div>
+  </div>
+
+  <!-- Fixed Persistent VAAREC Logo (Req 9) -->
+  <div class="slim-fixed-header">
+    <span>🏄 VAAREC</span>
+    <span class="slim-badge-sub">SLIM</span>
+  </div>
+
+  <!-- Fixed Persistent Elapsed Time (Req 4.1) -->
+  <div class="slim-fixed-timer">
+    <span id="slim-elapsed-time">00:00:00</span>
+  </div>
+
+  <!-- Vertical Timeline on Left Side (Bottom to Top) (Req 4.1) -->
+  <div id="slim-vertical-timeline-wrap" class="slim-overlay-control">
+    <span class="slim-timeline-indicator">🏆 100%</span>
+    <div class="slim-timeline-rail" id="slim-timeline-rail" title="Clique ou arraste para navegar no tempo">
+      <div class="slim-timeline-fill" id="slim-timeline-fill"></div>
+      <div class="slim-timeline-bead" id="slim-timeline-bead"></div>
+    </div>
+    <span class="slim-timeline-indicator">🏁 0%</span>
+  </div>
+
+  <!-- Floating Center Playback Capsule (Req 4) -->
+  <div id="slim-playback-capsule" class="slim-overlay-control">
+    <button class="slim-ctrl-btn play-btn" id="btn-play-pause" onclick="togglePlay()" title="Reproduzir / Pausar (Espaço)">▶</button>
+    <button class="slim-speed-btn" id="btn-speed-cycle" onclick="cycleSpeed()" title="Velocidade de Reprodução">⚡ 1x</button>
+    <button class="slim-ctrl-btn" id="btn-audio-mute" onclick="toggleAudioMute()" title="Ativar / Silenciar Áudio">🔊</button>
+  </div>
+
+  <!-- Single Drone Camera Button & Menu (Req 5) -->
+  <div id="slim-drone-control" class="slim-overlay-control">
+    <button class="slim-cam-btn" id="btn-slim-camera" onclick="toggleCameraMenu()">
+      <span>🎥</span>
+      <span id="slim-cam-mode-label">AUTO DIRECT</span>
+      <span style="font-size:0.7rem;">▾</span>
+    </button>
+    <div class="slim-cam-popover" id="slim-cam-popover">
+      <div class="slim-cam-item active" onclick="selectCameraMode('auto', null)">🎬 Auto Direct (Inteligente)</div>
+      <div class="slim-cam-item" onclick="selectCameraMode('all', null)">🌐 Visão Geral (Todas as Canoas)</div>
+      <div class="slim-cam-item" onclick="selectCameraMode('leader', null)">🥇 Foco no Líder</div>
+      <div class="slim-cam-divider"></div>
+      <div id="slim-canoe-cam-list"></div>
+    </div>
+  </div>
+
+  <!-- Focused Canoe Floating Card (Top-Left) (Req 8) -->
+  <div id="slim-focused-canoe-card" class="slim-overlay-control" style="display:none;">
+    <div class="focused-card-header">
+      <div class="focused-card-name" id="fc-canoe-name">--</div>
+      <div class="focused-card-rank" id="fc-canoe-rank">1º LUGAR</div>
+    </div>
+    <div class="focused-card-grid">
+      <div class="focused-stat-box">
+        <span class="focused-stat-lbl">Vel. Atual</span>
+        <span class="focused-stat-val" id="fc-stat-cur-spd">-- km/h</span>
+      </div>
+      <div class="focused-stat-box">
+        <span class="focused-stat-lbl">Vel. Média</span>
+        <span class="focused-stat-val" id="fc-stat-avg-spd">-- km/h</span>
+      </div>
+      <div class="focused-stat-box">
+        <span class="focused-stat-lbl">Distância</span>
+        <span class="focused-stat-val" id="fc-stat-dist">-- km</span>
+      </div>
+      <div class="focused-stat-box">
+        <span class="focused-stat-lbl">Gap Líder</span>
+        <span class="focused-stat-val" id="fc-stat-gap">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Modal -->
+  <div id="modal-result">
+    <div class="result-card">
+      <div style="font-size:44px; margin-bottom:8px;">🏆</div>
+      <h2 style="font-family:var(--font-title); font-size:24px; font-weight:800; color:#fff; margin-bottom:4px;">PROVA FINALIZADA!</h2>
+      <p id="result-winner-text" style="color:var(--accent); font-family:var(--font-title); font-size:1.1rem; font-weight:700; margin-bottom:16px;"></p>
+      
+      <table class="result-rank-table">
+        <thead>
+          <tr>
+            <th>Pos</th>
+            <th style="text-align:left;">Canoa</th>
+            <th>Tempo Total</th>
+            <th>Vel. Média</th>
+            <th>Distância</th>
+          </tr>
+        </thead>
+        <tbody id="result-rank-tbody"></tbody>
+      </table>
+
+      <button class="auth-btn" onclick="restartReplay()" style="margin-top:20px;">🔄 Assistir Novamente</button>
+    </div>
+  </div>
+
+  <div id="confetti-wrap"></div>
+</div>
+
+<script>
+// ===== GLOBAL STATE =====
+const SLIM_COLORS = ['#00F2FE', '#FF007A', '#38EF7D', '#F59E0B', '#8B5CF6', '#F97316', '#3B82F6', '#EC4899'];
+let athletes = [];
+let totalDurationMs = 0;
+let playTimeMs = 0;
+let isPlaying = false;
+let speed = 1;
+const SPEEDS = [1, 5, 10, 30, 60];
+let lastRaf = null;
+let draggingTimeline = false;
+let resultShown = false;
+let map = null;
+let droneCamera = null;
+let satLayer = null;
+let streetLayer = null;
+let activeMapType = null;
+let activeCanoeFocusIdx = null; // null se camera for auto/all/leader, ou index da canoa
+let activeCameraMode = 'auto'; // 'auto' | 'all' | 'leader' | 'canoe'
+
+// 5-Second Inactivity Auto-Hide Logic (Req 3)
+let idleTimer = null;
+function resetIdleTimer() {
+  document.body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (isPlaying) {
+      document.body.classList.add('idle');
+      const popover = document.getElementById('slim-cam-popover');
+      if (popover) popover.classList.remove('show');
+    }
+  }, 5000);
+}
+
+['mousemove', 'mousedown', 'touchstart', 'click', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, resetIdleTimer, { passive: true });
+});
+
+// Map layer auto-switcher (<30m)
+function getScaleBarMeters(mapInstance) {
+  if (!mapInstance) return 100;
+  try {
+    const y = mapInstance.getSize().y / 2;
+    const p1 = mapInstance.containerPointToLatLng([0, y]);
+    const p2 = mapInstance.containerPointToLatLng([100, y]);
+    return p1.distanceTo(p2);
+  } catch (e) {
+    const z = mapInstance.getZoom ? mapInstance.getZoom() : 17;
+    return (156543 / Math.pow(2, z)) * 100;
+  }
+}
+
+function updateMapLayerForZoom() {
+  if (!map || !satLayer || !streetLayer) return;
+  const scaleMeters = getScaleBarMeters(map);
+  const zoom = map.getZoom();
+  if (scaleMeters <= 30 || zoom >= 18.25) {
+    if (activeMapType !== 'streetmap') {
+      if (map.hasLayer(satLayer)) map.removeLayer(satLayer);
+      if (!map.hasLayer(streetLayer)) streetLayer.addTo(map);
+      activeMapType = 'streetmap';
+    }
+  } else {
+    if (activeMapType !== 'satellite') {
+      if (map.hasLayer(streetLayer)) map.removeLayer(streetLayer);
+      if (!map.hasLayer(satLayer)) satLayer.addTo(map);
+      activeMapType = 'satellite';
+    }
+  }
+}
+
+// Distance Helper
+function calcDistM(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Time Format HH:MM:SS
+function formatTimeHMS(ms) {
+  if (ms == null || isNaN(ms) || ms < 0) ms = 0;
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+// Init App
+async function initApp() {
+  let contractData = window.CONTRACT || null;
+
+  if (!contractData && typeof VaarecClient !== 'undefined') {
+    const slug = VaarecClient.getSlugFromUrl();
+    if (slug) {
+      try {
+        contractData = await VaarecClient.loadViewerData(slug);
+      } catch (err) {
+        console.warn("Falha no loadViewerData do Supabase:", err);
+      }
+    }
+  }
+
+  if (!contractData) {
+    contractData = generateDemoSlimTracks();
+  }
+
+  setupData(contractData);
+  initMap();
+  hideLoading();
+  resetIdleTimer();
+}
+
+function generateDemoSlimTracks() {
+  const baseLat = -27.1895, baseLon = -48.5140;
+  const names = ['Valter', 'Filipe', 'Luiz', 'Jean', 'Noe'];
+  const tracks = names.map((name, idx) => {
+    const points = [];
+    const numPts = 120;
+    const baseSpd = 11.5 + (names.length - idx) * 0.3;
+    for (let i = 0; i < numPts; i++) {
+      const frac = i / (numPts - 1);
+      const t = i * 2000;
+      const lat = baseLat + frac * 0.035 + (idx * 0.0003);
+      const lon = baseLon + frac * 0.045 + Math.sin(frac * Math.PI * 3) * 0.002;
+      const spdKmh = baseSpd + Math.sin(i * 0.2 + idx) * 1.5;
+      points.push({ lat, lon, t, spdKmh });
+    }
+    return { id: 'track-' + (idx + 1), name, points, color: SLIM_COLORS[idx % SLIM_COLORS.length] };
+  });
+
+  return {
+    name: 'Desafio Zimbros VAAREC Slim',
+    context: 'slim',
+    sportPackage: { tracks }
+  };
+}
+
+function setupData(contract) {
+  const rawTracks = contract.sportPackage?.tracks || contract.tracks || [];
+  athletes = rawTracks.map((tr, idx) => {
+    const pts = (tr.points || tr.data || tr.gpsData || []).map(p => ({
+      lat: Number(p.lat ?? p.latitude),
+      lon: Number(p.lon ?? p.lng ?? p.longitude),
+      t: Number(p.t ?? p.timestamp ?? 0),
+      spdKmh: Number(p.spdKmh ?? p.speedKmh ?? 0)
+    }));
+
+    const color = tr.color || SLIM_COLORS[idx % SLIM_COLORS.length];
+    return {
+      id: tr.id || 'track-' + idx,
+      name: tr.name || `Canoa ${idx + 1}`,
+      color,
+      points: pts,
+      marker: null,
+      polyline: null,
+      curPt: pts[0] || { lat: 0, lon: 0, spdKmh: 0 },
+      distanceTraveledM: 0,
+      totalDistanceM: 0,
+      avgSpeedKmh: 0,
+      rank: idx + 1
+    };
+  }).filter(a => a.points.length > 1);
+
+  if (!athletes.length) return;
+
+  // Sincronizar tempo relativo (0 até totalDurationMs)
+  athletes.forEach(ath => {
+    const t0 = ath.points[0].t;
+    ath.points.forEach((p, i) => {
+      p.relT = p.t - t0;
+      if (i > 0) {
+        const prev = ath.points[i - 1];
+        ath.totalDistanceM += calcDistM(prev.lat, prev.lon, p.lat, p.lon);
+      }
+    });
+  });
+
+  totalDurationMs = Math.max(...athletes.map(a => a.points[a.points.length - 1].relT));
+  buildCameraMenuList();
+}
+
+function initMap() {
+  if (map) return;
+  const firstPt = athletes[0]?.points[0] || { lat: -27.1895, lon: -48.5140 };
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([firstPt.lat, firstPt.lon], 16);
+
+  satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20 });
+  streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+  satLayer.addTo(map);
+  activeMapType = 'satellite';
+
+  map.on('zoomend moveend', updateMapLayerForZoom);
+
+  // Criar marcadores e polylines
+  athletes.forEach(ath => {
+    const latlngs = ath.points.map(p => [p.lat, p.lon]);
+    ath.polyline = L.polyline(latlngs, {
+      color: ath.color,
+      weight: 3,
+      opacity: 0.85
+    }).addTo(map);
+
+    const icon = L.divIcon({
+      className: 'slim-marker-wrap',
+      html: `<div style="width:18px; height:18px; border-radius:50%; background:${ath.color}; border:3px solid #fff; box-shadow:0 0 16px ${ath.color}; position:relative;"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+
+    ath.marker = L.marker([ath.points[0].lat, ath.points[0].lon], { icon }).addTo(map);
+    
+    // Tooltip simplificado (Req 6: Nome + Vel Média, sem batimento, sem emoji)
+    ath.marker.bindTooltip(`
+      <div class="slim-marker-tip">
+        <span class="slim-tip-name" style="color:${ath.color}; font-weight:800;">${ath.name}</span>
+        <span class="slim-tip-spd" id="tip-spd-${ath.id}">0.0 km/h</span>
+      </div>
+    `, { permanent: true, direction: 'top', offset: [0, -10], className: 'slim-custom-leaflet-tip' });
+  });
+
+  // Fit bounds
+  const allLatLngs = athletes.flatMap(a => a.points.map(p => [p.lat, p.lon]));
+  if (allLatLngs.length) {
+    map.fitBounds(L.latLngBounds(allLatLngs), { padding: [60, 60] });
+  }
+
+  // Inicializar Diretor de Câmera Drone
+  if (typeof VaarecDroneDirector !== 'undefined') {
+    droneCamera = new VaarecDroneDirector(map);
+  }
+
+  initTimelineEvents();
+  updateFrame(0);
+}
+
+// Timeline Navigation Events (Req 4.1)
+function initTimelineEvents() {
+  const rail = document.getElementById('slim-timeline-rail');
+  if (!rail) return;
+
+  function seekFromEvent(e) {
+    const rect = rail.getBoundingClientRect();
+    const clientY = e.clientY ?? (e.touches && e.touches[0]?.clientY);
+    if (clientY == null) return;
+    const clickY = clientY - rect.top;
+    const clampedY = Math.max(0, Math.min(rect.height, clickY));
+    // Invertido: 100% no topo (clickY = 0), 0% na base (clickY = rect.height)
+    const frac = 1 - (clampedY / rect.height);
+    seekToMs(frac * totalDurationMs);
+  }
+
+  rail.addEventListener('mousedown', e => {
+    draggingTimeline = true;
+    seekFromEvent(e);
+  });
+  window.addEventListener('mousemove', e => {
+    if (draggingTimeline) seekFromEvent(e);
+  });
+  window.addEventListener('mouseup', () => { draggingTimeline = false; });
+
+  rail.addEventListener('touchstart', e => {
+    draggingTimeline = true;
+    seekFromEvent(e);
+  }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (draggingTimeline) seekFromEvent(e);
+  }, { passive: true });
+  window.addEventListener('touchend', () => { draggingTimeline = false; });
+}
+
+// Frame & Physics Loop
+function updateFrame(ms) {
+  playTimeMs = Math.max(0, Math.min(totalDurationMs, ms));
+  document.getElementById('slim-elapsed-time').textContent = formatTimeHMS(playTimeMs);
+
+  const pct = totalDurationMs > 0 ? (playTimeMs / totalDurationMs) * 100 : 0;
+  document.getElementById('slim-timeline-fill').style.height = `${pct}%`;
+  document.getElementById('slim-timeline-bead').style.bottom = `${pct}%`;
+
+  athletes.forEach(ath => {
+    const pts = ath.points;
+    let p0 = pts[0], p1 = pts[pts.length - 1];
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (pts[i].relT <= playTimeMs && pts[i + 1].relT >= playTimeMs) {
+        p0 = pts[i];
+        p1 = pts[i + 1];
+        break;
+      }
+    }
+
+    const span = (p1.relT - p0.relT) || 1;
+    const f = Math.max(0, Math.min(1, (playTimeMs - p0.relT) / span));
+    const curLat = p0.lat + (p1.lat - p0.lat) * f;
+    const curLon = p0.lon + (p1.lon - p0.lon) * f;
+    const curSpd = p0.spdKmh + (p1.spdKmh - p0.spdKmh) * f;
+
+    ath.curPt = { lat: curLat, lon: curLon, spdKmh: curSpd };
+    if (ath.marker) ath.marker.setLatLng([curLat, curLon]);
+
+    // Calcular velocidade média até o momento
+    ath.distanceTraveledM = ath.totalDistanceM * (playTimeMs / totalDurationMs);
+    const hoursElapsed = (playTimeMs / 1000) / 3600;
+    ath.avgSpeedKmh = hoursElapsed > 0.001 ? (ath.distanceTraveledM / 1000) / hoursElapsed : curSpd;
+
+    // Atualizar tooltip (Req 6)
+    const tipEl = document.getElementById(`tip-spd-${ath.id}`);
+    if (tipEl) tipEl.textContent = `${ath.avgSpeedKmh.toFixed(1)} km/h`;
+  });
+
+  // Ordenar ranking atual por distância percorrida
+  const sorted = [...athletes].sort((a, b) => b.distanceTraveledM - a.distanceTraveledM);
+  sorted.forEach((ath, r) => ath.rank = r + 1);
+
+  // Atualizar Card da Canoa Focada (Req 8)
+  updateFocusedCanoeCard(sorted);
+
+  // Atualizar Câmera Drone
+  if (droneCamera && !draggingTimeline) {
+    updateDroneCameraPosition();
+  }
+
+  // Verificar final de prova
+  if (playTimeMs >= totalDurationMs && !resultShown) {
+    showResults(sorted);
+  }
+}
+
+// Drone Camera Mode Controller (Req 5)
+function buildCameraMenuList() {
+  const container = document.getElementById('slim-canoe-cam-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  athletes.forEach((ath, idx) => {
+    const item = document.createElement('div');
+    item.className = 'slim-cam-item';
+    item.id = `cam-item-canoe-${idx}`;
+    item.innerHTML = `<span style="width:10px; height:10px; border-radius:50%; background:${ath.color};"></span> ${ath.name}`;
+    item.onclick = () => selectCameraMode('canoe', idx);
+    container.appendChild(item);
+  });
+}
+
+function toggleCameraMenu() {
+  const popover = document.getElementById('slim-cam-popover');
+  if (popover) popover.classList.toggle('show');
+}
+
+function selectCameraMode(mode, canoeIdx) {
+  activeCameraMode = mode;
+  activeCanoeFocusIdx = canoeIdx;
+
+  document.querySelectorAll('.slim-cam-item').forEach(el => el.classList.remove('active'));
+
+  const label = document.getElementById('slim-cam-mode-label');
+  if (mode === 'auto') {
+    if (label) label.textContent = 'AUTO DIRECT';
+  } else if (mode === 'all') {
+    if (label) label.textContent = 'VISÃO GERAL';
+  } else if (mode === 'leader') {
+    if (label) label.textContent = 'LÍDER';
+  } else if (mode === 'canoe' && canoeIdx != null && athletes[canoeIdx]) {
+    if (label) label.textContent = athletes[canoeIdx].name.toUpperCase();
+    const item = document.getElementById(`cam-item-canoe-${canoeIdx}`);
+    if (item) item.classList.add('active');
+  }
+
+  const popover = document.getElementById('slim-cam-popover');
+  if (popover) popover.classList.remove('show');
+}
+
+function updateDroneCameraPosition() {
+  if (!droneCamera || !athletes.length) return;
+
+  if (activeCameraMode === 'auto') {
+    // Auto Direct Inteligente
+    droneCamera.updateAutoDirector(athletes, playTimeMs);
+  } else if (activeCameraMode === 'all') {
+    const bounds = L.latLngBounds(athletes.map(a => [a.curPt.lat, a.curPt.lon]));
+    map.fitBounds(bounds, { padding: [60, 60], animate: true, duration: 0.5 });
+  } else if (activeCameraMode === 'leader') {
+    const leader = athletes.reduce((prev, curr) => (curr.distanceTraveledM > prev.distanceTraveledM) ? curr : prev, athletes[0]);
+    map.panTo([leader.curPt.lat, leader.curPt.lon], { animate: true, duration: 0.3 });
+  } else if (activeCameraMode === 'canoe' && activeCanoeFocusIdx != null && athletes[activeCanoeFocusIdx]) {
+    const target = athletes[activeCanoeFocusIdx];
+    map.panTo([target.curPt.lat, target.curPt.lon], { animate: true, duration: 0.3 });
+  }
+}
+
+// Focused Canoe Card (Req 8 - Top Left)
+function updateFocusedCanoeCard(sortedAthletes) {
+  const card = document.getElementById('slim-focused-canoe-card');
+  if (!card) return;
+
+  if (activeCameraMode === 'canoe' && activeCanoeFocusIdx != null && athletes[activeCanoeFocusIdx]) {
+    const ath = athletes[activeCanoeFocusIdx];
+    card.style.display = 'block';
+
+    const leader = sortedAthletes[0];
+    const gapM = leader ? Math.round(leader.distanceTraveledM - ath.distanceTraveledM) : 0;
+    const gapText = gapM <= 5 ? '🏆 Líder' : `+${gapM}m`;
+
+    document.getElementById('fc-canoe-name').innerHTML = `<span style="width:10px; height:10px; border-radius:50%; background:${ath.color}; display:inline-block;"></span> ${ath.name}`;
+    document.getElementById('fc-canoe-rank').textContent = `${ath.rank}º LUGAR`;
+    document.getElementById('fc-stat-cur-spd').textContent = `${ath.curPt.spdKmh.toFixed(1)} km/h`;
+    document.getElementById('fc-stat-avg-spd').textContent = `${ath.avgSpeedKmh.toFixed(1)} km/h`;
+    document.getElementById('fc-stat-dist').textContent = `${(ath.distanceTraveledM / 1000).toFixed(2)} km`;
+    document.getElementById('fc-stat-gap').textContent = gapText;
+  } else {
+    card.style.display = 'none';
+  }
+}
+
+// Playback Controls (Req 4)
+function togglePlay() {
+  if (typeof VaarecAudio !== 'undefined') {
+    VaarecAudio.init();
+  }
+
+  isPlaying = !isPlaying;
+  const btn = document.getElementById('btn-play-pause');
+  if (btn) btn.textContent = isPlaying ? '⏸' : '▶';
+
+  if (isPlaying) {
+    if (playTimeMs >= totalDurationMs) playTimeMs = 0;
+    lastRaf = performance.now();
+    requestAnimationFrame(playbackLoop);
+    if (typeof VaarecAudio !== 'undefined') {
+      VaarecAudio.setPlaybackSpeed(speed);
+      VaarecAudio.playBGM();
+    }
+  } else {
+    if (typeof VaarecAudio !== 'undefined') VaarecAudio.stopBGM();
+  }
+}
+
+function playbackLoop(now) {
+  if (!isPlaying) return;
+  const dt = (now - lastRaf) * speed;
+  lastRaf = now;
+
+  let newTime = playTimeMs + dt;
+  if (newTime >= totalDurationMs) {
+    newTime = totalDurationMs;
+    updateFrame(newTime);
+    togglePlay();
+    return;
+  }
+
+  updateFrame(newTime);
+  requestAnimationFrame(playbackLoop);
+}
+
+function seekToMs(targetMs) {
+  playTimeMs = Math.max(0, Math.min(totalDurationMs, targetMs));
+  updateFrame(playTimeMs);
+}
+
+function cycleSpeed() {
+  const curIdx = SPEEDS.indexOf(speed);
+  const nextIdx = (curIdx + 1) % SPEEDS.length;
+  speed = SPEEDS[nextIdx];
+
+  const btn = document.getElementById('btn-speed-cycle');
+  if (btn) btn.textContent = `⚡ ${speed}x`;
+
+  if (typeof VaarecAudio !== 'undefined') {
+    VaarecAudio.setPlaybackSpeed(speed);
+  }
+}
+
+function toggleAudioMute() {
+  if (typeof VaarecAudio === 'undefined') return;
+  VaarecAudio.init();
+  const isMuted = VaarecAudio.toggleMute();
+  const btn = document.getElementById('btn-audio-mute');
+  if (btn) btn.textContent = isMuted ? '🔇' : '🔊';
+  if (!isMuted && isPlaying) {
+    VaarecAudio.setPlaybackSpeed(speed);
+    VaarecAudio.playBGM();
+  }
+}
+
+// Final Results
+function showResults(sorted) {
+  resultShown = true;
+  if (typeof VaarecAudio !== 'undefined') {
+    VaarecAudio.playFanfare();
+  }
+  spawnConfetti();
+
+  const winner = sorted[0];
+  document.getElementById('result-winner-text').textContent = `Vencedor: ${winner?.name} (${(winner?.distanceTraveledM/1000).toFixed(2)} km percorridos)`;
+
+  const tbody = document.getElementById('result-rank-tbody');
+  tbody.innerHTML = '';
+  sorted.forEach((ath, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:800; color:${i === 0 ? 'var(--gold)' : 'var(--text)'};">${i + 1}º</td>
+      <td style="text-align:left; font-weight:700; color:${ath.color};">${ath.name}</td>
+      <td style="font-family:var(--font-mono);">${formatTimeHMS(totalDurationMs)}</td>
+      <td style="font-family:var(--font-mono); color:var(--accent);">${ath.avgSpeedKmh.toFixed(1)} km/h</td>
+      <td style="font-family:var(--font-mono);">${(ath.distanceTraveledM / 1000).toFixed(2)} km</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('modal-result').style.display = 'flex';
+}
+
+function restartReplay() {
+  document.getElementById('modal-result').style.display = 'none';
+  resultShown = false;
+  seekToMs(0);
+  togglePlay();
+}
+
+function spawnConfetti() {
+  const wrap = document.getElementById('confetti-wrap');
+  wrap.innerHTML = '';
+  const colors = ['#00F2FE', '#F59E0B', '#38EF7D', '#FF007A', '#8B5CF6'];
+  for (let i = 0; i < 50; i++) {
+    const p = document.createElement('div');
+    p.className = 'conf-particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDuration = (2 + Math.random() * 2) + 's';
+    p.style.animationDelay = (Math.random() * 0.5) + 's';
+    wrap.appendChild(p);
+  }
+}
+
+function hideLoading() {
+  const el = document.getElementById('loading');
+  if (el) {
+    el.style.opacity = '0';
+    setTimeout(() => el.style.display = 'none', 400);
+  }
+}
+
+// Auth Gate Handler
+async function handleAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const status = document.getElementById('auth-status');
+  if (!email || !email.includes('@')) {
+    status.style.display = 'block'; status.style.color = '#ef4444';
+    status.textContent = 'Por favor, informe um e-mail válido.'; return;
+  }
+  localStorage.setItem('vaarec_user_email', email);
+
+  const params = new URLSearchParams(window.location.search);
+  const shareToken = params.get('t');
+  if (shareToken) {
+    try { sessionStorage.setItem('vaarec_redeemed_token_' + shareToken, '1'); } catch(e){}
+  }
+
+  if (typeof VaarecClient !== 'undefined') {
+    try {
+      await VaarecClient.redeemShareToken(email);
+    } catch (e) {
+      console.warn('Redeem token:', e);
+    }
+  }
+
+  document.getElementById('auth-gate').style.display = 'none';
+  try {
+    if (typeof VaarecAudio !== 'undefined') {
+      VaarecAudio.init();
+      VaarecAudio.setPlaybackSpeed(speed);
+    }
+    await initApp();
+    setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+  } catch (err) {
+    console.error("Erro no initApp:", err);
+  }
+}
+
+// Startup Listener
+window.addEventListener('load', async () => {
+  const params = new URLSearchParams(window.location.search);
+  const shareToken = params.get('t');
+  const savedEmail = localStorage.getItem('vaarec_user_email');
+  const gate = document.getElementById('auth-gate');
+  const inputEl = document.getElementById('auth-email');
+
+  if (inputEl) {
+    if (savedEmail) inputEl.value = savedEmail;
+    inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth(); });
+  }
+
+  const isTokenRedeemed = shareToken ? sessionStorage.getItem('vaarec_redeemed_token_' + shareToken) : null;
+  const requiresAuth = shareToken ? !isTokenRedeemed : !savedEmail;
+
+  if (!requiresAuth && savedEmail) {
+    if (gate) gate.style.display = 'none';
+    try {
+      await initApp();
+      setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+    } catch (err) {
+      console.error("Erro no initApp:", err);
+    }
+  } else {
+    if (gate) gate.style.display = 'flex';
+    hideLoading();
+  }
+});
+</script>
+</body>
+</html>
