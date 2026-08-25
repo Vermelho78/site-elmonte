@@ -514,16 +514,37 @@ export function approveVesselInState(vesselNumberOrId?: string, approveAll?: boo
   });
 }
 
-export function removeVesselFromState(vesselNumberOrId?: string, clearAll?: boolean) {
+export function removeVesselFromState(vesselNumberOrId?: string, clearAll?: boolean, vesselId?: string | number) {
   if (clearAll) {
     activeVessels.clear();
+    console.log(`🧹 [State] Todas as embarcações ativas foram removidas do estado em memória.`);
     return;
   }
-  if (!vesselNumberOrId) return;
-  const key = vesselNumberOrId.toString().trim().toLowerCase();
+  if (!vesselNumberOrId && !vesselId) return;
+
+  const key = (vesselNumberOrId || "").toString().trim().toLowerCase();
+  const idStr = vesselId ? String(vesselId).trim() : "";
+  const numPrefix = key ? key.split(" ")[0].trim().replace(/[^0-9a-zA-Z]/g, "") : "";
+
+  const toDelete: string[] = [];
+
   activeVessels.forEach((v, k) => {
-    if (k === key || String(v.vesselId) === String(vesselNumberOrId)) {
-      activeVessels.delete(k);
+    const vNum = (v.vesselNumber || "").toString().trim().toLowerCase();
+    const vId = (v.vesselId || "").toString().trim();
+    const vPrefix = vNum ? vNum.split(" ")[0].trim().replace(/[^0-9a-zA-Z]/g, "") : "";
+
+    const matchExactKey = key && (k === key || vNum === key);
+    const matchId = (idStr && vId === idStr) || (key && vId === key);
+    const matchPrefix = numPrefix && vPrefix && numPrefix === vPrefix;
+    const matchContains = key && vNum && (key.startsWith(vNum) || vNum.startsWith(key));
+
+    if (matchExactKey || matchId || matchPrefix || matchContains) {
+      toDelete.push(k);
     }
+  });
+
+  toDelete.forEach((k) => {
+    activeVessels.delete(k);
+    console.log(`🗑️ [State] Embarcação removida do estado em memória: ${k}`);
   });
 }

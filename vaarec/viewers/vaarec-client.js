@@ -16,7 +16,7 @@
       
       const path = window.location.pathname;
       const match = path.match(/\/viewers\/([^.]+)/);
-      if (match && match[1] !== 'viewer' && match[1] !== 'index') return match[1];
+      if (match && !['viewer', 'index', 'viewer-desafio', 'viewer-treino-raia', 'viewer-template'].includes(match[1])) return match[1];
       
       return 'viewer-05_08_2026-ManaO-AMador-Fem';
     },

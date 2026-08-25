@@ -11,3 +11,11 @@ assets-backup
 assets-backup/*
 *.log
 *.bak
+00-AA-Marina
+00-AA-Marina/*
+00-6_porto_belo
+00-6_porto_belo/*
+$RECYCLE.BIN
+$RECYCLE.BIN/*
+*.psd
+*.mobi

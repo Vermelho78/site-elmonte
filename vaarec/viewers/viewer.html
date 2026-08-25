@@ -1,1624 +1,1571 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-  <script type="module" src="/@vite/client"></script>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>VAAREC Viewer — Replay Multi-GPS OC6</title>
-<meta name="description" content="Visualizador de replay GPS para canoas OC6. HUD de telemetria e splits km×km.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-/* ================================================================ DESIGN SYSTEM */
-:root {
-  --bg:#030712; --bg-card:#0d1520; --bg-panel:#111827; --bg-hover:#1a2535;
-  --border:rgba(255,255,255,0.07); --border-glow:rgba(6,182,212,0.3);
-  --c1:#F59E0B; --c1-dark:#92400E; --c1-glow:rgba(245,158,11,0.25);
-  --c2:#38bdf8; --c2-dark:#0369a1; --c2-glow:rgba(56,189,248,0.25);
-  --accent:#06B6D4; --accent-dim:rgba(6,182,212,0.15);
-  --start:#10b981; --end:#ef4444;
-  --text:#F9FAFB; --text-sec:#9CA3AF; --text-muted:#4B5563;
-  --font-hud:'Rajdhani',sans-serif; --font-body:'Inter',sans-serif;
-  --nav-h:56px; --header-h:48px;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;height:100dvh;background:var(--bg);color:var(--text);font-family:var(--font-body);overflow:hidden}
-
-/* ================================================================ LAYOUT */
-#app{
-  display:flex;flex-direction:column;
-  height:100vh;height:100dvh;max-height:100dvh;width:100vw;max-width:500px;margin:0 auto;
-  border-left:1px solid var(--border);border-right:1px solid var(--border);
-  position:relative;overflow:hidden;padding-bottom:var(--nav-h);
-}
-#app-header{
-  height:var(--header-h);flex-shrink:0;
-  display:flex;align-items:center;justify-content:space-between;padding:0 10px;
-  background:linear-gradient(90deg,#0a1628 0%,var(--bg-card) 100%);
-  border-bottom:1px solid var(--border);gap:6px;z-index:100;
-}
-.header-left{display:flex;align-items:center;gap:8px;overflow:hidden;min-width:0;flex:1}
-.header-badge{
-  font-family:var(--font-hud);font-size:.62rem;font-weight:700;letter-spacing:1px;
-  text-transform:uppercase;color:var(--accent);background:var(--accent-dim);
-  border:1px solid var(--border-glow);padding:2px 6px;border-radius:4px;flex-shrink:0;
-}
-#app-header h1{
-  font-family:var(--font-hud);font-size:.92rem;font-weight:700;
-  background:linear-gradient(90deg,#fff 0%,#a5b4fc 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.header-sub{font-size:.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
-.header-right{display:flex;align-items:center;gap:4px;flex-shrink:0}
-.icon-btn{
-  display:flex;align-items:center;justify-content:center;
-  width:28px;height:28px;border:1px solid var(--border);border-radius:6px;
-  background:transparent;color:var(--text-sec);font-size:.85rem;cursor:pointer;transition:all .2s;
-}
-.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
-
-/* ================================================================ CONTENT AREA */
-#content-area{flex:1;width:100%;position:relative;overflow:hidden;display:flex;flex-direction:column}
-.mobile-tab{display:none!important;width:100%;height:100%}
-.mobile-tab.active{display:block!important;overflow-y:auto;-webkit-overflow-scrolling:touch}
-#view-map.active{display:flex!important;flex-direction:column;overflow:hidden}
-
-/* ================================================================ MAP TAB */
-#map-area{flex:1;width:100%;height:100%;position:relative;overflow:hidden}
-#map-detail{width:100%;height:100%;background:var(--bg)}
-.leaflet-container{background:#0a0f1a}
-.leaflet-control-layers{display:none!important}
-.leaflet-control-zoom{border:1px solid var(--border)!important;border-radius:6px}
-.leaflet-control-zoom a{background:var(--bg-card)!important;color:var(--text-sec)!important;border-color:var(--border)!important}
-.leaflet-control-zoom a:hover{color:var(--text)!important}
-.leaflet-control-attribution{background:rgba(3,7,18,.7)!important;color:var(--text-muted)!important;font-size:.6rem}
-.leaflet-control-attribution a{color:var(--text-muted)!important}
-.cp-tooltip{background:rgba(6,182,212,.15)!important;border:1px solid rgba(6,182,212,.4)!important;border-radius:4px!important;color:var(--accent)!important;font-family:var(--font-hud)!important;font-size:.7rem!important;font-weight:700!important;padding:2px 6px!important;box-shadow:none!important;white-space:nowrap}
-.cp-tooltip::before{display:none!important}
-
-/* Map overlays */
-#map-overlay-top{position:absolute;top:10px;left:10px;z-index:1000;display:flex;flex-direction:column;gap:5px}
-.canoe-follow-btn{
-  font-family:var(--font-hud);font-size:.72rem;font-weight:700;
-  padding:4px 10px;border-radius:6px;border:1px solid transparent;
-  cursor:pointer;transition:all .2s;backdrop-filter:blur(8px);letter-spacing:.5px;
-}
-#btn-follow-c1{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.4);color:var(--c1)}
-#btn-follow-c1.active{background:rgba(245,158,11,.3);border-color:var(--c1);box-shadow:0 0 12px var(--c1-glow)}
-#btn-follow-c2{background:rgba(56,189,248,.15);border-color:rgba(56,189,248,.4);color:var(--c2)}
-#btn-follow-c2.active{background:rgba(56,189,248,.3);border-color:var(--c2);box-shadow:0 0 12px var(--c2-glow)}
-
-/* Map Weather & Wind Overlay */
-#map-weather-overlay{
-  position:absolute;top:10px;right:10px;z-index:1000;
-  background:rgba(13,21,32,0.85);border:1px solid rgba(255,255,255,0.12);
-  backdrop-filter:blur(8px);border-radius:8px;padding:4px 8px;
-  display:flex;align-items:center;gap:6px;pointer-events:none;
-}
-.weather-compass-widget{width:34px;height:34px;position:relative;flex-shrink:0}
-.weather-info-text{display:flex;flex-direction:column;gap:1px;font-family:var(--font-hud)}
-.weather-info-title{font-size:0.58rem;font-weight:700;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase}
-.weather-info-val{font-size:0.78rem;font-weight:700;color:var(--text)}
-.weather-info-sub{font-size:0.62rem;color:var(--accent)}
-
-/* Heatmap legend */
-.heatmap-legend{
-  position:absolute;bottom:12px;right:10px;z-index:1000;
-  background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.15);
-  backdrop-filter:blur(8px);padding:6px 10px;border-radius:8px;pointer-events:none;
-}
-.legend-title{font-size:9px;font-weight:700;color:#94A3B8;letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:3px}
-.legend-bar{display:flex;height:6px;width:120px;border-radius:3px;overflow:hidden}
-.legend-bar span{flex:1;height:100%}
-.legend-labels{display:flex;justify-content:space-between;font-size:8px;color:#CBD5E1;margin-top:2px}
-
-/* Toasts */
-#toast{position:absolute;bottom:14px;left:50%;transform:translateX(-50%) translateY(6px);z-index:2000;font-family:var(--font-hud);font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:6px;background:rgba(13,21,32,.92);border:1px solid var(--border-glow);color:var(--accent);pointer-events:none;opacity:0;transition:opacity .2s,transform .2s;backdrop-filter:blur(6px);white-space:nowrap}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#toast-km{position:absolute;bottom:55px;left:12px;z-index:2000;font-family:var(--font-hud);font-size:.85rem;font-weight:700;padding:5px 14px;border-radius:6px;background:rgba(13,21,32,.9);border:1px solid var(--border-glow);color:var(--accent);pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;backdrop-filter:blur(6px)}
-#toast-km.show{opacity:1;transform:translateY(0)}
-
-/* ================================================================ CONTROLS BAR */
-#controls-bar{
-  width:100%;flex-shrink:0;
-  background:var(--bg-panel);border-top:1px solid var(--border);padding:10px 14px;
-  display:flex;flex-direction:column;gap:6px;
-}
-#timeline-row{display:flex;align-items:center;gap:10px}
-.time-display{font-family:var(--font-hud);font-size:.8rem;font-weight:600;color:var(--text-sec);white-space:nowrap;min-width:38px}
-#timeline-track{flex:1;height:20px;display:flex;align-items:center;cursor:pointer;position:relative}
-#timeline-bg{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:4px;background:var(--bg-hover);border-radius:2px}
-#timeline-fill{position:absolute;top:50%;transform:translateY(-50%);left:0;height:4px;background:linear-gradient(90deg,var(--accent),rgba(6,182,212,.5));border-radius:2px;width:0;pointer-events:none}
-#timeline-handle{position:absolute;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);pointer-events:none;left:0}
-#timeline-cps{position:absolute;top:50%;transform:translateY(-50%);left:0;width:100%;height:100%;pointer-events:none}
-.tl-cp-mark{position:absolute;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;background:var(--accent);border-radius:50%;opacity:.6;cursor:pointer;pointer-events:all;transition:opacity .2s,transform .2s}
-.tl-cp-mark:hover{opacity:1;transform:translate(-50%,-50%) scale(1.4)}
-#dist-row{display:flex;justify-content:space-between;font-family:var(--font-hud);font-size:.75rem;font-weight:700;color:var(--text-sec);padding:0 2px}
-#dist-c1{color:var(--c1)} #dist-c2{color:var(--c2)} #dist-gap{color:var(--accent)}
-#buttons-row{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto}
-.ctrl-btn{font-family:var(--font-hud);font-size:.8rem;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-hover);color:var(--text-sec);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
-.ctrl-btn:hover{border-color:var(--accent);color:var(--accent)}
-#btn-play{width:36px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;font-size:1rem;border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-#btn-play:hover{background:rgba(6,182,212,.25);box-shadow:0 0 12px var(--border-glow)}
-.sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
-.speed-group{display:flex;gap:3px;flex-shrink:0}
-.speed-btn{font-family:var(--font-hud);font-size:.75rem;font-weight:700;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s}
-.speed-btn:hover{color:var(--text);border-color:var(--text-sec)}
-.speed-btn.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
-.cp-group{display:flex;align-items:center;gap:3px;flex-shrink:0}
-.cp-label{font-family:var(--font-hud);font-size:.65rem;font-weight:700;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase}
-.cp-btn{font-family:var(--font-hud);font-size:.7rem;font-weight:700;width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s}
-.cp-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-
-/* ================================================================ HUD TAB */
-#view-hud{padding:14px;display:flex;flex-direction:column;gap:12px}
-.hud-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0}
-.hud-card{border-radius:8px;padding:12px;border:1px solid transparent;transition:border-color .3s,box-shadow .3s}
-.hud-card.c1{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.2)}
-.hud-card.c1.leading{border-color:rgba(245,158,11,.5);box-shadow:0 0 16px rgba(245,158,11,.15)}
-.hud-card.c2{background:rgba(56,189,248,.05);border-color:rgba(56,189,248,.2)}
-.hud-card.c2.leading{border-color:rgba(56,189,248,.5);box-shadow:0 0 16px rgba(56,189,248,.15)}
-.hud-title{font-family:var(--font-hud);font-size:.7rem;font-weight:700;letter-spacing:.5px;margin-bottom:4px}
-.c1 .hud-title{color:var(--c1)} .c2 .hud-title{color:var(--c2)}
-.hud-speed{font-family:var(--font-hud);font-size:1.6rem;font-weight:700;line-height:1;color:var(--text)}
-.hud-speed-unit{font-size:.7rem;font-weight:500;color:var(--text-muted)}
-.hud-sub{font-family:var(--font-hud);font-size:.8rem;color:var(--text-sec);margin-top:2px}
-.hud-dist{font-family:var(--font-hud);font-size:.9rem;font-weight:600;margin-top:4px}
-.c1 .hud-dist{color:rgba(245,158,11,.8)} .c2 .hud-dist{color:rgba(56,189,248,.8)}
-.hud-row2{display:flex;gap:6px;font-family:var(--font-hud);font-size:.75rem;color:var(--text-sec);margin-top:4px}
-.hud-row2 span{font-weight:600;color:var(--text)}
-#gap-bar{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:6px;padding:8px 12px;border:1px solid var(--border)}
-#gap-label{font-family:var(--font-hud);font-size:.7rem;font-weight:600;color:var(--text-muted);letter-spacing:1px}
-#gap-value{font-family:var(--font-hud);font-size:1.1rem;font-weight:700;color:var(--text)}
-#gap-leader{font-family:var(--font-hud);font-size:.8rem;font-weight:700}
-.chart-block{background:rgba(0,0,0,.2);border-radius:8px;padding:10px;border:1px solid var(--border)}
-.chart-title{font-family:var(--font-hud);font-size:.7rem;font-weight:600;letter-spacing:.5px;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px}
-.chart-wrap{position:relative;height:130px}
-
-/* ================================================================ SPLITS TAB */
-#view-splits{padding:14px;display:flex;flex-direction:column;gap:12px}
-.splits-header{font-family:var(--font-hud);font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:1px;display:flex;align-items:center;gap:8px}
-.splits-header svg{flex-shrink:0}
-.splits-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.split-sum-card{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:4px}
-.split-sum-label{font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
-.split-sum-value{font-family:var(--font-hud);font-size:1rem;font-weight:700;color:var(--text)}
-.split-sum-sub{font-size:.65rem;color:var(--text-sec)}
-.table-container{background:rgba(0,0,0,.2);border-radius:8px;border:1px solid var(--border);max-height:420px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-table.splits-tbl{width:100%;border-collapse:collapse;text-align:left;font-size:.82rem}
-table.splits-tbl thead tr{position:sticky;top:0;background:#0d1520;z-index:10;border-bottom:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,.5)}
-table.splits-tbl th{padding:10px 6px;color:var(--text-muted);font-weight:600;font-family:var(--font-hud);letter-spacing:.5px;font-size:.7rem}
-table.splits-tbl th.c1h{color:var(--c1);text-align:center}
-table.splits-tbl th.c2h{color:var(--c2);text-align:center}
-table.splits-tbl tbody tr{border-bottom:1px solid rgba(255,255,255,.04)}
-table.splits-tbl tbody tr:last-child{border-bottom:none}
-table.splits-tbl tbody tr:hover td{background:rgba(255,255,255,.02)}
-table.splits-tbl td{padding:8px 6px;vertical-align:middle}
-table.splits-tbl td.dist-cell{color:var(--text-muted);font-family:var(--font-hud);font-weight:600;font-size:.78rem;white-space:nowrap}
-table.splits-tbl td.vector-cell{text-align:center}
-table.splits-tbl td.pace-cell{text-align:center}
-.pace-badge{font-family:var(--font-hud);font-weight:700;padding:3px 8px;border-radius:4px;display:inline-block}
-.pace-fast{background:rgba(16,185,129,.12)!important;color:#10b981!important;border:1px solid rgba(16,185,129,.2)!important}
-.pace-med{background:rgba(245,158,11,.12)!important;color:#f59e0b!important;border:1px solid rgba(245,158,11,.2)!important}
-.pace-slow{background:rgba(239,68,68,.12)!important;color:#ef4444!important;border:1px solid rgba(239,68,68,.2)!important}
-.pace-sub{font-size:.68rem;color:var(--text-sec);margin-top:3px;font-family:var(--font-hud)}
-
-/* ================================================================ BOTTOM NAV (3 ITEMS) */
-.bottom-nav{
-  position:absolute;bottom:0;left:0;right:0;height:var(--nav-h);
-  background:rgba(13,21,32,.9);backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);
-  border-top:1px solid rgba(255,255,255,.08);
-  display:grid;grid-template-columns:repeat(3,1fr);z-index:2000;
-  box-shadow:0 -4px 20px rgba(0,0,0,.4);
-}
-.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:none;color:var(--text-muted);cursor:pointer;gap:4px;transition:all .2s ease;padding:6px 0;font-size:.65rem;font-family:var(--font-hud);font-weight:700;letter-spacing:.5px;text-transform:uppercase}
-.nav-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .2s ease}
-.nav-item.active{color:var(--accent)}
-.nav-item:hover{color:var(--text)}
-
-/* ================================================================ LOADING */
-#loading{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
-.loading-logo{font-family:var(--font-hud);font-size:1.2rem;font-weight:700;color:var(--accent);letter-spacing:3px;text-transform:uppercase}
-.loading-msg{font-family:var(--font-hud);font-size:.9rem;color:var(--text-muted);letter-spacing:1px;text-align:center;max-width:280px}
-.loading-bar-wrap{width:240px;height:3px;background:var(--bg-hover);border-radius:2px;overflow:hidden}
-.loading-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#a5b4fc);border-radius:2px;animation:loadSlide 2.5s ease-in-out infinite}
-@keyframes loadSlide{0%{width:0%;margin-left:0}50%{width:60%}100%{width:0%;margin-left:100%}}
-
-/* ================================================================ CANOE ICON */
-.canoe-icon-wrap{width:0!important;height:0!important;display:block}
-.canoe-svg{position:absolute;transform-origin:center center;overflow:visible;left:-70px;top:-20px}
-
-/* ================================================================ MISC */
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-@keyframes glowPulse{0%,100%{box-shadow:0 0 8px currentColor}50%{box-shadow:0 0 20px currentColor}}
-.flash-anim{animation:flash .3s ease 3}
-@keyframes flash{0%,100%{opacity:1}50%{opacity:.3}}
-.leaflet-control-scale-line{background:rgba(15,23,42,.85)!important;border:2px solid #06B6D4!important;border-top:none!important;color:#F9FAFB!important;font-weight:700!important;font-size:11px!important;padding:2px 5px!important;border-radius:0 0 4px 4px!important;backdrop-filter:blur(6px)}
-.leaflet-control-scale{margin-bottom:25px!important;margin-left:12px!important}
-</style>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>VAAREC Viewer — Replay Multi-GPS OC6</title>
+  <meta name="description"
+    content="Visualizador de replay GPS para canoas OC6. HUD de telemetria, câmera drone e splits km×km.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  </head>
-  
+  <script src="/drone-camera-skills.js"></script>
 
-  <body>
+  <style>
+    /* ================================================================ DESIGN SYSTEM */
+    :root {
+      --bg: #030712;
+      --bg-card: #0d1520;
+      --bg-panel: #0f172a;
+      --bg-hover: #1e293b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(6, 182, 212, 0.3);
+      --accent: #06b6d4;
+      --accent-dim: rgba(6, 182, 212, 0.15);
+      --gold: #f59e0b;
+      --gold-glow: rgba(245, 158, 11, 0.35);
+      --start: #10b981;
+      --end: #ef4444;
+      --text: #f8fafc;
+      --text-sec: #94a3b8;
+      --text-muted: #64748b;
+      --font-hud: 'Rajdhani', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --nav-h: 52px;
+      --header-h: 46px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      overflow: hidden;
+    }
+
+    /* ================================================================ LAYOUT */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      max-height: 100dvh;
+      width: 100vw;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+      padding-bottom: var(--nav-h);
+    }
+
+    #app-header {
+      height: var(--header-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      background: linear-gradient(90deg, #0a1628 0%, var(--bg-card) 100%);
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .header-badge {
+      font-family: var(--font-hud);
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid var(--border-glow);
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    #app-header h1 {
+      font-family: var(--font-hud);
+      font-size: 0.95rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #fff 0%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-sub {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-sec);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ================================================================ CONTENT AREA */
+    #content-area {
+      flex: 1;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mobile-tab {
+      display: none !important;
+      width: 100%;
+      height: 100%;
+    }
+
+    .mobile-tab.active {
+      display: block !important;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #view-map.active {
+      display: flex !important;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ================================================================ MAP TAB */
+    #map-area {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map-detail {
+      width: 100%;
+      height: 100%;
+      background: #070a13;
+    }
+
+    .leaflet-container {
+      background: #070a13;
+    }
+
+    /* Floating Drone Camera Director Widget */
+    #drone-camera-bar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(12, 19, 32, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-family: var(--font-hud);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .drone-bar-title {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .drone-btns {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .drone-btn {
+      font-family: var(--font-hud);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #e2e8f0;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .drone-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .drone-btn.active {
+      border-color: var(--accent);
+      color: #000;
+      background: var(--accent);
+      font-weight: 800;
+      box-shadow: 0 0 10px var(--border-glow);
+    }
+
+    .drone-btn-mini {
+      font-family: var(--font-hud);
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .drone-btn-mini:hover {
+      border-color: var(--accent);
+      color: #fff;
+      background: var(--accent-dim);
+    }
+
+    .drone-btn-mini.active {
+      border-color: var(--accent);
+      color: #000;
+      background: var(--accent);
+      font-weight: 800;
+    }
+
+    /* Floating Heart Rate (FC) Zone Legend */
+    #hr-legend {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(12, 19, 32, 0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-family: var(--font-hud);
+      pointer-events: none;
+    }
+
+    .hr-legend-title {
+      font-size: 0.58rem;
+      font-weight: 700;
+      color: var(--text-sec);
+      margin-bottom: 3px;
+      text-transform: uppercase;
+    }
+
+    .hr-legend-bars {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .hr-item {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #f0f9ff;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .hr-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* ================================================================ COMPACT CONTROLS BAR */
+    #controls-bar {
+      width: 100%;
+      flex-shrink: 0;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 100;
+    }
+
+    #main-player-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .player-left-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #btn-play {
+      width: 38px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 1.1rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    #btn-play:hover {
+      background: rgba(6, 182, 212, 0.3);
+      box-shadow: 0 0 12px var(--border-glow);
+    }
+
+    #btn-speed-toggle {
+      font-family: var(--font-hud);
+      font-size: 0.8rem;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    #btn-speed-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    #time-indicator-pill {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    #btn-toggle-metrics {
+      font-family: var(--font-hud);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-sec);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    #btn-toggle-metrics:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Collapsible Metrics & Timeline Container */
+    #collapsible-metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.25s ease-in-out;
+      overflow: hidden;
+    }
+
+    #collapsible-metrics.collapsed {
+      display: none;
+    }
+
+    #timeline-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .time-display {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-sec);
+      white-space: nowrap;
+    }
+
+    #timeline-track {
+      flex: 1;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    #timeline-bg {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--bg-hover);
+      border-radius: 2px;
+    }
+
+    #timeline-fill {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), #38bdf8);
+      border-radius: 2px;
+      width: 0%;
+      pointer-events: none;
+    }
+
+    #timeline-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+      pointer-events: none;
+      left: 0%;
+    }
+
+    #dist-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-hud);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-sec);
+      padding: 0 2px;
+      overflow-x: auto;
+    }
+
+    /* Eventos Notáveis Bar */
+    #events-card-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 10px;
+      background: rgba(10, 15, 26, 0.95);
+      border-top: 1px solid var(--border);
+      -webkit-overflow-scrolling: touch;
+      flex-shrink: 0;
+    }
+
+    .event-pill {
+      font-family: var(--font-hud);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-sec);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .event-pill:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: var(--gold-glow);
+    }
+
+    /* ================================================================ HUD & SPLITS TABS */
+    #view-hud,
+    #view-splits {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .hud-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+
+    .hud-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hud-card-title {
+      font-family: var(--font-hud);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .hud-card-spd {
+      font-family: var(--font-hud);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .hud-card-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      font-size: 0.72rem;
+      color: var(--text-sec);
+      font-family: var(--font-mono);
+    }
+
+    /* ================================================================ BOTTOM NAV */
+    .bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-h);
+      background: rgba(13, 21, 32, 0.95);
+      backdrop-filter: blur(15px);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      z-index: 2000;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      gap: 3px;
+      font-size: 0.65rem;
+      font-family: var(--font-hud);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+    }
+
+    /* Canoe Icon */
+    .canoe-marker-icon {
+      transform-origin: center center;
+    }
+  </style>
+</head>
+
+<body>
   <div id="app">
 
-  <!-- HEADER -->
-  <header id="app-header">
-    <div class="header-left">
-      <span class="header-badge">🏄 VAAREC</span>
-      <div>
-        <h1 id="hdr-title">OC6 · Amador Masc.</h1>
-        <div class="header-sub" id="hdr-sub">Replay Multi-GPS · Jurerê</div>
-      </div>
-    </div>
-    <div class="header-right">
-      <button class="icon-btn" onclick="toggleFullscreen()" title="Tela cheia">⛶</button>
-      <a href="/" class="icon-btn" title="VAAREC Editor" style="text-decoration:none;font-size:.65rem;font-family:var(--font-hud);font-weight:700">ED</a>
-    </div>
-  </header>
-
-  <!-- CONTENT AREA -->
-  <div id="content-area">
-
-    <!-- TAB: MAPA -->
-    <div id="view-map" class="mobile-tab active">
-      <div id="map-area">
-        <div id="map-detail">
-          <!-- Weather & Wind Overlay -->
-          <div id="map-weather-overlay">
-            <div class="weather-compass-widget" id="map-compass-svg"></div>
-            <div class="weather-info-text">
-              <span class="weather-info-title">Vento &amp; Corrente</span>
-              <span class="weather-info-val" id="map-wx-wind-val">-- kts</span>
-              <span class="weather-info-sub" id="map-wx-curr-val">--</span>
-            </div>
-          </div>
-          <div class="heatmap-legend">
-            <span class="legend-title">Rastro Popa · Velocidade</span>
-            <div class="legend-bar">
-              <span style="background:#3b82f6"></span><span style="background:#06b6d4"></span>
-              <span style="background:#10b981"></span><span style="background:#f59e0b"></span>
-              <span style="background:#f97316"></span><span style="background:#ef4444"></span>
-            </div>
-            <div class="legend-labels"><span>&lt;3</span><span>6</span><span>8.5</span><span>10.5</span><span>&gt;12.5 km/h</span></div>
-          </div>
-        </div>
-        <div id="map-overlay-top">
-          <button class="canoe-follow-btn active" id="btn-follow-c1" onclick="setFollow(1)">🟡 C1 NATUREZA · ---</button>
-          <button class="canoe-follow-btn" id="btn-follow-c2" onclick="setFollow(2)">🔵 C2 SALVA'A · ---</button>
-        </div>
-        <div id="toast"></div>
-        <div id="toast-km"></div>
-      </div>
-      <div id="controls-bar">
-        <div id="timeline-row">
-          <span class="time-display" id="time-cur">00:00</span>
-          <div id="timeline-track">
-            <div id="timeline-bg"></div>
-            <div id="timeline-fill"></div>
-            <div id="timeline-handle"></div>
-            <div id="timeline-cps"></div>
-          </div>
-          <span class="time-display" id="time-tot">00:00</span>
-        </div>
-        <div id="dist-row">
-          <span id="dist-c1">🟡 C1: 0.00 km</span>
-          <span id="dist-gap">GAP: 0 m</span>
-          <span id="dist-c2">🔵 C2: 0.00 km</span>
-        </div>
-        <div id="buttons-row">
-          <button class="ctrl-btn" onclick="jumpSec(-10)" title="Recuar 10s">⏮ 10s</button>
-          <button class="ctrl-btn" id="btn-play" onclick="togglePlay()">▶</button>
-          <button class="ctrl-btn" onclick="jumpSec(10)" title="Avançar 10s">10s ⏭</button>
-          <div class="sep"></div>
-          <div class="speed-group">
-            <button class="speed-btn active" data-s="1" onclick="setSpeed(1)">1×</button>
-            <button class="speed-btn" data-s="5" onclick="setSpeed(5)">5×</button>
-            <button class="speed-btn" data-s="10" onclick="setSpeed(10)">10×</button>
-            <button class="speed-btn" data-s="30" onclick="setSpeed(30)">30×</button>
-            <button class="speed-btn" data-s="60" onclick="setSpeed(60)">60×</button>
-          </div>
-          <div class="sep"></div>
-          <div class="cp-group"><span class="cp-label">km</span><div id="cp-btns"></div></div>
-        </div>
-      </div>
-      <div id="events-card-row" style="display:flex; align-items:center; gap:8px; overflow-x:auto; padding:6px 12px; background:rgba(13,21,32,0.95); border-top:1px solid var(--border); -webkit-overflow-scrolling:touch; flex-shrink:0;">
-        <div style="font-family:var(--font-hud); font-size:0.68rem; font-weight:700; color:var(--accent); letter-spacing:1px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; display:flex; align-items:center; gap:4px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          EVENTOS:
-        </div>
-        <div id="events-pills-list" style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
-          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-hud)">Nenhum evento registrado</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: HUD -->
-    <div id="view-hud" class="mobile-tab">
-      <div style="padding:14px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto">
-        <div style="font-family:var(--font-hud);font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase">📡 Telemetria ao Vivo</div>
-        <div class="hud-cards">
-          <div class="hud-card c1" id="hud-c1">
-            <div class="hud-title">🟡 C1 NATUREZA</div>
-            <div><span class="hud-speed" id="hud-spd1">0.0</span><span class="hud-speed-unit"> km/h</span></div>
-            <div class="hud-sub">Méd: <span id="hud-avg1">--</span> km/h</div>
-            <div class="hud-dist" id="hud-dist1">0.00 km</div>
-            <div class="hud-row2">Dev: <span id="hud-dev1">0 m</span></div>
-          </div>
-          <div class="hud-card c2" id="hud-c2">
-            <div class="hud-title">🔵 C2 SALVA'A</div>
-            <div><span class="hud-speed" id="hud-spd2">0.0</span><span class="hud-speed-unit"> km/h</span></div>
-            <div class="hud-sub">Méd: <span id="hud-avg2">--</span> km/h</div>
-            <div class="hud-dist" id="hud-dist2">0.00 km</div>
-            <div class="hud-row2">Dev: <span id="hud-dev2">0 m</span></div>
-          </div>
-        </div>
-        <div id="gap-bar">
-          <span id="gap-label">GAP PROJETADO NO PERCURSO</span>
-          <span id="gap-value">0 m</span>
-          <span id="gap-leader" style="color:var(--c1)">C1 na frente</span>
-        </div>
-        <div class="chart-block">
-          <div class="chart-title">⚡ Velocidade Comparativa (km/h)</div>
-          <div class="chart-wrap"><canvas id="canvas-speed"></canvas></div>
-        </div>
-        <div class="chart-block">
-          <div class="chart-title">📐 Desvio Padrão &amp; Distância do Percurso (m)</div>
-          <div class="chart-wrap"><canvas id="canvas-stddev"></canvas></div>
-        </div>
-        <div class="chart-block">
-          <div class="chart-title">↔ Gap Projetado na Rota (m)</div>
-          <div class="chart-wrap"><canvas id="canvas-gap"></canvas></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: SPLITS -->
-    <div id="view-splits" class="mobile-tab">
-      <div style="padding:14px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto">
-        <div class="splits-header">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:20px;height:20px">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          TABELA DETALHADA DE SPLITS
-        </div>
-        <p style="font-size:.78rem;color:var(--text-sec);line-height:1.5">Ritmo (Pace em min/km), vetores ambientais (rosa dos ventos) e velocidade média a cada 1 km do percurso.</p>
-        <div class="splits-summary">
-          <div class="split-sum-card">
-            <div class="split-sum-label" style="color:var(--c1)">🟡 C1 Total</div>
-            <div class="split-sum-value" id="sc-dist1">-- km</div>
-            <div class="split-sum-sub" id="sc-avg1">-- km/h méd.</div>
-            <div class="split-sum-sub" id="sc-best1">Melhor pace: --</div>
-          </div>
-          <div class="split-sum-card">
-            <div class="split-sum-label" style="color:var(--c2)">🔵 C2 Total</div>
-            <div class="split-sum-value" id="sc-dist2">-- km</div>
-            <div class="split-sum-sub" id="sc-avg2">-- km/h méd.</div>
-            <div class="split-sum-sub" id="sc-best2">Melhor pace: --</div>
-          </div>
-        </div>
-        <div class="table-container">
-          <table class="splits-tbl">
-            <thead>
-              <tr>
-                <th>KM</th>
-                <th style="text-align:center">DIREÇÃO &amp; CLIMA</th>
-                <th class="c1h">🟡 NATUREZA</th>
-                <th class="c2h">🔵 SALVA'A</th>
-              </tr>
-            </thead>
-            <tbody id="splits-tbody"><tr><td colspan="4" style="padding:16px;text-align:center;color:var(--text-muted);font-family:var(--font-hud)">Aguardando dados GPS…</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /#content-area -->
-
-  <!-- BOTTOM NAV (3 ITEMS PROMINENTES) -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" id="btn-nav-map" onclick="switchTab('map')">
-      <svg viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
-      Mapa
-    </button>
-    <button class="nav-item" id="btn-nav-hud" onclick="switchTab('hud')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      HUD
-    </button>
-    <button class="nav-item" id="btn-nav-splits" onclick="switchTab('splits')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Splits
-    </button>
-  </nav>
-
-  <!-- Loading Screen Placeholder -->
-  <div id="loading" style="position: fixed; inset: 0; background: #030712; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; transition: opacity .5s;">
-    <div style="font-size: 40px; margin-bottom: 12px;" class="flash-anim">🛶</div>
-    <div id="loading-msg" style="font-family: 'Rajdhani', sans-serif; font-size: 15px; color: #9CA3AF; letter-spacing: 1px; text-align: center; max-width: 280px;">Carregando viewer...</div>
-  </div>
-
-  <!-- Modal de Autenticação / Portão de Acesso VAAREC -->
-  <div id="auth-gate-modal" style="position: fixed; inset: 0; background: rgba(3, 7, 18, 0.94); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px;">
-    <div style="background: #0d1520; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; width: 100%; max-width: 400px; padding: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
-      <div style="font-size: 44px; margin-bottom: 10px;">🛶</div>
-      <h2 style="font-family: 'Rajdhani', sans-serif; font-size: 22px; color: #fff; margin-bottom: 8px;">Acesso ao Replay VAAREC</h2>
-      <p style="font-size: 13px; color: #9CA3AF; margin-bottom: 20px; line-height: 1.5;">Este replay GPS é protegido. Insira seu e-mail para transmitir a prova instantaneamente.</p>
-      
-      <form id="auth-form" action="javascript:void(0);" onsubmit="window.handleAuthSubmit(); return false;" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+    <!-- HEADER -->
+    <header id="app-header">
+      <div class="header-left">
+        <span class="header-badge">🏄 VAAREC</span>
         <div>
-          <label style="font-size: 12px; font-weight: 600; color: #9CA3AF; display: block; margin-bottom: 6px;">Seu E-mail</label>
-          <input type="email" id="auth-email-input" placeholder="seu@email.com" required autocomplete="off" style="width: 100%; padding: 12px 14px; background: #111827; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-size: 14px; outline: none;" />
+          <h1 id="hdr-title">Replay Multi-GPS</h1>
+          <div class="header-sub" id="hdr-sub">Carregando telemetria...</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" onclick="toggleFullscreen()" title="Tela cheia">⛶</button>
+        <a href="/" class="icon-btn" title="VAAREC Generator"
+          style="text-decoration:none;font-family:var(--font-hud);font-weight:700">GEN</a>
+      </div>
+    </header>
+
+    <!-- CONTENT AREA -->
+    <div id="content-area">
+
+      <!-- TAB: MAPA -->
+      <div id="view-map" class="mobile-tab active">
+        <div id="map-area">
+          <div id="map-detail"></div>
+
+          <!-- Floating Drone Camera Director Widget -->
+          <div id="drone-camera-bar">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="drone-bar-title">🎥 Câmera Drone</span>
+              <span id="drone-zoom-indicator"
+                style="font-size:0.6rem; color:var(--accent); font-weight:700; font-family:var(--font-mono);">Alt:
+                35m</span>
+            </div>
+            <div class="drone-btns">
+              <button class="drone-btn active" id="btn-cam-auto" onclick="setCameraDirector('auto')">🎬 Auto</button>
+              <button class="drone-btn" id="btn-cam-leader" onclick="setCameraDirector('follow-leader')">👑 Líder</button>
+              <button class="drone-btn" id="btn-cam-all" onclick="setCameraDirector('follow-all')">👁️ Todas</button>
+              <div id="dynamic-canoe-cam-btns" style="display:inline-flex; gap:4px;"></div>
+              <button class="drone-btn" id="btn-cam-overview" onclick="setCameraDirector('overview')">🗺️ Geral</button>
+            </div>
+            <div
+              style="display:flex; gap:3px; align-items:center; margin-top:2px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.08);">
+              <span style="font-size:0.58rem; color:#94a3b8; font-weight:700; margin-right:2px;">Altura:</span>
+              <button class="drone-btn-mini active" id="btn-alt-close" onclick="setDroneAltitude('close')"
+                title="Baixa Altitude (~30m) — Zoom Próximo e Imersivo">Cinemático</button>
+              <button class="drone-btn-mini" id="btn-alt-normal" onclick="setDroneAltitude('normal')"
+                title="Média Altitude (~60m)">Padrão</button>
+              <button class="drone-btn-mini" id="btn-alt-pano" onclick="setDroneAltitude('panoramic')"
+                title="Alta Altitude (~150m)">Alto</button>
+              <button class="drone-btn-mini" onclick="adjustDroneZoom(1)" title="Aproximar Drone (Zoom In)">🔍+</button>
+              <button class="drone-btn-mini" onclick="adjustDroneZoom(-1)" title="Afastar Drone (Zoom Out)">🔍-</button>
+            </div>
+          </div>
+
+          <!-- Floating Heart Rate (FC) Zone Legend -->
+          <div id="hr-legend">
+            <div class="hr-legend-title">❤️ Frequência Cardíaca</div>
+            <div class="hr-legend-bars">
+              <div class="hr-item"><span class="hr-dot" style="background:#06b6d4"></span> Z1 &lt;110</div>
+              <div class="hr-item"><span class="hr-dot" style="background:#10b981"></span> Z2 110-130</div>
+              <div class="hr-item"><span class="hr-dot" style="background:#f59e0b"></span> Z3 130-150</div>
+              <div class="hr-item"><span class="hr-dot" style="background:#f97316"></span> Z4 150-165</div>
+              <div class="hr-item"><span class="hr-dot" style="background:#ef4444"></span> Z5 &gt;165</div>
+            </div>
+          </div>
         </div>
 
-        <button type="button" onclick="window.handleAuthSubmit();" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #06B6D4, #3B82F6); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 6px;">Acessar Replay 🚀</button>
-      </form>
+        <!-- COMPACT CONTROLS BAR -->
+        <div id="controls-bar">
+          <!-- Main Player Bar (Play, Speed, Time, Expand/Collapse Toggle) -->
+          <div id="main-player-row">
+            <div class="player-left-group">
+              <button id="btn-play" onclick="togglePlay()">▶</button>
+              <button id="btn-speed-toggle" onclick="cycleSpeed()" title="Velocidade de Reprodução">⚡ 1×</button>
+              <div id="time-indicator-pill">00:00:00 / 00:00:00</div>
+            </div>
+            <button id="btn-toggle-metrics" onclick="toggleMetricsCollapse()">
+              <span id="lbl-toggle-metrics">Linha do Tempo</span> <span id="icon-toggle-metrics">🔽</span>
+            </button>
+          </div>
 
-      <div id="auth-status-msg" style="margin-top: 14px; font-size: 13px; font-weight: 600; display: none;"></div>
+          <!-- Collapsible Section: Timeline & Metric Distances -->
+          <div id="collapsible-metrics">
+            <div id="timeline-row">
+              <span class="time-display" id="time-cur">00:00</span>
+              <div id="timeline-track">
+                <div id="timeline-bg"></div>
+                <div id="timeline-fill"></div>
+                <div id="timeline-handle"></div>
+              </div>
+              <span class="time-display" id="time-tot">00:00</span>
+            </div>
+            <div id="dist-row">
+              <!-- Dynamic canoe distance stats populated here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Eventos Notáveis Bar -->
+        <div id="events-card-row">
+          <div
+            style="font-family:var(--font-hud); font-size:0.65rem; font-weight:800; color:var(--gold); letter-spacing:1px; text-transform:uppercase; white-space:nowrap; flex-shrink:0;">
+            ⚡ EVENTOS:
+          </div>
+          <div id="events-pills-list" style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+            <span style="font-size:0.7rem; color:var(--text-muted); font-family:var(--font-hud)">Nenhum evento
+              registrado</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: HUD -->
+      <div id="view-hud" class="mobile-tab">
+        <div
+          style="font-family:var(--font-hud); font-size:1rem; font-weight:800; color:var(--accent); letter-spacing:1px; text-transform:uppercase;">
+          📡 Telemetria em Tempo Real
+        </div>
+        <div class="hud-grid" id="hud-cards-container"></div>
+      </div>
+
+      <!-- TAB: SPLITS -->
+      <div id="view-splits" class="mobile-tab">
+        <div
+          style="font-family:var(--font-hud); font-size:1rem; font-weight:800; color:var(--accent); letter-spacing:1px; text-transform:uppercase;">
+          📊 Parciais por Km
+        </div>
+        <div id="splits-table-container"></div>
+      </div>
+
     </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" onclick="switchTab('map')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        Mapa
+      </button>
+      <button class="nav-item" onclick="switchTab('hud')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        Telemetria
+      </button>
+      <button class="nav-item" onclick="switchTab('splits')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+        Parciais
+      </button>
+    </nav>
+
   </div>
 
-  <script src="./vaarec-client.js"></script>
   <script>
-  window.showAuthGate = function() {
-    const modal = document.getElementById('auth-gate-modal');
-    if (modal) modal.style.display = 'flex';
-  };
+    // ==========================================
+    // VAAREC VIEWER CONTROLLER & REPLAY ENGINE
+    // ==========================================
+    let CONTRACT = window.CONTRACT || {};
+    let map = null;
+    let droneCamera = null;
+    let tracks = []; // [{ id, name, color, points: [{lat, lon, t, spdKmh, hr, heading}], marker, trailPolyline }]
+    let isPlaying = false;
+    let playTimeMs = 0;
+    let maxDurMs = 0;
+    let speedFactor = 1;
+    const speedOptions = [1, 2, 5, 10, 30, 60];
+    let speedIdx = 0;
+    let animTimer = null;
+    let lastTimestamp = null;
+    let dragging = false;
+    let metricsCollapsed = false;
 
-  window.hideAuthGate = function() {
-    const modal = document.getElementById('auth-gate-modal');
-    if (modal) modal.style.display = 'none';
-  };
+    const TRACK_COLORS = ['#00F2FE', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#F43F5E', '#3B82F6', '#EC4899'];
 
-  window.handleAuthSubmit = async function() {
-    const emailInput = document.getElementById('auth-email-input');
-    const email = emailInput ? emailInput.value.trim() : '';
-    const statusEl = document.getElementById('auth-status-msg');
-
-    if (!email || !email.includes('@')) {
-      if (statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.style.color = '#ef4444';
-        statusEl.textContent = 'Por favor, informe um e-mail válido.';
-      }
-      return;
+    // Helpers
+    function formatTime(ms) {
+      const s = Math.floor((ms || 0) / 1000);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     }
 
-    if (statusEl) {
-      statusEl.style.display = 'block';
-      statusEl.style.color = '#38bdf8';
-      statusEl.textContent = 'Liberando acesso...';
+    function haversineM(la1, lo1, la2, lo2) {
+      const R = 6371000;
+      const dLat = (la2 - la1) * Math.PI / 180;
+      const dLon = (lo2 - lo1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    try {
-      await VaarecClient.redeemShareToken(email);
-      if (statusEl) {
-        statusEl.style.color = '#10b981';
-        statusEl.textContent = 'Acesso liberado!';
-      }
-      window.hideAuthGate();
-      startViewerApp();
-    } catch (err) {
-      if (statusEl) {
-        statusEl.style.color = '#ef4444';
-        statusEl.textContent = err.message || 'Erro ao validar acesso.';
-      }
-    }
-  };
-  
-/* ================================================================
-   CONSTANTS & DEFAULT CONTRACT
-================================================================ */
-const C1_COLOR='#F59E0B', C2_COLOR='#38bdf8';
-const SAT_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const DARK_URL='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const STEP_MS=2000;
-
-const DEFAULT_CONTRACT={
-  courseName:'Circuito Jurerê / Canasvieiras',
-  startLine:{p1:{lat:-27.4350,lng:-48.4900},p2:{lat:-27.4320,lng:-48.4900},bearing:204.3,lengthMeters:541,defined:true},
-  endLine:{p1:{lat:-27.4200,lng:-48.4600},p2:{lat:-27.4220,lng:-48.4600},bearing:214.1,lengthMeters:595,defined:true},
-  buoys:[],laps:1,totalDistanceKm:0,
-  kmSegments:[],
-  weatherSnapshot:{windSpeedKts:10,windDirectionDeg:65,windDirLabel:'ENE',tempC:22,tideHeightMeters:0.85,tidePhase:'HIGH',currentSpeedKts:0.3,currentDirectionDeg:180}
-};
-
-/* ================================================================
-   STATE
-================================================================ */
-let D=[],distC1=[],distC2=[];
-let mapDetail=null;
-let mc1=null,mc2=null;
-let tr1=null,tr2=null,canvasRenderer=null;
-let speedChart=null,gapChart=null,stdDevChart=null;
-let isPlaying=false,playTimeMs=0,speed=1,lastRaf=null;
-let currentIndex=0,followCanoe=1,prevKmPassed=0;
-let activeTab='map';
-let CONTRACT=DEFAULT_CONTRACT;
-
-/* ================================================================
-   HELPERS
-================================================================ */
-function haversine(la1,lo1,la2,lo2){
-  const R=6371000,dLat=(la2-la1)*Math.PI/180,dLon=(lo2-lo1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-function calcBearing(la1,lo1,la2,lo2){
-  const dL=(lo2-lo1)*Math.PI/180,rlat1=la1*Math.PI/180,rlat2=la2*Math.PI/180;
-  return(Math.atan2(Math.sin(dL)*Math.cos(rlat2),Math.cos(rlat1)*Math.sin(rlat2)-Math.sin(rlat1)*Math.cos(rlat2))*180/Math.PI+360)%360;
-}
-
-function distToSegmentMeters(pLat, pLon, aLat, aLon, bLat, bLon) {
-  const x = haversine(aLat, aLon, pLat, pLon);
-  const y = haversine(bLat, bLon, pLat, pLon);
-  const d = haversine(aLat, aLon, bLat, bLon);
-  if (d === 0) return x;
-  const s = (x + y + d) / 2;
-  const area = Math.sqrt(Math.max(0, s * (s - x) * (s - y) * (s - d)));
-  return (2 * area) / d;
-}
-
-function interpTrack(pts,t){
-  if(!pts.length)return null;
-  if(t<pts[0].t)return pts[0];
-  if(t>pts[pts.length-1].t)return null;
-  let lo=0,hi=pts.length-1;
-  while(hi-lo>1){const m=(lo+hi)>>1;if(pts[m].t<=t)lo=m;else hi=m;}
-  const a=pts[lo],b=pts[hi],f=a.t===b.t?0:(t-a.t)/(b.t-a.t);
-  return{lat:a.lat+(b.lat-a.lat)*f,lon:a.lon+(b.lon-a.lon)*f,spdKmh:(a.spdKmh||0)+((b.spdKmh||0)-(a.spdKmh||0))*f};
-}
-function fmtDur(sec){const m=Math.floor(sec/60),s=sec%60;return(m+'').padStart(2,'0')+':'+(s+'').padStart(2,'0')}
-function showToast(msg,dur=2000){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur)}
-function showToastKm(msg,dur=2500){const el=document.getElementById('toast-km');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur)}
-
-/* ================================================================
-   RECORTE POR CONTRATO (Linha Largada/Chegada + Voltas)
-================================================================ */
-function trimPointsByContract(pts) {
-  if (!pts || pts.length < 2) return pts;
-  const sl = CONTRACT.startLine;
-  const el = CONTRACT.endLine;
-  const totalLaps = CONTRACT.laps || 1;
-
-  const intersects = (p1, p2, l1, l2) => {
-    if (!l1 || !l2 || l1.lat == null || l2.lat == null) return false;
-    const l1lng = l1.lng || l1.lon, l2lng = l2.lng || l2.lon;
-    const ccw = (A, B, C) => (C.lon - A.lon) * (B.lat - A.lat) > (B.lon - A.lon) * (C.lat - A.lat);
-    const L1 = { lat: l1.lat, lon: l1lng }, L2 = { lat: l2.lat, lon: l2lng };
-    return (ccw(p1, L1, L2) !== ccw(p2, L1, L2)) && (ccw(p1, p2, L1) !== ccw(p1, p2, L2));
-  };
-
-  let startIndex = 0, endIndex = pts.length - 1;
-
-  if (sl && sl.defined && sl.p1 && sl.p2) {
-    for (let i = 0; i < pts.length - 1; i++) {
-      if (intersects(pts[i], pts[i + 1], sl.p1, sl.p2)) {
-        startIndex = i;
-        break;
-      }
-    }
-  }
-
-  if (el && el.defined && el.p1 && el.p2) {
-    let lapCount = 0;
-    for (let i = startIndex; i < pts.length - 1; i++) {
-      if (intersects(pts[i], pts[i + 1], el.p1, el.p2)) {
-        lapCount++;
-        if (lapCount >= totalLaps) {
-          endIndex = i + 1;
-          break;
-        }
-      }
-    }
-  }
-
-  return pts.slice(startIndex, endIndex + 1);
-}
-
-/* ================================================================
-   GPS PARSERS
-================================================================ */
-function parseGPX(text){
-  const pts=[];
-  const parser=new DOMParser(),doc=parser.parseFromString(text,'text/xml');
-  const trkpts=doc.querySelectorAll('trkpt');
-  trkpts.forEach(tp=>{
-    const lat=parseFloat(tp.getAttribute('lat')),lon=parseFloat(tp.getAttribute('lon'));
-    const timeEl=tp.querySelector('time');
-    const speedEl=tp.querySelector('speed');
-    if(isNaN(lat)||isNaN(lon)||!timeEl)return;
-    const t=new Date(timeEl.textContent.trim()).getTime();
-    if(isNaN(t))return;
-    const spdMs=speedEl?parseFloat(speedEl.textContent):NaN;
-    pts.push({t,lat,lon,spdKmh:isNaN(spdMs)?NaN:spdMs*3.6});
-  });
-  pts.sort((a,b)=>a.t-b.t);
-
-  const needsDerive=pts.some(p=>isNaN(p.spdKmh));
-  if(needsDerive){
-    for(let i=0;i<pts.length;i++){
-      if(!isNaN(pts[i].spdKmh))continue;
-      if(i===0){pts[i].spdKmh=0;continue;}
-      const dt=(pts[i].t-pts[i-1].t)/1000;
-      if(dt<=0){pts[i].spdKmh=pts[i-1].spdKmh||0;continue;}
-      const distM=haversine(pts[i-1].lat,pts[i-1].lon,pts[i].lat,pts[i].lon);
-      pts[i].spdKmh=(distM/dt)*3.6;
-    }
-    for(let i=1;i<pts.length-1;i++){
-      pts[i].spdKmh=(pts[i-1].spdKmh+pts[i].spdKmh+pts[i+1].spdKmh)/3;
-    }
-  }
-  return trimPointsByContract(pts);
-}
-
-function parseGarminTXT(text){
-  let pts=[];
-  try{
-    const obj=JSON.parse(text);
-    const act=Array.isArray(obj)?obj[0]:obj;
-    if(act.metricDescriptors&&act.activityDetailMetrics){
-      const desc=act.metricDescriptors;
-      const iLat=desc.findIndex(d=>d.key==='directLatitude');
-      const iLon=desc.findIndex(d=>d.key==='directLongitude');
-      const iTs=desc.findIndex(d=>d.key==='directTimestamp');
-      const iSpd=desc.findIndex(d=>d.key==='directSpeed');
-      if(iLat>=0&&iLon>=0&&iTs>=0){
-        act.activityDetailMetrics.forEach(row=>{
-          const m=row.metrics;
-          const lat=m[iLat],lon=m[iLon],ts=m[iTs],spd=iSpd>=0?m[iSpd]:null;
-          if(lat==null||lon==null||ts==null||isNaN(ts))return;
-          pts.push({t:ts,lat,lon,spdKmh:spd!=null?spd*3.6:NaN});
-        });
-        if(pts.length) pts.sort((a,b)=>a.t-b.t);
-      }
-    }
-    if(!pts.length){
-      const tries=[act?.laps?.flatMap(l=>l.records||[]),act?.records,Array.isArray(act)?act:null];
-      for(const list of tries){
-        if(!Array.isArray(list)||!list.length)continue;
-        list.forEach(r=>{
-          const lat=r.latitudeMeters??r.lat,lon=r.longitudeMeters??r.lon;
-          const t=r.startTimeInSeconds!=null?(r.startTimeInSeconds+(r.timeOffsetInSeconds||0))*1000:NaN;
-          const spd=r.speedMetersPerSecond??r.avgSpeedMetersPerSecond;
-          if(lat==null||lon==null||isNaN(t))return;
-          pts.push({t,lat,lon,spdKmh:spd!=null?spd*3.6:NaN});
-        });
-        if(pts.length)break;
-      }
-    }
-  }catch(e){console.warn('parseGarminTXT:',e.message);}
-  pts.sort((a,b)=>a.t-b.t);
-  return trimPointsByContract(pts);
-}
-
-function interpTrackRel(relPts, targetTRel) {
-  if (!relPts || !relPts.length) return null;
-  if (targetTRel < relPts[0].tRel || targetTRel > relPts[relPts.length - 1].tRel) return null;
-
-  let low = 0, high = relPts.length - 1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (relPts[mid].tRel === targetTRel) return relPts[mid];
-    if (relPts[mid].tRel < targetTRel) low = mid + 1;
-    else high = mid - 1;
-  }
-  const i2 = low, i1 = low - 1;
-  if (i1 < 0) return relPts[0];
-  if (i2 >= relPts.length) return relPts[relPts.length - 1];
-
-  const p1 = relPts[i1], p2 = relPts[i2];
-  const factor = (targetTRel - p1.tRel) / (p2.tRel - p1.tRel || 1);
-  return {
-    lat: p1.lat + (p2.lat - p1.lat) * factor,
-    lon: (p1.lon || p1.lng) + ((p2.lon || p2.lng) - (p1.lon || p1.lng)) * factor,
-    spdKmh: (p1.spdKmh || 0) + ((p2.spdKmh || 0) - (p1.spdKmh || 0)) * factor
-  };
-}
-
-function mergeToTimeline(pts1, pts2) {
-  if (!pts1 || !pts1.length) return [];
-
-  let R = [];
-
-  let norm1 = pts1.map((p, idx) => {
-    let tMs = p.t || p.timestamp || p.time;
-    if (typeof tMs === 'string') tMs = new Date(tMs).getTime();
-    if (!tMs || isNaN(tMs)) tMs = idx * 1000;
-    return { ...p, lat: p.lat, lon: p.lon || p.lng, t: tMs };
-  }).sort((a, b) => a.t - b.t);
-
-  let norm2 = (pts2 && pts2.length) ? pts2.map((p, idx) => {
-    let tMs = p.t || p.timestamp || p.time;
-    if (typeof tMs === 'string') tMs = new Date(tMs).getTime();
-    if (!tMs || isNaN(tMs)) tMs = idx * 1000;
-    return { ...p, lat: p.lat, lon: p.lon || p.lng, t: tMs };
-  }).sort((a, b) => a.t - b.t) : [];
-
-  // Obter o timestamp exato da Largada Comum se definido no Contrato
-  const contractStartTs = CONTRACT?.startTs || CONTRACT?.sportPackage?.startTs || CONTRACT?.sportPackage?.tracks?.[0]?.startTs || null;
-
-  if (contractStartTs && norm1.length > 0 && norm1[0].t < contractStartTs) {
-    const s1 = norm1.filter(p => p.t >= contractStartTs);
-    if (s1.length > 0) norm1 = s1;
-  }
-  if (contractStartTs && norm2.length > 0 && norm2[0].t < contractStartTs) {
-    const s2 = norm2.filter(p => p.t >= contractStartTs);
-    if (s2.length > 0) norm2 = s2;
-  }
-
-  const minStart = norm1[0] ? norm1[0].t : (norm2.length ? norm2[0].t : 0);
-
-  const rel1 = norm1.map(p => ({ ...p, tRel: p.t - minStart }));
-  const rel2 = norm2.map(p => ({ ...p, tRel: p.t - minStart }));
-
-  const maxDur = Math.max(
-    rel1[rel1.length - 1].tRel,
-    rel2.length ? rel2[rel2.length - 1].tRel : rel1[rel1.length - 1].tRel
-  );
-
-  let lastH1 = 0, lastH2 = 0;
-  for (let step = 1000; step <= 5000; step += 1000) {
-    const f1 = interpTrackRel(rel1, step);
-    if (f1 && lastH1 === 0) {
-      const d = haversine(rel1[0].lat, rel1[0].lon || rel1[0].lng, f1.lat, f1.lon || f1.lng);
-      if (d > 0.3) lastH1 = calcBearing(rel1[0].lat, rel1[0].lon || rel1[0].lng, f1.lat, f1.lon || f1.lng);
-    }
-    if (rel2.length) {
-      const f2 = interpTrackRel(rel2, step);
-      if (f2 && lastH2 === 0) {
-        const d = haversine(rel2[0].lat, rel2[0].lon || rel2[0].lng, f2.lat, f2.lon || f2.lng);
-        if (d > 0.3) lastH2 = calcBearing(rel2[0].lat, rel2[0].lon || rel2[0].lng, f2.lat, f2.lon || f2.lng);
-      }
-    }
-  }
-  if (!lastH1) lastH1 = 90;
-  if (!lastH2) lastH2 = lastH1;
-
-  for (let tRel = 0; tRel <= maxDur; tRel += STEP_MS) {
-    const p1 = interpTrackRel(rel1, tRel);
-    const p2 = rel2.length ? interpTrackRel(rel2, tRel) : null;
-
-    const activeP1 = p1 || rel1[rel1.length - 1];
-    const activeP2 = p2 || (rel2.length ? rel2[rel2.length - 1] : { ...activeP1, lat: activeP1.lat + 0.0001, lon: activeP1.lon + 0.0001, spdKmh: (activeP1.spdKmh || 0) * 0.97 });
-
-    const lookAhead1 = interpTrackRel(rel1, tRel + STEP_MS) || activeP1;
-    const lookAhead2 = (rel2.length ? interpTrackRel(rel2, tRel + STEP_MS) : null) || activeP2;
-
-    const dist1 = haversine(activeP1.lat, activeP1.lon || activeP1.lng, lookAhead1.lat, lookAhead1.lon || lookAhead1.lng);
-    if (dist1 > 0.2) {
-      lastH1 = calcBearing(activeP1.lat, activeP1.lon || activeP1.lng, lookAhead1.lat, lookAhead1.lon || lookAhead1.lng);
+    function calcBearing(la1, lo1, la2, lo2) {
+      const dL = (lo2 - lo1) * Math.PI / 180;
+      const rlat1 = la1 * Math.PI / 180, rlat2 = la2 * Math.PI / 180;
+      return (Math.atan2(Math.sin(dL) * Math.cos(rlat2), Math.cos(rlat1) * Math.sin(rlat2) - Math.sin(rlat1) * Math.cos(rlat2)) * 180 / Math.PI + 360) % 360;
     }
 
-    const dist2 = haversine(activeP2.lat, activeP2.lon || activeP2.lng, lookAhead2.lat, lookAhead2.lon || lookAhead2.lng);
-    if (dist2 > 0.2) {
-      lastH2 = calcBearing(activeP2.lat, activeP2.lon || activeP2.lng, lookAhead2.lat, lookAhead2.lon || lookAhead2.lng);
+    function getHRColor(hr) {
+      if (!hr || isNaN(hr)) return '#06B6D4';
+      if (hr < 110) return '#06B6D4';
+      if (hr < 130) return '#10B981';
+      if (hr < 150) return '#F59E0B';
+      if (hr < 165) return '#F97316';
+      return '#EF4444';
     }
 
-    R.push({
-      t: tRel,
-      la1: activeP1.lat,
-      lo1: activeP1.lon || activeP1.lng,
-      h1: lastH1,
-      s1: p1 ? (p1.spdKmh || 0) / 3.6 : 0,
-      la2: activeP2.lat,
-      lo2: activeP2.lon || activeP2.lng,
-      h2: lastH2,
-      s2: p2 ? (p2.spdKmh || 0) / 3.6 : 0,
-      cd: haversine(activeP1.lat, activeP1.lon || activeP1.lng, activeP2.lat, activeP2.lon || activeP2.lng)
-    });
-  }
-
-  return R;
-}
-
-
-function computeDistances(){
-  distC1=[0];distC2=[0];
-  for(let i=1;i<D.length;i++){
-    distC1.push(distC1[i-1]+haversine(D[i-1].la1,D[i-1].lo1,D[i].la1,D[i].lo1));
-    distC2.push(distC2[i-1]+haversine(D[i-1].la2,D[i-1].lo2,D[i].la2,D[i].lo2));
-  }
-}
-
-/* ================================================================
-   CANOE RENDERING (APRIMORADO E DESLOCADO 1.5M Á ESQUERDA)
-================================================================ */
-function getSpeedColor(kmh){
-  if(kmh<3)return'#3b82f6';if(kmh<6)return'#06b6d4';if(kmh<8.5)return'#10b981';
-  if(kmh<10.5)return'#f59e0b';if(kmh<12.5)return'#f97316';return'#ef4444';
-}
-
-function makeCanoeIcon(color,stroke,id){
-  const svgHtml=`<div style="position:relative; width:140px; height:70px; overflow:visible;">
+    function createCanoeIcon(color, stroke, id, labelText) {
+      const sColor = stroke || '#ffffff';
+      const svgHtml = `<div style="position:relative; width:140px; height:70px; overflow:visible;">
     <!-- Marcador de Posição Exata no Ponto (70px, 35px) -->
     <div style="position:absolute; left:70px; top:35px; transform:translate(-50%,-50%); width:8px; height:8px; border-radius:50%; background:${color}; border:2px solid #ffffff; box-shadow:0 0 8px ${color}; z-index:1100;"></div>
     <!-- Desenho SVG da Canoa Rotacionado -->
     <svg class="canoe-svg" viewBox="-70 -35 140 70" width="140" height="70" overflow="visible" style="position:absolute; left:0; top:0; z-index:1000;">
-      <path d="M -26 0 C -16 -2.8, 16 -2.8, 26 0 C 16 2.8, -16 2.8, -26 0 Z" fill="${color}" stroke="${stroke}" stroke-width="2"/>
+      <path d="M -26 0 C -16 -2.8, 16 -2.8, 26 0 C 16 2.8, -16 2.8, -26 0 Z" fill="${color}" stroke="${sColor}" stroke-width="2"/>
       <path d="M 26 0 C 21 -2.2, 21 2.2, 26 0 Z" fill="#ffffff" opacity="0.95"/>
-      <line x1="-12" y1="0" x2="-12" y2="-8" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>
-      <line x1="12" y1="0" x2="12" y2="-8" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>
-      <path d="M -18 -8 C -9 -9.5, 9 -9.5, 18 -8 C 9 -6.8, -9 -6.8, -18 -8 Z" fill="${stroke}" stroke="#ffffff" stroke-width="1.5"/>
+      <line x1="-12" y1="0" x2="-12" y2="-8" stroke="${sColor}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="12" y1="0" x2="12" y2="-8" stroke="${sColor}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M -18 -8 C -9 -9.5, 9 -9.5, 18 -8 C 9 -6.8, -9 -6.8, -18 -8 Z" fill="${sColor}" stroke="#ffffff" stroke-width="1.5"/>
     </svg>
-    <div id="spd-lbl-${id}" style="position:absolute; left:82px; top:42px; font-family:'Rajdhani',sans-serif; font-size:11px; font-weight:700; color:${color}; text-shadow:1px 1px 3px #000; white-space:nowrap; pointer-events:none; z-index:1110">---</div>
+    <div style="position:absolute; left:82px; top:42px; font-family:'Rajdhani',sans-serif,system-ui; font-size:11px; font-weight:800; color:${color}; text-shadow:1px 1px 3px #000; white-space:nowrap; pointer-events:none; z-index:1110">
+      🛶 ${labelText || `Canoa ${id + 1}`} <span id="spd-marker-${id}">--</span> | <span id="hr-marker-${id}" style="color:#FF6B6B">--</span>
+    </div>
   </div>`;
-  
-  // iconAnchor: [70,35] = centro do SVG 140×70, alinha exatamente sobre a coordenada GPS
-  return L.divIcon({
-    html:`<div style="position:relative;overflow:visible">${svgHtml}</div>`,
-    className:'canoe-icon-wrap',
-    iconSize:[140,70],
-    iconAnchor:[70,35]
-  });
-}
 
-function rotateCanoe(el,h){
-  if(!el||!mapDetail)return;
-  const svg=el.querySelector('.canoe-svg');if(!svg)return;
-  const z=mapDetail.getZoom(),lat=mapDetail.getCenter().lat;
-  const mpp=(156543.03392*Math.cos(lat*Math.PI/180))/Math.pow(2,z);
-  // Escala exata com limite mínimo (0.18) para a canoa permanecer visível e perfeitamente ancorada em zoom out
-  const scale=Math.max(0.18, 13.71/mpp/52);
-  svg.style.transformOrigin='70px 35px';
-  svg.style.transform=`scale(${scale.toFixed(4)}) rotate(${(h-90).toFixed(1)}deg)`;
-}
-
-function updateHeatTrail(group, maxIdx, getLa, getLo, getSpd, distArray) {
-  if (!group || !canvasRenderer) return;
-  group.clearLayers();
-  if (maxIdx < 1) return;
-
-  const numLaps = (CONTRACT && CONTRACT.laps) ? CONTRACT.laps : 1;
-  const totDistKm = (CONTRACT && CONTRACT.totalDistanceKm) ? CONTRACT.totalDistanceKm : 0;
-  const totalTrackMeters = (distArray && distArray.length) ? distArray[distArray.length - 1] : 0;
-  
-  let lapDistMeters = 0;
-  if (numLaps > 1) {
-    if (totDistKm > 0) lapDistMeters = (totDistKm * 1000) / numLaps;
-    else if (totalTrackMeters > 0) lapDistMeters = totalTrackMeters / numLaps;
-  }
-
-  const currentDist = (distArray && distArray[maxIdx] != null) ? distArray[maxIdx] : 0;
-  const currentLap = (lapDistMeters > 0) ? Math.floor(currentDist / lapDistMeters) : 0;
-
-  let seg = [], col = null, segLap = null;
-
-  for (let i = 0; i <= maxIdx; i++) {
-    const ptDist = (distArray && distArray[i] != null) ? distArray[i] : 0;
-    const ptLap = (lapDistMeters > 0) ? Math.floor(ptDist / lapDistMeters) : 0;
-    const c = getSpeedColor(getSpd(D[i]) * 3.6);
-
-    if (!col) {
-      col = c;
-      segLap = ptLap;
-      seg.push([getLa(D[i]), getLo(D[i])]);
-    } else if (c === col && ptLap === segLap) {
-      seg.push([getLa(D[i]), getLo(D[i])]);
-    } else {
-      seg.push([getLa(D[i]), getLo(D[i])]);
-      
-      const isPastLap = segLap < currentLap;
-      const op = isPastLap ? 0.22 : 0.85;
-      const w = isPastLap ? 3 : 4;
-
-      L.polyline(seg, {
-        color: col,
-        weight: w,
-        opacity: op,
-        lineCap: 'round',
-        lineJoin: 'round',
-        renderer: canvasRenderer
-      }).addTo(group);
-
-      seg = [[getLa(D[i]), getLo(D[i])]];
-      col = c;
-      segLap = ptLap;
+      return L.divIcon({
+        html: `<div style="position:relative;overflow:visible">${svgHtml}</div>`,
+        className: 'canoe-icon-wrap',
+        iconSize: [140, 70],
+        iconAnchor: [70, 35]
+      });
     }
-  }
 
-  if (seg.length > 1) {
-    const isPastLap = segLap < currentLap;
-    const op = isPastLap ? 0.22 : 0.85;
-    const w = isPastLap ? 3 : 4;
-
-    L.polyline(seg, {
-      color: col,
-      weight: w,
-      opacity: op,
-      lineCap: 'round',
-      lineJoin: 'round',
-      renderer: canvasRenderer
-    }).addTo(group);
-  }
-}
-
-/* ================================================================
-   MAP SETUP
-================================================================ */
-function setupMap(){
-  const sat=L.tileLayer(SAT_URL,{maxZoom:22,maxNativeZoom:19,attribution:'Tiles &copy; Esri'});
-  const dark=L.tileLayer(DARK_URL,{maxZoom:22,maxNativeZoom:19,subdomains:'abcd',attribution:'&copy; CARTO'});
-  mapDetail=L.map('map-detail',{center:[D[0].la1,D[0].lo1],zoom:17,maxZoom:22,zoomControl:true,layers:[sat]});
-  L.control.scale({metric:true,imperial:false,position:'bottomleft'}).addTo(mapDetail);
-  canvasRenderer=L.canvas({padding:.5});
-  tr1=L.layerGroup().addTo(mapDetail);
-  tr2=L.layerGroup().addTo(mapDetail);
-  mc1=L.marker([D[0].la1,D[0].lo1],{icon:makeCanoeIcon(C1_COLOR,'#D97706',1),zIndexOffset:1000}).addTo(mapDetail);
-  mc2=L.marker([D[0].la2,D[0].lo2],{icon:makeCanoeIcon(C2_COLOR,'#0ea5e9',2),zIndexOffset:999}).addTo(mapDetail);
-  if(mc1&&D[0])rotateCanoe(mc1.getElement(),D[0].h1);
-  if(mc2&&D[0])rotateCanoe(mc2.getElement(),D[0].h2);
-  mapDetail.on('zoomend',()=>{
-    if(mc1&&D[currentIndex])rotateCanoe(mc1.getElement(),D[currentIndex].h1);
-    if(mc2&&D[currentIndex])rotateCanoe(mc2.getElement(),D[currentIndex].h2);
-  });
-  
-  const tr1pts=D.map(p=>[p.la1,p.lo1]),tr2pts=D.map(p=>[p.la2,p.lo2]);
-  L.polyline(tr1pts,{color:C1_COLOR,weight:2.5,opacity:.45,dashArray:'6, 6'}).addTo(mapDetail);
-  L.polyline(tr2pts,{color:C2_COLOR,weight:2.5,opacity:.45,dashArray:'6, 6'}).addTo(mapDetail);
-
-  drawContractLines(mapDetail);
-}
-
-function drawContractLines(map){
-  const sl=CONTRACT.startLine,el=CONTRACT.endLine;
-  if(sl&&sl.p1&&sl.p2){
-    const p1lat = sl.p1.lat, p1lng = sl.p1.lng || sl.p1.lon;
-    const p2lat = sl.p2.lat, p2lng = sl.p2.lng || sl.p2.lon;
-    L.polyline([[p1lat,p1lng],[p2lat,p2lng]],{color:'#10b981',weight:3,opacity:.9}).addTo(map).bindTooltip('🟢 Largada',{permanent:false,className:'cp-tooltip'});
-  }
-  if(el&&el.p1&&el.p2){
-    const p1lat = el.p1.lat, p1lng = el.p1.lng || el.p1.lon;
-    const p2lat = el.p2.lat, p2lng = el.p2.lng || el.p2.lon;
-    L.polyline([[p1lat,p1lng],[p2lat,p2lng]],{color:'#ef4444',weight:3,opacity:.9}).addTo(map).bindTooltip('🔴 Chegada',{permanent:false,className:'cp-tooltip'});
-  }
-  if(CONTRACT.buoys&&CONTRACT.buoys.length){
-    CONTRACT.buoys.forEach((b,i)=>{
-      L.circleMarker([b.lat,b.lng||b.lon],{radius:5,color:'#8b5cf6',fillColor:'#8b5cf6',fillOpacity:.8}).addTo(map).bindTooltip(`B${i+1}`,{permanent:false,className:'cp-tooltip'});
-    });
-  }
-}
-
-/* ================================================================
-   TIMELINE SETUP
-================================================================ */
-function setupTimeline(){
-  const track=document.getElementById('timeline-track'),totalMs=D[D.length-1].t;
-  document.getElementById('time-tot').textContent=fmtDur(Math.round(totalMs/1000));
-  const cpsEl=document.getElementById('timeline-cps'),cpBtns=document.getElementById('cp-btns');
-  for(let i=1;i<=Math.floor((distC1[distC1.length-1]||0)/1000);i++){
-    const ki=distC1.findIndex(d=>d>=i*1000);if(ki<0)continue;
-    const pct=D[ki].t/totalMs*100;
-    const m=document.createElement('div');m.className='tl-cp-mark';m.style.left=pct+'%';m.title='km '+i;m.onclick=()=>seek(D[ki].t);cpsEl.appendChild(m);
-    const btn=document.createElement('button');btn.className='cp-btn';btn.textContent=i;btn.onclick=()=>seek(D[ki].t);cpBtns.appendChild(btn);
-  }
-  let dragging=false;
-  const seekE=e=>{const r=track.getBoundingClientRect(),x=Math.max(0,Math.min(1,((e.clientX||e.touches?.[0]?.clientX||0)-r.left)/r.width));seek(x*totalMs);};
-  track.addEventListener('mousedown',e=>{dragging=true;seekE(e);});
-  track.addEventListener('touchstart',e=>{dragging=true;seekE(e);},{passive:true});
-  window.addEventListener('mousemove',e=>{if(dragging)seekE(e);});
-  window.addEventListener('touchmove',e=>{if(dragging)seekE(e);},{passive:true});
-  window.addEventListener('mouseup',()=>dragging=false);
-  window.addEventListener('touchend',()=>dragging=false);
-}
-
-/* ================================================================
-   FRAME UPDATE
-================================================================ */
-function updateFrame(tMs){
-  if(!D.length)return;
-  tMs=Math.max(0,Math.min(D[D.length-1].t,tMs));playTimeMs=tMs;
-  let lo=0,hi=D.length-1;
-  while(hi-lo>1){const m=(lo+hi)>>1;if(D[m].t<=tMs)lo=m;else hi=m;}
-  currentIndex=lo;const f=D[lo];
-  const s1=(f.s1||0)*3.6,s2=(f.s2||0)*3.6;
-  const d1=(distC1[lo]||0)/1000,d2=(distC2[lo]||0)/1000;
-  
-  const projGapMeters = Math.abs(distC1[lo] - distC2[lo]);
-
-  if(mc1){mc1.setLatLng([f.la1,f.lo1]);rotateCanoe(mc1.getElement(),f.h1);}
-  if(mc2){mc2.setLatLng([f.la2,f.lo2]);rotateCanoe(mc2.getElement(),f.h2);}
-
-  const l1=document.getElementById('spd-lbl-1'),l2=document.getElementById('spd-lbl-2');
-  if(l1)l1.textContent=s1.toFixed(1)+' km/h';
-  if(l2)l2.textContent=s2.toFixed(1)+' km/h';
-
-  if(mc1&&mc2&&mapDetail){
-    if(followCanoe===1)mapDetail.setView([f.la1,f.lo1],mapDetail.getZoom(),{animate:false});
-    else mapDetail.setView([f.la2,f.lo2],mapDetail.getZoom(),{animate:false});
-  }
-
-  updateHeatTrail(tr1,lo,p=>p.la1,p=>p.lo1,p=>p.s1,distC1);
-  updateHeatTrail(tr2,lo,p=>p.la2,p=>p.lo2,p=>p.s2,distC2);
-
-  const c1Leading=d1>=d2;
-
-  document.getElementById('btn-follow-c1').textContent=`🟡 C1 ${C1_NAME} · ${s1.toFixed(1)} km/h`;
-  document.getElementById('btn-follow-c2').textContent=`🔵 C2 ${C2_NAME} · ${s2.toFixed(1)} km/h`;
-  document.getElementById('gap-leader').textContent=c1Leading?`🟡 C1 ${C1_NAME} na frente`:`🔵 C2 ${C2_NAME} na frente`;
-
-  let dev1 = 0, dev2 = 0;
-  if (CONTRACT.startLine && CONTRACT.endLine && CONTRACT.startLine.p1 && CONTRACT.endLine.p1) {
-    const sl = CONTRACT.startLine.p1, el = CONTRACT.endLine.p1;
-    dev1 = distToSegmentMeters(f.la1, f.lo1, sl.lat, sl.lng||sl.lon, el.lat, el.lng||el.lon);
-    dev2 = distToSegmentMeters(f.la2, f.lo2, sl.lat, sl.lng||sl.lon, el.lat, el.lng||el.lon);
-  }
-
-  document.getElementById('hud-spd1').textContent=s1.toFixed(1);
-  document.getElementById('hud-spd2').textContent=s2.toFixed(1);
-  const hrs=tMs/3600000;
-  document.getElementById('hud-avg1').textContent=d1>0?(d1/hrs).toFixed(1):'--';
-  document.getElementById('hud-avg2').textContent=d2>0?(d2/hrs).toFixed(1):'--';
-  document.getElementById('hud-dist1').textContent=d1.toFixed(2)+' km';
-  document.getElementById('hud-dist2').textContent=d2.toFixed(2)+' km';
-  document.getElementById('hud-dev1').textContent=dev1.toFixed(0)+' m';
-  document.getElementById('hud-dev2').textContent=dev2.toFixed(0)+' m';
-  document.getElementById('hud-c1').classList.toggle('leading',c1Leading);
-  document.getElementById('hud-c2').classList.toggle('leading',!c1Leading);
-  
-  document.getElementById('gap-value').textContent=projGapMeters.toFixed(0)+' m (projetado)';
-  document.getElementById('gap-leader').textContent=c1Leading?'🟡 C1 na frente':'🔵 C2 na frente';
-  document.getElementById('gap-leader').style.color=c1Leading?C1_COLOR:C2_COLOR;
-
-  document.getElementById('dist-c1').textContent='🟡 C1: '+d1.toFixed(2)+' km';
-  document.getElementById('dist-c2').textContent='🔵 C2: '+d2.toFixed(2)+' km';
-  document.getElementById('dist-gap').textContent='GAP: '+projGapMeters.toFixed(0)+' m';
-
-  const pct=D[D.length-1].t>0?tMs/D[D.length-1].t*100:0;
-  document.getElementById('timeline-fill').style.width=pct+'%';
-  document.getElementById('timeline-handle').style.left=pct+'%';
-  document.getElementById('time-cur').textContent=fmtDur(Math.round(tMs/1000));
-
-  const kmN=Math.floor(Math.max(d1,d2));
-  if(kmN>prevKmPassed){prevKmPassed=kmN;showToastKm('⏱ km '+kmN+' atingido');}
-}
-
-/* ================================================================
-   PLAYBACK CONTROLS
-================================================================ */
-function togglePlay(){isPlaying?pause():play();}
-function play(){
-  if(playTimeMs>=D[D.length-1].t)seek(0);
-  isPlaying=true;document.getElementById('btn-play').textContent='⏸';
-  let lastTs=null;
-  function loop(ts){
-    if(!isPlaying)return;
-    if(lastTs!=null)playTimeMs=Math.min(playTimeMs+(ts-lastTs)*speed,D[D.length-1].t);
-    lastTs=ts;updateFrame(playTimeMs);
-    if(playTimeMs<D[D.length-1].t)lastRaf=requestAnimationFrame(loop);
-    else{isPlaying=false;document.getElementById('btn-play').textContent='▶';}
-  }
-  lastRaf=requestAnimationFrame(loop);
-}
-function pause(){isPlaying=false;document.getElementById('btn-play').textContent='▶';if(lastRaf){cancelAnimationFrame(lastRaf);lastRaf=null;}}
-function seek(tMs){pause();updateFrame(tMs);}
-function setSpeed(s){speed=s;document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.s)===s));if(!isPlaying&&playTimeMs<D[D.length-1].t)play();}
-function jumpSec(s){seek(Math.max(0,playTimeMs+s*1000));}
-function setFollow(c){followCanoe=c;document.getElementById('btn-follow-c1').classList.toggle('active',c===1);document.getElementById('btn-follow-c2').classList.toggle('active',c===2);}
-function toggleFullscreen(){if(!document.fullscreenElement)document.getElementById('app').requestFullscreen?.();else document.exitFullscreen?.();}
-
-/* ================================================================
-   TAB SWITCHING (3 ABAS PRINCIPAIS)
-================================================================ */
-function switchTab(tab){
-  activeTab=tab;
-  ['map','hud','splits'].forEach(id=>{
-    document.getElementById('view-'+id)?.classList.toggle('active',id===tab);
-    document.getElementById('btn-nav-'+id)?.classList.toggle('active',id===tab);
-  });
-  if(tab==='map')setTimeout(()=>mapDetail?.invalidateSize(),60);
-  if(tab==='hud'&&speedChart)setTimeout(()=>{speedChart.resize();gapChart.resize();stdDevChart?.resize();},100);
-}
-
-/* ================================================================
-   CHARTS
-================================================================ */
-function setupCharts(){
-  const step=Math.max(1,Math.floor(D.length/200));
-  const labels=[],sp1=[],sp2=[],projGaps=[],dev1List=[],dev2List=[];
-
-  const sl = CONTRACT.startLine && CONTRACT.startLine.p1 ? CONTRACT.startLine.p1 : {lat:-27.4350,lng:-48.4900};
-  const el = CONTRACT.endLine && CONTRACT.endLine.p1 ? CONTRACT.endLine.p1 : {lat:-27.4200,lng:-48.4600};
-
-  for(let i=0;i<D.length;i+=step){
-    labels.push(fmtDur(Math.round(D[i].t/1000)));
-    sp1.push(((D[i].s1||0)*3.6).toFixed(2));
-    sp2.push(((D[i].s2||0)*3.6).toFixed(2));
-    
-    const pGap = Math.abs(distC1[i] - distC2[i]);
-    projGaps.push(pGap.toFixed(1));
-
-    const d1 = distToSegmentMeters(D[i].la1, D[i].lo1, sl.lat, sl.lng||sl.lon, el.lat, el.lng||el.lon);
-    const d2 = distToSegmentMeters(D[i].la2, D[i].lo2, sl.lat, sl.lng||sl.lon, el.lat, el.lng||el.lon);
-    dev1List.push(d1.toFixed(1));
-    dev2List.push(d2.toFixed(1));
-  }
-
-  const base={responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{color:'#9CA3AF',font:{size:10},boxWidth:10}}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#6B7280',font:{size:9}}}}};
-
-  speedChart=new Chart(document.getElementById('canvas-speed'),{type:'line',data:{labels,datasets:[
-    {label:'🟡 C1 Natureza',borderColor:C1_COLOR,backgroundColor:'transparent',data:sp1,tension:.3,pointRadius:0,borderWidth:1.5},
-    {label:"🔵 C2 Salva'a",borderColor:C2_COLOR,backgroundColor:'transparent',data:sp2,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[4,3]}
-  ]},options:base});
-
-  stdDevChart=new Chart(document.getElementById('canvas-stddev'),{type:'line',data:{labels,datasets:[
-    {label:'🟡 Desvio C1 (m)',borderColor:C1_COLOR,backgroundColor:'transparent',data:dev1List,tension:.3,pointRadius:0,borderWidth:1.5},
-    {label:'🔵 Desvio C2 (m)',borderColor:C2_COLOR,backgroundColor:'transparent',data:dev2List,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[3,3]}
-  ]},options:base});
-
-  gapChart=new Chart(document.getElementById('canvas-gap'),{type:'line',data:{labels,datasets:[
-    {label:'Gap Projetado (m)',borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,0.08)',data:projGaps,tension:.3,pointRadius:0,borderWidth:1.5,fill:true}
-  ]},options:{...base,plugins:{legend:{display:false}}}});
-}
-
-/* ================================================================
-   ROSA DE SETAS E VETORES AMBIENTAIS (SVG AMPLIAÇÃO PARA 52PX)
-================================================================ */
-function makeCompassRoseSVG(bearing, windDeg, currentDeg, size=52) {
-  const bRot = Math.round(bearing || 0);
-  const wRot = Math.round(windDeg || 0);
-  const cRot = Math.round(currentDeg || 0);
-  const r = size / 2;
-  const c = r;
-
-  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="vertical-align:middle;display:inline-block">
-    <circle cx="${c}" cy="${c}" r="${r-2}" fill="rgba(15,23,42,0.85)" stroke="rgba(6,182,212,0.3)" stroke-width="1.5"/>
-    <circle cx="${c}" cy="${c}" r="${r-8}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="2 2"/>
-    
-    <!-- Vento (Âmbar) -->
-    <g transform="rotate(${wRot} ${c} ${c})">
-      <line x1="${c}" y1="${c}" x2="${c}" y2="7" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3 1.5"/>
-      <polygon points="${c},4 ${c-4},10 ${c+4},10" fill="#f59e0b"/>
-    </g>
-    <!-- Corrente (Azul) -->
-    <g transform="rotate(${cRot} ${c} ${c})">
-      <line x1="${c}" y1="${c}" x2="${c}" y2="9" stroke="#06b6d4" stroke-width="1.8"/>
-      <polygon points="${c},6 ${c-3.5},12 ${c+3.5},12" fill="#06b6d4"/>
-    </g>
-    <!-- Rumo/Canoa (Ciano Neon) -->
-    <g transform="rotate(${bRot} ${c} ${c})">
-      <line x1="${c}" y1="${c}" x2="${c}" y2="6" stroke="#00f2fe" stroke-width="2.5"/>
-      <polygon points="${c},3 ${c-5},10 ${c+5},10" fill="#00f2fe"/>
-    </g>
-  </svg>`;
-}
-
-/* ================================================================
-   SPLITS RENDER
-================================================================ */
-function renderSplits(){
-  const getKI=dist=>{
-    let lastActiveIdx = dist.length - 1;
-    while (lastActiveIdx > 0 && dist[lastActiveIdx] === dist[lastActiveIdx - 1]) {
-      lastActiveIdx--;
+    function rotateCanoe(el, h) {
+      if (!el || !map) return;
+      const svg = el.querySelector('.canoe-svg');
+      if (!svg) return;
+      const z = map.getZoom(), lat = map.getCenter().lat;
+      const mpp = (156543.03392 * Math.cos(lat * Math.PI / 180)) / Math.pow(2, z);
+      const scale = Math.max(0.18, 13.71 / mpp / 52);
+      svg.style.transformOrigin = '70px 35px';
+      svg.style.transform = `scale(${scale.toFixed(4)}) rotate(${(h - 90).toFixed(1)}deg)`;
     }
-    const idx=[0]; let nk=1000;
-    for(let i=0;i<=lastActiveIdx;i++){
-      if(dist[i]>=nk){idx.push(i);nk+=1000;}
+
+    async function fetchGPSFile(filename) {
+      if (!filename) return null;
+      const cleanName = filename.replace(/^.*[\\\/]/, '');
+      const candidateUrls = [
+        `./${cleanName}`,
+        `../GPS/${cleanName}`,
+        `/GPS/${cleanName}`,
+        `./GPS/${cleanName}`,
+        `./files/${cleanName}`,
+        filename
+      ];
+
+      for (const url of candidateUrls) {
+        try {
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const text = await resp.text();
+            if (text && text.trim().length > 0) return text;
+          }
+        } catch (e) { }
+      }
+      return null;
     }
-    if(idx[idx.length-1]!==lastActiveIdx) idx.push(lastActiveIdx);
-    return idx;
-  };
-  const ki1=getKI(distC1),ki2=getKI(distC2),n=Math.max(ki1.length-1,ki2.length-1);
-  let html='',bp1=Infinity,bp2=Infinity;
-  const totD1=distC1[distC1.length-1]||0,totD2=distC2[distC2.length-1]||0;
-  const totSec=D[D.length-1].t/1000;
 
-  const wx = CONTRACT.weatherSnapshot || { windDirectionDeg:65, currentDirectionDeg:180 };
+    function parseGPXText(xmlText) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+      const trkpts = Array.from(xmlDoc.getElementsByTagName('trkpt'));
+      if (!trkpts.length) return [];
 
-  for(let i=1;i<=n;i++){
-    let p1='--',s1='--',cl1='pace-slow',dr1=0;
-    let p2='--',s2='--',cl2='pace-slow',dr2=0;
-    let kmBearing = 0;
+      const rawPoints = [];
+      trkpts.forEach(pt => {
+        const lat = parseFloat(pt.getAttribute('lat'));
+        const lon = parseFloat(pt.getAttribute('lon'));
+        const timeEl = pt.getElementsByTagName('time')[0];
+        const hrEl = pt.getElementsByTagName('hr')[0] || pt.getElementsByTagName('gpxtpx:hr')[0];
+        const spdEl = pt.getElementsByTagName('speed')[0] || pt.getElementsByTagName('gpxtpx:speed')[0];
 
-    if(i<ki1.length){
-      const iS=ki1[i-1],iE=ki1[i],dt=D[iE].t-D[iS].t,dist=distC1[iE]-distC1[iS];dr1=dist;
-      kmBearing = calcBearing(D[iS].la1, D[iS].lo1, D[iE].la1, D[iE].lo1);
-      if(dt>0&&dist>0){const ps=(dt/1000)*(1000/dist);if(ps<bp1)bp1=ps;const pm=Math.floor(ps/60),psc=Math.round(ps%60);p1=pm+':'+(psc+'').padStart(2,'0');const spd=(dist/(dt/1000))*3.6;s1=spd.toFixed(1);cl1=spd>=10.5?'pace-fast':spd>=8.5?'pace-med':'pace-slow';}
+        const timestamp = timeEl ? new Date(timeEl.textContent).getTime() : 0;
+        const hr = hrEl ? parseInt(hrEl.textContent) : null;
+        const spdKmh = spdEl ? parseFloat(spdEl.textContent) * 3.6 : undefined;
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+          rawPoints.push({ lat, lon, timestamp, hr, spdKmh });
+        }
+      });
+      return rawPoints;
     }
-    if(i<ki2.length){
-      const iS=ki2[i-1],iE=ki2[i],dt=D[iE].t-D[iS].t,dist=distC2[iE]-distC2[iS];dr2=dist;
-      if (kmBearing === 0) kmBearing = calcBearing(D[iS].la2, D[iS].lo2, D[iE].la2, D[iE].lo2);
-      if(dt>0&&dist>0){const ps=(dt/1000)*(1000/dist);if(ps<bp2)bp2=ps;const pm=Math.floor(ps/60),psc=Math.round(ps%60);p2=pm+':'+(psc+'').padStart(2,'0');const spd=(dist/(dt/1000))*3.6;s2=spd.toFixed(1);cl2=spd>=10.5?'pace-fast':spd>=8.5?'pace-med':'pace-slow';}
+
+    function parseGarminJSONText(jsonText) {
+      try {
+        const data = typeof jsonText === 'string' ? JSON.parse(jsonText) : jsonText;
+        const descriptors = data.metricDescriptors || [];
+        const metricsList = data.activityDetailMetrics || [];
+
+        let latIdx = descriptors.findIndex(d => d.key === 'directLatitude');
+        let lngIdx = descriptors.findIndex(d => d.key === 'directLongitude');
+        let timeIdx = descriptors.findIndex(d => d.key === 'directTimestamp');
+        let hrIdx = descriptors.findIndex(d => d.key === 'directHeartRate');
+        let speedIdx = descriptors.findIndex(d => d.key === 'directSpeed');
+
+        if (latIdx === -1) latIdx = 0;
+        if (lngIdx === -1) lngIdx = 1;
+        if (timeIdx === -1) timeIdx = 3;
+        if (hrIdx === -1) hrIdx = 4;
+        if (speedIdx === -1) speedIdx = 9;
+
+        const rawPoints = [];
+        metricsList.forEach(item => {
+          const m = item.metrics;
+          if (!m || m.length <= Math.max(latIdx, lngIdx)) return;
+          const lat = m[latIdx];
+          const lon = m[lngIdx];
+          let timestamp = m[timeIdx];
+          const hr = m[hrIdx] ? Math.round(m[hrIdx]) : null;
+          let spdKmh = m[speedIdx] ? m[speedIdx] * 3.6 : 0;
+          if (timestamp && timestamp < 1e11) timestamp = timestamp * 1000;
+
+          if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
+            rawPoints.push({ lat, lon, timestamp, hr, spdKmh });
+          }
+        });
+        return rawPoints;
+      } catch (e) {
+        return [];
+      }
     }
-    const f1=p1!='--'&&s2!='--'&&parseFloat(s1)>parseFloat(s2);
-    const f2=p2!='--'&&s1!='--'&&parseFloat(s2)>parseFloat(s1);
-    const lbl=i===n&&Math.max(dr1,dr2)<950?'Final ('+Math.max(dr1,dr2).toFixed(0)+'m)':'km '+i;
 
-    const compassSVG = makeCompassRoseSVG(kmBearing, wx.windDirectionDeg || 65, wx.currentDirectionDeg || 180, 52);
+    function getTrackPoints(track) {
+      if (!track) return [];
+      const rawData = track.points || track.data || track.gpsData || [];
+      if (!Array.isArray(rawData)) return [];
 
-    html+=`<tr>
-      <td class="dist-cell">${lbl}</td>
-      <td class="vector-cell">${compassSVG}<div style="font-size:10px;color:var(--text);font-family:var(--font-hud);font-weight:700;margin-top:2px">${Math.round(kmBearing)}°</div></td>
-      <td class="pace-cell">${p1!='--'?`<span class="pace-badge ${cl1}">${f1?'<b>+</b> ':''}${p1}</span><div class="pace-sub">${s1} km/h</div>`:'<span style="color:var(--text-muted)">--</span>'}</td>
-      <td class="pace-cell">${p2!='--'?`<span class="pace-badge ${cl2}">${f2?'<b>+</b> ':''}${p2}</span><div class="pace-sub">${s2} km/h</div>`:'<span style="color:var(--text-muted)">--</span>'}</td>
-    </tr>`;
-  }
-  document.getElementById('splits-tbody').innerHTML=html;
-  
-  let finishSec1 = totSec, finishSec2 = totSec;
-  for (let i = D.length - 1; i >= 0; i--) {
-    if (D[i].s1 > 0 && finishSec1 === totSec) finishSec1 = D[i].t / 1000;
-    if (D[i].s2 > 0 && finishSec2 === totSec) finishSec2 = D[i].t / 1000;
-  }
-  if (finishSec1 <= 0) finishSec1 = totSec;
-  if (finishSec2 <= 0) finishSec2 = totSec;
+      return rawData.map(p => {
+        if (!p) return null;
+        const lat = p.lat != null ? p.lat : p.latitude;
+        const lon = p.lon != null ? p.lon : (p.lng != null ? p.lng : p.longitude);
+        const t = p.timestamp != null ? Number(p.timestamp) : 
+                 (p.t != null ? Number(p.t) : 
+                 (p.tRel != null ? Number(p.tRel) : 
+                 (p.time ? new Date(p.time).getTime() : null)));
+        const spdKmh = p.spdKmh != null ? Number(p.spdKmh) : 
+                      (p.speedKmh != null ? Number(p.speedKmh) : 
+                      (p.speed != null ? Number(p.speed) * 3.6 : 0));
 
-  document.getElementById('sc-dist1').textContent=(totD1/1000).toFixed(2)+' km';
-  document.getElementById('sc-dist2').textContent=(totD2/1000).toFixed(2)+' km';
-  document.getElementById('sc-avg1').textContent=totD1>0?((totD1/finishSec1)*3.6).toFixed(1)+' km/h méd.':'--';
-  document.getElementById('sc-avg2').textContent=totD2>0?((totD2/finishSec2)*3.6).toFixed(1)+' km/h méd.':'--';
-  if(bp1<Infinity){const pm=Math.floor(bp1/60),ps=Math.round(bp1%60);document.getElementById('sc-best1').textContent='Melhor pace: '+pm+':'+(ps+'').padStart(2,'0')+' min/km';}
-  if(bp2<Infinity){const pm=Math.floor(bp2/60),ps=Math.round(bp2%60);document.getElementById('sc-best2').textContent='Melhor pace: '+pm+':'+(ps+'').padStart(2,'0')+' min/km';}
-}
-
-let C1_NAME = "NATUREZA";
-let C2_NAME = "SALVA'A";
-
-function extractCleanTeamName(fullName, fallback) {
-  if (!fullName) return fallback;
-  let str = fullName.replace(/^Canoa\s*\d+:\s*/i, "").replace(/\.(txt|gpx|json|fit)$/i, "").trim();
-  const parts = str.split(/[-_]/);
-  if (parts.length > 0 && parts[0].length >= 2) {
-    let first = parts[0].trim();
-    if (first.toLowerCase().startsWith('salvaa')) return "SALVA'A";
-    if (first.toLowerCase().startsWith('natureza')) return "NATUREZA";
-    if (first.toLowerCase().startsWith('recanto')) return "RECANTO";
-    return first.toUpperCase();
-  }
-  return str.toUpperCase() || fallback;
-}
-
-function updateDynamicTitlesAndNames() {
-  const tracks = CONTRACT?.sportPackage?.tracks || CONTRACT?.tracks || [];
-  if (tracks.length > 0 && tracks[0].name) {
-    C1_NAME = extractCleanTeamName(tracks[0].name, "NATUREZA");
-  }
-  if (tracks.length > 1 && tracks[1].name) {
-    C2_NAME = extractCleanTeamName(tracks[1].name, "SALVA'A");
-  }
-
-  // 1. Cabeçalho (Header)
-  const fullText = ((CONTRACT.name || '') + ' ' + (tracks.map(t => t.name).join(' '))).toLowerCase();
-  let categoryLabel = "OC6 · Amador Masc.";
-  if (fullText.includes('pro-fem') || fullText.includes('pro fem')) categoryLabel = "OC6 · Pro Fem.";
-  else if (fullText.includes('pro-masc') || fullText.includes('pro masc')) categoryLabel = "OC6 · Pro Masc.";
-  else if (fullText.includes('pro-mista') || fullText.includes('pro mista')) categoryLabel = "OC6 · Pro Mista";
-  else if (fullText.includes('amador-fem') || fullText.includes('amador fem')) categoryLabel = "OC6 · Amador Fem.";
-  else if (fullText.includes('amador-masc') || fullText.includes('amador masc')) categoryLabel = "OC6 · Amador Masc.";
-  else if (CONTRACT.name) categoryLabel = "OC6 · " + CONTRACT.name;
-
-  const hdrH1 = document.querySelector('#app-header h1');
-  if (hdrH1) hdrH1.textContent = categoryLabel;
-
-  const hdrSub = document.getElementById('hdr-sub');
-  if (hdrSub && CONTRACT.name) hdrSub.textContent = CONTRACT.name + ' · Replay';
-
-  // 2. HUD Cards
-  const hudC1Title = document.querySelector('#hud-c1 .hud-title');
-  if (hudC1Title) hudC1Title.textContent = `🟡 C1 ${C1_NAME}`;
-
-  const hudC2Title = document.querySelector('#hud-c2 .hud-title');
-  if (hudC2Title) hudC2Title.textContent = `🔵 C2 ${C2_NAME}`;
-
-  // 3. Aba Splits
-  const scCards = document.querySelectorAll('.split-sum-card');
-  if (scCards.length > 0) {
-    const lbl1 = scCards[0].querySelector('.split-sum-label');
-    if (lbl1) lbl1.textContent = `🟡 C1 ${C1_NAME} Total`;
-  }
-  if (scCards.length > 1) {
-    const lbl2 = scCards[1].querySelector('.split-sum-label');
-    if (lbl2) lbl2.textContent = `🔵 C2 ${C2_NAME} Total`;
-  }
-
-  const thC1 = document.querySelector('table.splits-tbl th.c1h');
-  if (thC1) thC1.textContent = `🟡 ${C1_NAME}`;
-
-  const thC2 = document.querySelector('table.splits-tbl th.c2h');
-  if (thC2) thC2.textContent = `🔵 ${C2_NAME}`;
-}
-
-/* ================================================================
-   CONTRACT RENDERING
-================================================================ */
-function applyContract(){
-  updateDynamicTitlesAndNames();
-
-  if(CONTRACT.name||CONTRACT.courseName){
-    document.getElementById('hdr-sub').textContent=(CONTRACT.name||CONTRACT.courseName)+'  ·  Replay';
-  }
-
-  let wx=CONTRACT.weatherSnapshot||null;
-  if(!wx&&CONTRACT.kmSegments&&CONTRACT.kmSegments.length){
-    wx=CONTRACT.kmSegments[0].weatherSnapshot;
-  }
-  if(wx){
-    const wSpeed = (wx.windSpeedKts || '--') + ' kts';
-    const wDir = wx.windDirectionDeg ? wx.windDirectionDeg + '° (' + (wx.windDirLabel || degToCompass(wx.windDirectionDeg)) + ')' : '--';
-    const cVal = (wx.currentSpeedKts || '0') + ' kts (' + (wx.currentDirectionDeg || '0') + '°)';
-    
-    document.getElementById('map-wx-wind-val').textContent = wSpeed;
-    document.getElementById('map-wx-curr-val').textContent = 'Corrente: ' + cVal;
-
-    const mapCompassEl = document.getElementById('map-compass-svg');
-    if (mapCompassEl) {
-      mapCompassEl.innerHTML = makeCompassRoseSVG(0, wx.windDirectionDeg || 65, wx.currentDirectionDeg || 180, 42);
+        if (lat == null || lon == null || t == null || isNaN(lat) || isNaN(lon) || isNaN(t)) return null;
+        return { 
+          lat: Number(lat), 
+          lon: Number(lon), 
+          t: Number(t), 
+          spdKmh: Number(spdKmh) || 0, 
+          hr: p.hr || p.heartRate || null, 
+          heading: p.heading != null ? Number(p.heading) : null,
+          cadence: p.cadence || null 
+        };
+      }).filter(Boolean);
     }
-  }
 
-  const eventsList = CONTRACT.events || [];
-  const pillsContainer = document.getElementById('events-pills-list');
-  if (pillsContainer) {
-    if (!eventsList.length) {
-      pillsContainer.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-hud)">Nenhum evento no contrato</span>';
-    } else {
-      pillsContainer.innerHTML = eventsList.map((evt, idx) => {
-        const typeIcon = evt.type === 'BUOY_COLLISION' ? '🚩' : (evt.type === 'SPRINT' ? '⚡' : (evt.type === 'ABRUPT_TURN' ? '↪️' : (evt.type === 'STOP' ? '🛑' : '📍')));
-        const title = evt.title || 'Evento Notável';
-        return `<button onclick="onSelectEvent(${idx})" style="display:inline-flex; align-items:center; gap:4px; font-family:var(--font-hud); font-size:0.72rem; font-weight:700; padding:3px 8px; border-radius:4px; border:1px solid var(--border-glow); background:rgba(6,182,212,0.1); color:var(--text); cursor:pointer; white-space:nowrap; transition:all 0.2s;">
-          <span>${typeIcon}</span>
-          <span>${title}</span>
-        </button>`;
+    function generateDemoTracks() {
+      const startLat = -27.4320, startLon = -48.4850;
+      const numPts = 80;
+      const tStep = 3000;
+
+      const track1Pts = [];
+      const track2Pts = [];
+
+      for (let i = 0; i < numPts; i++) {
+        const frac = i / (numPts - 1);
+        const t = i * tStep;
+        const curve = Math.sin(frac * Math.PI * 2) * 0.003;
+        const lat = startLat + frac * 0.025 + curve;
+        const lon = startLon + frac * 0.040;
+        
+        const spd1 = 12.2 + Math.sin(i * 0.3) * 1.5 + (i > 50 ? 0.8 : 0);
+        const hr1 = 135 + Math.round(frac * 30 + Math.sin(i * 0.2) * 8);
+        track1Pts.push({ lat: lat + 0.0002, lon: lon - 0.0001, t, spdKmh: spd1, hr: hr1 });
+
+        const spd2 = 12.0 + Math.cos(i * 0.3) * 1.4 + (i > 40 && i < 65 ? 1.2 : 0);
+        const hr2 = 138 + Math.round(frac * 28 + Math.cos(i * 0.2) * 7);
+        track2Pts.push({ lat: lat - 0.0002, lon: lon + 0.0001, t, spdKmh: spd2, hr: hr2 });
+      }
+
+      return [
+        { name: 'C1 Natureza', color: '#00F2FE', points: track1Pts },
+        { name: 'C2 Salvaá', color: '#F59E0B', points: track2Pts }
+      ];
+    }
+
+    // Inicialização Principal
+    async function init() {
+      // 1. Tentar resolver CONTRACT de todas as fontes disponíveis
+      if (typeof window.CONTRACT !== 'undefined' && (window.CONTRACT.sportPackage || window.CONTRACT.tracks)) {
+        CONTRACT = window.CONTRACT;
+      } else {
+        try {
+          const stored = localStorage.getItem('vaarec_sport_package') || localStorage.getItem('vaarec_contract');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            CONTRACT = parsed.sportPackage ? parsed : { sportPackage: parsed, ...parsed };
+          }
+        } catch (e) { }
+
+        const params = new URLSearchParams(window.location.search);
+        const contractUrl = params.get('contract') || params.get('file');
+        if (contractUrl) {
+          try {
+            const res = await fetch(contractUrl);
+            if (res.ok) CONTRACT = await res.json();
+          } catch (e) { }
+        }
+      }
+
+      // Configurar Cabeçalho Limpo
+      const hdrTitle = document.getElementById('hdr-title');
+      const hdrSub = document.getElementById('hdr-sub');
+
+      const rawTitle = CONTRACT.name || "Replay Multi-GPS";
+      const cleanTitle = (rawTitle.includes("Base Espacial") || rawTitle.includes("Circuito Jurerê"))
+        ? "VAAREC Replay Multi-GPS"
+        : rawTitle;
+      hdrTitle.textContent = cleanTitle;
+
+      // 2. Carregar Trilhas do Contrato ou Fallback
+      let rawTracks = CONTRACT.sportPackage?.tracks || CONTRACT.tracks || [];
+      if (!rawTracks.length) {
+        rawTracks = generateDemoTracks();
+      }
+
+      let loadedTracks = [];
+      for (let idx = 0; idx < rawTracks.length; idx++) {
+        const t = rawTracks[idx];
+        const color = t.color || TRACK_COLORS[idx % TRACK_COLORS.length];
+        let rawPts = getTrackPoints(t);
+
+        if (!rawPts.length && (t.fileName || t.file || t.name)) {
+          const fileData = await fetchGPSFile(t.fileName || t.file || `${t.name}.gpx`);
+          if (fileData) {
+            if (fileData.trim().startsWith('{') || (t.fileName && t.fileName.endsWith('.txt'))) {
+              rawPts = parseGarminJSONText(fileData);
+            } else {
+              rawPts = parseGPXText(fileData);
+            }
+          }
+        }
+
+        if (!rawPts.length) continue;
+
+        const t0 = rawPts[0].t;
+        let accDist = 0;
+        const pts = [];
+
+        for (let pIdx = 0; pIdx < rawPts.length; pIdx++) {
+          const p = rawPts[pIdx];
+          const lat = p.lat;
+          const lon = p.lon;
+          const tMs = p.t - t0;
+
+          if (pts.length > 0) {
+            const prev = pts[pts.length - 1];
+            accDist += haversineM(prev.lat, prev.lon, lat, lon);
+          }
+
+          let heading = p.heading;
+          if (heading == null) {
+            if (pIdx + 1 < rawPts.length) {
+              const nextLat = rawPts[pIdx + 1].lat;
+              const nextLon = rawPts[pIdx + 1].lon;
+              heading = (!isNaN(nextLat) && !isNaN(nextLon)) ? calcBearing(lat, lon, nextLat, nextLon) : 0;
+            } else if (pts.length > 0) {
+              heading = pts[pts.length - 1].heading;
+            } else {
+              heading = 0;
+            }
+          }
+
+          pts.push({
+            lat,
+            lon,
+            t: tMs,
+            spdKmh: Number(p.spdKmh || 0),
+            hr: p.hr || null,
+            heading: Number(heading || 0),
+            accDist
+          });
+        }
+
+        if (!pts.length) continue;
+
+        const trackDur = pts[pts.length - 1].t;
+        if (trackDur > maxDurMs) maxDurMs = trackDur;
+
+        loadedTracks.push({
+          id: t.id || `track-${idx + 1}`,
+          name: t.name || `Canoa ${idx + 1}`,
+          color,
+          points: pts,
+          totalDistM: accDist,
+          maxDurMs: trackDur
+        });
+      }
+
+      if (!loadedTracks.length) {
+        const demo = generateDemoTracks();
+        demo.forEach((t, idx) => {
+          const pts = t.points.map(p => ({ ...p, accDist: 0 }));
+          loadedTracks.push({
+            id: `demo-${idx + 1}`,
+            name: t.name,
+            color: t.color,
+            points: pts,
+            totalDistM: 1000,
+            maxDurMs: pts[pts.length - 1].t
+          });
+        });
+        maxDurMs = loadedTracks[0].maxDurMs;
+      }
+
+      tracks = loadedTracks;
+      hdrSub.textContent = `${tracks.length} Canoa(s) • Telemetria Oficial`;
+
+      // 3. Inicializar Mapa Leaflet
+      const initialCenter = (tracks[0]?.points?.[0])
+        ? [tracks[0].points[0].lat, tracks[0].points[0].lon]
+        : (CONTRACT.viewport20km?.center ? [CONTRACT.viewport20km.center.lat, CONTRACT.viewport20km.center.lng] : [-27.426, -48.481]);
+
+      map = L.map('map-detail', {
+        center: initialCenter,
+        zoom: 15,
+        zoomControl: false
+      });
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CartoDB &copy; OpenStreetMap',
+        maxZoom: 20
+      }).addTo(map);
+
+      L.control.zoom({ position: 'bottom-right' }).addTo(map);
+      L.control.scale({ position: 'bottom-left', metric: true, imperial: false }).addTo(map);
+
+      // 4. Desenhar Linhas de Largada e Chegada
+      if (CONTRACT.startLine?.p1 && CONTRACT.startLine?.p2) {
+        const sl = CONTRACT.startLine;
+        L.polyline([[sl.p1.lat, sl.p1.lng || sl.p1.lon], [sl.p2.lat, sl.p2.lng || sl.p2.lon]], {
+          color: '#10b981', weight: 4, opacity: 0.9, dashArray: '6,6'
+        }).addTo(map).bindTooltip('Linha de Largada', { permanent: false });
+      }
+      if (CONTRACT.endLine?.p1 && CONTRACT.endLine?.p2) {
+        const el = CONTRACT.endLine;
+        L.polyline([[el.p1.lat, el.p1.lng || el.p1.lon], [el.p2.lat, el.p2.lng || el.p2.lon]], {
+          color: '#ef4444', weight: 4, opacity: 0.9, dashArray: '6,6'
+        }).addTo(map).bindTooltip('Linha de Chegada', { permanent: false });
+      }
+
+      // 5. Adicionar Marcadores e Polylines das Canoas
+      const allCoords = [];
+      tracks.forEach((t, i) => {
+        if (!t.points.length) return;
+        t.trailPolyline = L.polyline([], { color: t.color, weight: 3, opacity: 0.85 }).addTo(map);
+        t.marker = L.marker([t.points[0].lat, t.points[0].lon], {
+          icon: createCanoeIcon(t.color, '#ffffff', i, t.name),
+          zIndexOffset: 1000 + i
+        }).addTo(map);
+        t._currentHeading = t.points[0].heading || 0;
+        rotateCanoe(t.marker.getElement(), t._currentHeading);
+
+        t.points.forEach(p => allCoords.push([p.lat, p.lon]));
+      });
+
+      map.on('zoomend', () => {
+        tracks.forEach((t) => {
+          if (t.marker && t._currentHeading != null) {
+            rotateCanoe(t.marker.getElement(), t._currentHeading);
+          }
+        });
+      });
+
+      if (allCoords.length) {
+        map.fitBounds(allCoords, { padding: [40, 40] });
+      }
+
+      // 5b. Montar Botões Dinâmicos de Canoa na Câmera Drone
+      const camCanoesWrap = document.getElementById('dynamic-canoe-cam-btns');
+      if (camCanoesWrap) {
+        camCanoesWrap.innerHTML = '';
+        tracks.forEach((t, i) => {
+          const cBtn = document.createElement('button');
+          cBtn.className = 'drone-btn';
+          cBtn.id = `btn-cam-c${i}`;
+          cBtn.style.color = t.color;
+          cBtn.textContent = `🛶 C${i + 1}`;
+          cBtn.onclick = () => setCameraDirector('follow-canoe', i);
+          camCanoesWrap.appendChild(cBtn);
+        });
+      }
+
+      // 6. Inicializar Drone Camera Skills
+      if (typeof DroneCameraSkills !== 'undefined') {
+        droneCamera = new DroneCameraSkills({
+          map,
+          getEntities: () => tracks.map(t => {
+            const p = getInterpolatedPoint(t, playTimeMs);
+            return {
+              lat: Number(p?.lat ?? t.points[0]?.lat),
+              lon: Number(p?.lon ?? t.points[0]?.lon),
+              heading: Number(p?.heading ?? 0),
+              spdKmh: Number(p?.spdKmh ?? 0),
+              accDist: Number(p?.accDist ?? 0),
+              points: t.points,
+              pts: t.points
+            };
+          }),
+          getContract: () => CONTRACT
+        });
+      }
+
+      // 7. Popular Eventos Notáveis
+      renderEvents();
+
+      // 8. Renderizar HUD e Distâncias Iniciais
+      updateFrame(0);
+      setupTimelineDrag();
+    }
+
+    function getInterpolatedPoint(track, timeMs) {
+      const pts = track.points;
+      if (!pts || !pts.length) return null;
+      if (timeMs <= pts[0].t) return pts[0];
+      if (timeMs >= pts[pts.length - 1].t) return pts[pts.length - 1];
+
+      let low = 0, high = pts.length - 1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (pts[mid].t < timeMs) low = mid + 1;
+        else high = mid - 1;
+      }
+      const i = Math.max(1, low);
+      const p1 = pts[i - 1];
+      const p2 = pts[i];
+      const frac = (p2.t - p1.t) > 0 ? (timeMs - p1.t) / (p2.t - p1.t) : 0;
+
+      const lat = p1.lat + (p2.lat - p1.lat) * frac;
+      const lon = p1.lon + (p2.lon - p1.lon) * frac;
+      const heading = p1.heading + (p2.heading - p1.heading) * frac;
+      const spdKmh = p1.spdKmh + (p2.spdKmh - p1.spdKmh) * frac;
+      const hr = p1.hr != null && p2.hr != null ? Math.round(p1.hr + (p2.hr - p1.hr) * frac) : (p1.hr || p2.hr);
+      const accDist = p1.accDist + (p2.accDist - p1.accDist) * frac;
+
+      return { lat, lon, heading, spdKmh, hr, accDist, t: timeMs };
+    }
+
+    function updateFrame(timeMs) {
+      playTimeMs = Math.max(0, Math.min(timeMs, maxDurMs));
+
+      // Atualizar Tempo no HUD
+      const curStr = formatTime(playTimeMs);
+      const totStr = formatTime(maxDurMs);
+      document.getElementById('time-cur').textContent = curStr.slice(3);
+      document.getElementById('time-tot').textContent = totStr.slice(3);
+      document.getElementById('time-indicator-pill').textContent = `${curStr} / ${totStr}`;
+
+      // Atualizar Barra de Progresso
+      const pct = maxDurMs > 0 ? (playTimeMs / maxDurMs) * 100 : 0;
+      document.getElementById('timeline-fill').style.width = `${pct}%`;
+      document.getElementById('timeline-handle').style.left = `${pct}%`;
+
+      // Atualizar Canoas no Mapa
+      let distHtml = '';
+      const currentPositions = [];
+
+      tracks.forEach((t, i) => {
+        const pt = getInterpolatedPoint(t, playTimeMs);
+        if (!pt) return;
+        currentPositions.push({ track: t, pt });
+
+        if (t.marker) {
+          t.marker.setLatLng([pt.lat, pt.lon]);
+          t._currentHeading = pt.heading || 0;
+          rotateCanoe(t.marker.getElement(), t._currentHeading);
+
+          const spdEl = document.getElementById(`spd-marker-${i}`);
+          if (spdEl) spdEl.textContent = (pt.spdKmh || 0).toFixed(1) + ' km/h';
+
+          const hrEl = document.getElementById(`hr-marker-${i}`);
+          if (hrEl) {
+            if (pt.hr) {
+              const hrColor = getHRColor(pt.hr);
+              hrEl.innerHTML = `<span style="color:${hrColor}">❤️ ${Math.round(pt.hr)} bpm</span>`;
+            } else {
+              hrEl.textContent = '';
+            }
+          }
+        }
+
+        // Atualizar rastro
+        if (t.trailPolyline) {
+          const trail = t.points.filter(p => p.t <= playTimeMs).map(p => [p.lat, p.lon]);
+          trail.push([pt.lat, pt.lon]);
+          t.trailPolyline.setLatLngs(trail);
+        }
+
+        const distKm = (pt.accDist / 1000).toFixed(2);
+        distHtml += `<span style="color:${t.color}"><strong>${t.name}:</strong> ${distKm} km (${pt.spdKmh.toFixed(1)} km/h)</span>`;
+      });
+
+      // Calcular Gap se houver 2 canoas
+      if (currentPositions.length >= 2) {
+        const d1 = currentPositions[0].pt.accDist;
+        const d2 = currentPositions[1].pt.accDist;
+        const gapM = Math.abs(d1 - d2).toFixed(0);
+        const leader = d1 >= d2 ? currentPositions[0].track.name : currentPositions[1].track.name;
+        distHtml += `<span style="color:var(--accent)"><strong>GAP:</strong> ${gapM}m (${leader} à frente)</span>`;
+      }
+
+      document.getElementById('dist-row').innerHTML = distHtml;
+
+      // Atualizar Câmera Drone
+      if (droneCamera) {
+        droneCamera.update(playTimeMs);
+      }
+
+      // Atualizar HUD Detalhado
+      renderHUD(currentPositions);
+    }
+
+    function renderHUD(positions) {
+      const container = document.getElementById('hud-cards-container');
+      if (!container) return;
+
+      container.innerHTML = positions.map(({ track, pt }) => `
+    <div class="hud-card" style="border-left: 3px solid ${track.color};">
+      <div class="hud-card-title" style="color:${track.color};">${track.name}</div>
+      <div class="hud-card-spd">${pt.spdKmh.toFixed(1)} <span style="font-size:0.75rem; color:#94a3b8;">km/h</span></div>
+      <div class="hud-card-metrics">
+        <div>Dist: ${(pt.accDist / 1000).toFixed(2)} km</div>
+        <div>FC: ${pt.hr ? pt.hr + ' bpm' : '--'}</div>
+        <div>Proa: ${Math.round(pt.heading)}°</div>
+        <div>Ritmo: ${pt.spdKmh > 0 ? (60 / pt.spdKmh).toFixed(1) + ' min/km' : '--'}</div>
+      </div>
+    </div>
+  `).join('');
+    }
+
+    function renderEvents() {
+      const pList = document.getElementById('events-pills-list');
+      const allEvents = CONTRACT.events?.all || CONTRACT.events?.interference || CONTRACT.events?.custom || [];
+      if (!allEvents.length || !pList) return;
+
+      pList.innerHTML = allEvents.map((ev, i) => {
+        const label = ev.name || ev.description || `Evento ${i + 1}`;
+        const tMs = ev.timeMs || (ev.t || 0);
+        return `<button class="event-pill" onclick="seekTo(${tMs})">📍 ${label} (${formatTime(tMs).slice(3)})</button>`;
       }).join('');
     }
-  }
-}
 
-function onSelectEvent(idx) {
-  const eventsList = CONTRACT.events || [];
-  const evt = eventsList[idx];
-  if (!evt) return;
-
-  const desc = evt.metadata?.description || evt.title || 'Evento Notável';
-  const timeInfo = evt.timeFormatted ? ` [${evt.timeFormatted}]` : '';
-
-  showToast(`📍 ${desc}${timeInfo}`, 4000);
-
-  if (evt.location && evt.location.lat && mapDetail) {
-    mapDetail.flyTo([evt.location.lat, evt.location.lng || evt.location.lon], 18.5, { duration: 1.2, easeLinearity: 0.25 });
-  }
-
-  if (evt.timestamp && D.length) {
-    const tTarget = evt.timestamp - (D[0].t_raw || 0);
-    if (tTarget > 0) seek(tTarget);
-  }
-}
-
-function degToCompass(d){
-  if(d==null)return'';
-  const dirs=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSO','SO','OSO','O','ONO','NO','NNO'];
-  return dirs[Math.round(((d%360)+360)%360/22.5)%16];
-}
-
-/* ================================================================
-   LOADING HELPERS
-================================================================ */
-function setLoadMsg(m){const el=document.getElementById('loading-msg');if(el)el.textContent=m;}
-function hideLoading(){const el=document.getElementById('loading');if(el){el.style.transition='opacity .5s';el.style.opacity='0';setTimeout(()=>el.style.display='none',500);}}
-function showLoadError(msg){const el=document.getElementById('loading');if(el){el.innerHTML=`<div style="text-align:center;max-width:300px;padding:24px"><div style="font-size:2.5rem;margin-bottom:14px">⚠️</div><div style="font-family:'Rajdhani',sans-serif;font-size:1rem;font-weight:700;color:#EF4444;margin-bottom:8px">Erro ao carregar GPS</div><div style="font-size:.8rem;color:#6B7280;line-height:1.5">${msg}</div></div>`;}}
-
-/* ================================================================
-   INIT (LEITURA DINÂMICA DO CONTRATO DE MESMO NOME E FALLBACK GPS)
-================================================================ */
-async function fetchGPSFile(filename) {
-  const paths = [
-    `./GPS/${filename}`,
-    `GPS/${filename}`,
-    `../GPS/${filename}`,
-    `/viewers/GPS/${filename}`,
-    `./viewers/GPS/${filename}`,
-    `/GPS/${filename}`
-  ];
-  for (const path of paths) {
-    try {
-      const res = await fetch(path);
-      if (res.ok) {
-        const text = await res.text();
-        if (text && text.trim().length > 50) {
-          console.log(`[Viewer] GPS '${filename}' carregado de: ${path}`);
-          return text;
-        }
-      }
-    } catch(e) {}
-  }
-  
-  // Fallback seguro de emergência caso fetch falhe devido a protocolo file://, CORS ou servidor
-  console.warn(`[Viewer] Fetch falhou para '${filename}'. Usando dados GPS integrados de fallback.`);
-  if (filename.includes('Natureza-Esdras-b6-Amador-Masc')) {
-    if (typeof EMBEDDED_GPX_1 !== 'undefined' && EMBEDDED_GPX_1.length > 50) return EMBEDDED_GPX_1;
-  }
-  if (filename.includes('Salvaa-Luciano-b6-Amador-Masc')) {
-    if (typeof EMBEDDED_TXT_2 !== 'undefined' && EMBEDDED_TXT_2.length > 50) return EMBEDDED_TXT_2;
-  }
-  
-  throw new Error(`Arquivo GPS '${filename}' não encontrado.`);
-}
-
-async function loadTrackFromContract(trackObj, defaultFilename, isGpxDefault) {
-  if (!trackObj) {
-    if (defaultFilename) {
-      const text = await fetchGPSFile(defaultFilename);
-      return isGpxDefault ? parseGPX(text) : parseGarminTXT(text);
+    function seekTo(ms) {
+      playTimeMs = ms;
+      updateFrame(playTimeMs);
     }
-    return [];
-  }
 
-  let pts = [];
+    // Controles de Reprodução
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('btn-play');
+      btn.textContent = isPlaying ? '⏸' : '▶';
 
-  // 1. Se os pontos de telemetria já estão embutidos no contrato JSON
-  if (trackObj.points && trackObj.points.length > 0) {
-    console.log(`[Viewer] Usando ${trackObj.points.length} pontos embutidos para: ${trackObj.name}`);
-    pts = trackObj.points.map(p => ({
-      lat: p.lat,
-      lon: p.lon != null ? p.lon : p.lng,
-      time: p.time || p.timestamp,
-      timestamp: p.timestamp || (p.time ? new Date(p.time).getTime() : 0),
-      spdKmh: p.spdKmh != null ? p.spdKmh : (p.speedKmh || 0),
-      hr: p.hr != null ? p.hr : (p.heartRate || null),
-      cadence: p.cadence || null
-    }));
-  } else {
-    // 2. Tentar carregar arquivo GPS local
-    const rawName = trackObj.fileName || trackObj.file || trackObj.name || "";
-    const cleanName = rawName.replace(/^Canoa\s*\d+:\s*/i, "").trim();
-
-    const candidates = [];
-    if (trackObj.fileName) candidates.push(trackObj.fileName);
-    if (trackObj.file) candidates.push(trackObj.file);
-    if (cleanName) {
-      if (!cleanName.includes('.')) {
-        candidates.push(`${cleanName}.txt`);
-        candidates.push(`${cleanName}.gpx`);
-        candidates.push(`${cleanName}.json`);
+      if (isPlaying) {
+        lastTimestamp = performance.now();
+        runLoop();
       } else {
-        candidates.push(cleanName);
-      }
-    }
-    if (defaultFilename && !candidates.includes(defaultFilename)) {
-      candidates.push(defaultFilename);
-    }
-
-    for (const candidate of candidates) {
-      try {
-        const text = await fetchGPSFile(candidate);
-        if (text && text.length > 50) {
-          console.log(`[Viewer] Sucesso ao carregar '${candidate}' para '${trackObj.name}'`);
-          pts = (candidate.endsWith('.gpx') || text.includes('<gpx')) ? parseGPX(text) : parseGarminTXT(text);
-          break;
-        }
-      } catch(e) {}
-    }
-
-    if (!pts.length && defaultFilename) {
-      const text = await fetchGPSFile(defaultFilename);
-      pts = isGpxDefault ? parseGPX(text) : parseGarminTXT(text);
-    }
-  }
-
-  // 3. Recorte rigoroso para que 00:00:00 corresponda à Largada (Comum)
-  
-  if ((!pts || pts.length === 0) && trackObj && (trackObj.id || trackObj.trackId)) {
-    try {
-      const slug = VaarecClient.getSlugFromUrl();
-      const rawId = trackObj.id || trackObj.trackId;
-      const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, rawId);
-      if (fetchedPoints && fetchedPoints.length > 0) {
-        console.log(`[Viewer] Carregados ${fetchedPoints.length} pontos via Supabase Storage para track: ${trackObj.name}`);
-        pts = fetchedPoints.map(p => ({
-          lat: p.lat,
-          lon: p.lon != null ? p.lon : p.lng,
-          time: p.time || p.timestamp,
-          timestamp: p.timestamp || (p.time ? new Date(p.time).getTime() : 0),
-          spdKmh: p.spdKmh != null ? p.spdKmh : (p.speedKmh || 0),
-          hr: p.hr != null ? p.hr : (p.heartRate || null),
-          cadence: p.cadence || null
-        }));
-        return pts; // Retorna imediatamente sem buscar arquivo local .gpx/.txt
-      }
-    } catch(e) {
-      console.warn('[Viewer] Falha ao buscar pontos da track no Supabase Storage:', e);
-    }
-  }
-  
-  if (pts && pts.length > 0) {
-    let sIdx = 0;
-    let eIdx = pts.length - 1;
-
-    if (trackObj.startIndex != null && trackObj.startIndex > 0) {
-      sIdx = Math.max(0, Math.min(pts.length - 1, trackObj.startIndex));
-    }
-    if (trackObj.endIndex != null && trackObj.endIndex > sIdx) {
-      eIdx = Math.max(sIdx, Math.min(pts.length - 1, trackObj.endIndex));
-    }
-
-    // Se sIdx for 0, buscar o timestamp da Largada Comum ou aplicar o offset default do demo (434s)
-    if (sIdx === 0) {
-      const pStart = pts[0];
-      const pStartTs = pStart.timestamp || (pStart.time ? new Date(pStart.time).getTime() : 0);
-      
-      const commonStartTs = CONTRACT?.startTs || CONTRACT?.sportPackage?.tracks?.[0]?.startTs || (trackObj.startTs ? trackObj.startTs : (pStartTs > 0 ? pStartTs + 434000 : 0));
-      
-      if (commonStartTs && pStartTs && commonStartTs > pStartTs) {
-        const foundIdx = pts.findIndex(p => {
-          const ts = p.timestamp || (p.time ? new Date(p.time).getTime() : 0);
-          return ts >= commonStartTs;
-        });
-        if (foundIdx > 0) sIdx = foundIdx;
+        cancelAnimationFrame(animTimer);
       }
     }
 
-    if (sIdx > 0 || eIdx < pts.length - 1) {
-      console.log(`[Viewer] Recortando '${trackObj.name || 'Canoa'}' para a Largada Comum: [${sIdx} .. ${eIdx}] (total original: ${pts.length})`);
-      pts = pts.slice(sIdx, eIdx + 1);
+    function runLoop() {
+      if (!isPlaying) return;
+      const now = performance.now();
+      const dt = (now - lastTimestamp);
+      lastTimestamp = now;
+
+      playTimeMs += dt * speedFactor;
+      if (playTimeMs >= maxDurMs) {
+        playTimeMs = maxDurMs;
+        togglePlay();
+      }
+
+      updateFrame(playTimeMs);
+      animTimer = requestAnimationFrame(runLoop);
     }
-  }
 
-  return pts;
-}
+    function cycleSpeed() {
+      speedIdx = (speedIdx + 1) % speedOptions.length;
+      speedFactor = speedOptions[speedIdx];
+      document.getElementById('btn-speed-toggle').textContent = `⚡ ${speedFactor}×`;
+    }
 
+    function toggleMetricsCollapse() {
+      metricsCollapsed = !metricsCollapsed;
+      const coll = document.getElementById('collapsible-metrics');
+      const icon = document.getElementById('icon-toggle-metrics');
+      if (metricsCollapsed) {
+        coll.classList.add('collapsed');
+        icon.textContent = '🔼';
+      } else {
+        coll.classList.remove('collapsed');
+        icon.textContent = '🔽';
+      }
+    }
 
+    // Câmera Drone Handlers
+    function setCameraDirector(mode, param) {
+      if (!droneCamera) return;
+      document.querySelectorAll('.drone-btn').forEach(b => b.classList.remove('active'));
 
+      if (mode === 'auto' || mode === 'smart' || mode === 'lookahead') {
+        document.getElementById('btn-cam-auto')?.classList.add('active');
+        droneCamera.setMode('auto');
+      } else if (mode === 'follow-leader' || mode === 'leader') {
+        document.getElementById('btn-cam-leader')?.classList.add('active');
+        droneCamera.setMode('follow-leader');
+      } else if (mode === 'follow-all' || mode === 'all' || mode === 'todas') {
+        document.getElementById('btn-cam-all')?.classList.add('active');
+        droneCamera.setMode('follow-all');
+      } else if (mode === 'follow-canoe' || mode === 'canoe') {
+        const idx = typeof param === 'number' ? param : 0;
+        document.getElementById(`btn-cam-c${idx}`)?.classList.add('active');
+        droneCamera.setMode('follow-canoe', { canoeIdx: idx });
+      } else if (mode === 'overview') {
+        document.getElementById('btn-cam-overview')?.classList.add('active');
+        droneCamera.setMode('overview');
+      }
+    }
 
-async function startViewerApp() {
-  const slug = VaarecClient.getSlugFromUrl();
-  try {
-    VaarecClient.logViewEvent(slug);
-    setLoadMsg('Carregando metadados da prova...');
-    CONTRACT = await VaarecClient.fetchMeta(slug);
-    window.CONTRACT = CONTRACT;
-    console.log('[Viewer] Contrato da prova carregado via Supabase:', CONTRACT.name);
-    
-    const contractTracks = CONTRACT?.sportPackage?.tracks || CONTRACT?.tracks || [];
-    const t1 = contractTracks[0];
-    const t2 = contractTracks[1];
+    function setDroneAltitude(preset) {
+      if (!droneCamera) return;
+      document.querySelectorAll('.drone-btn-mini').forEach(b => {
+        if (b.id && b.id.startsWith('btn-alt-')) b.classList.remove('active');
+      });
+      if (preset === 'close') document.getElementById('btn-alt-close')?.classList.add('active');
+      else if (preset === 'normal') document.getElementById('btn-alt-normal')?.classList.add('active');
+      else if (preset === 'panoramic') document.getElementById('btn-alt-pano')?.classList.add('active');
 
-    setLoadMsg(`Carregando Canoa 1${t1 ? ' (' + t1.name + ')' : ''}…`);
-    const pts1 = await loadTrackFromContract(t1, null, true);
+      droneCamera.setAltitudePreset(preset);
+      updateDroneIndicator();
+    }
 
-    setLoadMsg(`Carregando Canoa 2${t2 ? ' (' + t2.name + ')' : ''}…`);
-    const pts2 = t2 ? await loadTrackFromContract(t2, null, false) : [];
+    function adjustDroneZoom(delta) {
+      if (!droneCamera) return;
+      droneCamera.adjustZoomOffset(delta);
+      updateDroneIndicator();
+    }
 
-    const ptsB = pts2.length ? pts2 : pts1.map(p=>({...p, lat:p.lat+0.0001, lon:p.lon+0.0001, spdKmh:(p.spdKmh||0)*0.97}));
+    function updateDroneIndicator() {
+      const ind = document.getElementById('drone-zoom-indicator');
+      if (!ind || !droneCamera) return;
+      const z = droneCamera.config.followZoom + (droneCamera.config.zoomOffset || 0);
+      const altStr = z >= 20 ? 'Alt: 20m' : z === 19 ? 'Alt: 35m' : z === 18 ? 'Alt: 60m' : z === 17 ? 'Alt: 100m' : 'Alt: 180m';
+      ind.textContent = altStr;
+    }
 
-    setLoadMsg('Sincronizando timelines…');
-    D = mergeToTimeline(pts1, ptsB);
+    // Timeline Dragging Handler
+    function setupTimelineDrag() {
+      const track = document.getElementById('timeline-track');
+      function seek(e) {
+        const rect = track.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        playTimeMs = frac * maxDurMs;
+        updateFrame(playTimeMs);
+      }
 
-    setLoadMsg('Calculando distâncias…'); computeDistances();
-    setLoadMsg('Inicializando mapa principal…'); setupMap();
-    setLoadMsg('Configurando gráficos…'); setupCharts();
-    setupTimeline(); renderSplits();
-    applyContract();
-    updateFrame(0);
-    hideLoading();
-    setTimeout(() => { mapDetail?.invalidateSize(); }, 200);
-  } catch (err) {
-    console.error('Start viewer error:', err);
-    showLoadError(err.message || 'Erro ao carregar dados da prova.');
-  }
-}
+      track.addEventListener('mousedown', e => { dragging = true; seek(e); });
+      window.addEventListener('mousemove', e => { if (dragging) seek(e); });
+      window.addEventListener('mouseup', () => { dragging = false; });
+      track.addEventListener('touchstart', e => { dragging = true; seek(e); }, { passive: true });
+      window.addEventListener('touchmove', e => { if (dragging) seek(e); }, { passive: true });
+      window.addEventListener('touchend', () => { dragging = false; });
+    }
 
-async function init(){
-  const userEmail = VaarecClient.getUserEmail();
-  if (!userEmail) {
-    hideLoading();
-    window.showAuthGate();
-    return;
-  }
-  window.hideAuthGate();
-  startViewerApp();
-}
+    // Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
 
-document.addEventListener('DOMContentLoaded', init);
-</script>
+      if (tabId === 'map') {
+        document.querySelectorAll('.nav-item')[0].classList.add('active');
+        document.getElementById('view-map').classList.add('active');
+        setTimeout(() => map?.invalidateSize(), 150);
+      } else if (tabId === 'hud') {
+        document.querySelectorAll('.nav-item')[1].classList.add('active');
+        document.getElementById('view-hud').classList.add('active');
+      } else if (tabId === 'splits') {
+        document.querySelectorAll('.nav-item')[2].classList.add('active');
+        document.getElementById('view-splits').classList.add('active');
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => { });
+      } else {
+        document.exitFullscreen().catch(() => { });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
 </body>
+
 </html>
-  

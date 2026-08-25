@@ -125,7 +125,7 @@
       transition: border-color .2s;
       font-family: 'Inter', sans-serif;
     }
-    input:focus { border-color: var(--accent); }
+    input:focus, select:focus { border-color: var(--accent); }
 
     .btn {
       padding: 11px 22px;
@@ -142,6 +142,7 @@
     .btn:hover { opacity: 0.9; }
     .btn:active { transform: scale(0.98); }
     .btn-green { background: linear-gradient(135deg, #15803d, #22c55e); }
+    .btn-cyan { background: linear-gradient(135deg, #0891b2, #06b6d4); }
 
     /* STATS ROW */
     .stats-row {
@@ -203,6 +204,7 @@
     }
     .pill-green { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
     .pill-blue { background: rgba(59,130,246,0.12); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+    .pill-purple { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
     .email-mono { font-family: monospace; font-size: 12px; color: var(--accent); }
     .slug-mono { font-family: monospace; font-size: 12px; color: var(--text); font-weight: 600; }
 
@@ -213,14 +215,6 @@
       font-size: 14px;
     }
     .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
-
-    .filter-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 18px;
-      align-items: flex-end;
-    }
-    .filter-row .form-group { flex: 1; margin-bottom: 0; }
 
     .sql-note {
       background: rgba(245,158,11,0.08);
@@ -282,32 +276,50 @@
 
     <section class="card">
       <h2>🚀 Publicar Nova Prova (.json)</h2>
+      
+      <div class="form-group">
+        <label for="template-select">Template do Viewer</label>
+        <select id="template-select">
+          <option value="viewer-desafio.html" selected>🚀 Desafio VAAREC (Câmera Drone, Duelo & Áudio)</option>
+          <option value="viewer.html">🏄 Viewer Padrão (HUD, Splits & Gráficos)</option>
+          <option value="viewer-treino-raia.html">🏁 Treino Raia (Análise de Circuito)</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label for="custom-slug">Slug / Identificador da Prova (Opcional — se em branco, usa o nome do arquivo)</label>
-        <input type="text" id="custom-slug" placeholder="Ex: jurere-amador-fem-2026" />
+        <input type="text" id="custom-slug" placeholder="Ex: v1-zimbros-6canoas" />
       </div>
       <div class="form-group">
         <label for="json-file">Arquivo JSON da Prova</label>
         <input type="file" id="json-file" accept=".json" />
       </div>
-      <button class="btn" id="btn-publish">Fatiar e Publicar no Supabase Storage 📤</button>
-      <div id="publish-status" style="margin-top: 12px; font-size: 13px; font-weight: 600;"></div>
+      <button class="btn btn-cyan" id="btn-publish">Fatiar e Publicar no Supabase Storage 📤</button>
+      <div id="publish-status" style="margin-top: 14px; font-size: 13px; font-weight: 600;"></div>
     </section>
 
     <section class="card">
       <h2>🔗 Gerar Link de Compartilhamento</h2>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
         <div class="form-group">
-          <label for="viewer-slug">Slug do Viewer (deve ser igual ao publicado acima)</label>
-          <input type="text" id="viewer-slug" placeholder="ex: jurere-amador-fem-05-08-2026" />
+          <label for="viewer-slug">Slug do Viewer</label>
+          <input type="text" id="viewer-slug" placeholder="ex: v1-zimbros-6canoas" />
         </div>
         <div class="form-group">
-          <label for="max-uses">Limite de Usos (Nulo = Ilimitado)</label>
-          <input type="number" id="max-uses" placeholder="Ex: 50" />
+          <label for="share-template-select">Template do Link</label>
+          <select id="share-template-select">
+            <option value="viewer-desafio.html" selected>🚀 Desafio VAAREC (viewer-desafio.html)</option>
+            <option value="viewer.html">🏄 Viewer Padrão (viewer.html)</option>
+            <option value="viewer-treino-raia.html">🏁 Treino Raia (viewer-treino-raia.html)</option>
+          </select>
         </div>
       </div>
+      <div class="form-group">
+        <label for="max-uses">Limite de Usos (Nulo = Ilimitado)</label>
+        <input type="number" id="max-uses" placeholder="Ex: 50" />
+      </div>
       <button class="btn" id="btn-create-link">Gerar Share Link 🔗</button>
-      <div id="generated-link" style="margin-top: 14px; word-break: break-all; color: var(--green); font-weight: bold;"></div>
+      <div id="generated-link" style="margin-top: 14px; word-break: break-all;"></div>
     </section>
 
   </div>
@@ -379,25 +391,11 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
     </div>
 
     <section class="card">
-      <h2>📋 Log de Acessos</h2>
-      <div class="filter-row">
-        <div class="form-group">
-          <label for="filter-slug">Filtrar por Prova (slug)</label>
-          <input type="text" id="filter-slug" placeholder="Deixe em branco para ver todos" />
-        </div>
-        <button class="btn btn-green" onclick="loadReports()">🔄 Atualizar</button>
-      </div>
-      <div id="report-loading">⏳ Carregando...</div>
-      <div class="table-wrap" id="report-table-wrap">
-        <div class="empty-state"><div class="icon">📊</div><div>Clique em <strong>Atualizar</strong>.</div></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>👥 Usuários Registrados</h2>
-      <div class="table-wrap" id="users-table-wrap">
-        <div class="empty-state"><div class="icon">👥</div><div>Clique em <strong>Atualizar</strong>.</div></div>
-      </div>
+      <h2>📋 Logs Detalhados de Acesso</h2>
+      <div id="report-loading">Carregando relatórios...</div>
+      <div class="table-wrap" id="report-table-wrap"></div>
+      <h2 style="margin-top:24px;">👥 Usuários Cadastrados</h2>
+      <div class="table-wrap" id="users-table-wrap"></div>
     </section>
 
   </div>
@@ -413,7 +411,6 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
       const key = document.getElementById('supabase-key')?.value?.trim() || ADMIN_SERVICE_KEY;
       return { url, key, headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' } };
     }
-
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -449,18 +446,27 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
         const rows = viewers.map(v => {
           const date = new Date(v.created_at).toLocaleString('pt-BR');
           const accessCount = events.filter(e => e.viewer_slug === v.slug).length;
-          const link = `https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(v.slug)}&t=t_nova`;
+          const desafioUrl = `https://elmonte.dev.br/vaarec/viewers/viewer-desafio.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
+          const padraoUrl = `https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
+          const raiaUrl = `https://elmonte.dev.br/vaarec/viewers/viewer-treino-raia.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
+          
           return `<tr>
             <td class="slug-mono">${v.slug}</td>
-            <td style="color: var(--muted); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${v.title || '–'}</td>
+            <td style="color: var(--muted); font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${v.title || '–'}</td>
             <td><span class="pill pill-blue">${accessCount} acessos</span></td>
             <td style="color: var(--muted); font-size: 12px;">${date}</td>
-            <td><a href="${link}" target="_blank" style="color: var(--accent); font-size: 12px; text-decoration: none;">🔗 Abrir</a></td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <a href="${desafioUrl}" target="_blank" style="color: var(--accent); font-weight:700; font-size: 11px; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.3); border-radius:4px; padding:2px 6px; text-decoration:none;">🚀 Desafio</a>
+                <a href="${padraoUrl}" target="_blank" style="color: var(--blue); font-weight:700; font-size: 11px; background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); border-radius:4px; padding:2px 6px; text-decoration:none;">🏄 Padrão</a>
+                <a href="${raiaUrl}" target="_blank" style="color: #a78bfa; font-weight:700; font-size: 11px; background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.3); border-radius:4px; padding:2px 6px; text-decoration:none;">🏁 Raia</a>
+              </div>
+            </td>
           </tr>`;
         }).join('');
 
         wrap.innerHTML = `<table>
-          <thead><tr><th>Slug</th><th>Título</th><th>Acessos</th><th>Publicado em</th><th>Link</th></tr></thead>
+          <thead><tr><th>Slug</th><th>Título</th><th>Acessos</th><th>Publicado em</th><th>Visualizadores</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
 
@@ -471,7 +477,6 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
 
     async function loadReports() {
       const { url, headers } = getConfig();
-      const slugFilter = document.getElementById('filter-slug')?.value?.trim();
       const loadingEl = document.getElementById('report-loading');
       const tableWrap = document.getElementById('report-table-wrap');
       const usersWrap = document.getElementById('users-table-wrap');
@@ -481,11 +486,8 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
       usersWrap.innerHTML = '';
 
       try {
-        let eventUrl = `${url}/rest/v1/event_log?select=*&order=created_at.desc&limit=200`;
-        if (slugFilter) eventUrl += `&viewer_slug=eq.${encodeURIComponent(slugFilter)}`;
-
         const [evRes, uRes] = await Promise.all([
-          fetch(eventUrl, { headers }),
+          fetch(`${url}/rest/v1/event_log?select=*&order=created_at.desc&limit=200`, { headers }),
           fetch(`${url}/rest/v1/users?select=*&order=created_at.desc&limit=200`, { headers })
         ]);
 
@@ -498,7 +500,7 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
         document.getElementById('stat-total-provas').textContent = uniqueSlugs.size;
 
         if (events.length === 0) {
-          tableWrap.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>Nenhum acesso registrado. Execute o SQL de configuração acima e acesse um viewer para ver os dados aqui.</div></div>';
+          tableWrap.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>Nenhum acesso registrado ainda.</div></div>';
         } else {
           const rows = events.map(e => {
             const date = e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '–';

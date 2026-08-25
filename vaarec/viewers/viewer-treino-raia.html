@@ -1,0 +1,2190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>VAAREC Treino Raia — GPS Series Viewer</title>
+  <meta name="description" content="Viewer de treino em raia — análise de séries GPS VAAREC">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/drone-camera-skills.js"></script>
+
+  <style>
+    /* ===== DESIGN SYSTEM ===== */
+    :root {
+      --bg: #060a12;
+      --bg2: #0c1320;
+      --bg3: #111d2e;
+      --border: rgba(255, 255, 255, 0.07);
+      --neon: #22D3EE;
+      --neon-dim: rgba(34, 211, 238, 0.12);
+      --neon-glow: rgba(34, 211, 238, 0.3);
+      --green: #10B981;
+      --green-dim: rgba(16, 185, 129, 0.12);
+      --amber: #F59E0B;
+      --red: #EF4444;
+      --text: #F0F9FF;
+      --text-sec: #94A3B8;
+      --text-muted: #475569;
+      --font: 'Rajdhani', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --header-h: 50px;
+      --stats-h: 68px;
+      --nav-h: 52px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      overflow: hidden;
+    }
+
+    /* ===== LOADING ===== */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      transition: opacity 0.5s;
+    }
+
+    .loading-icon {
+      font-size: 48px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1
+      }
+
+      50% {
+        transform: scale(1.1);
+        opacity: 0.8
+      }
+    }
+
+    .loading-title {
+      font-family: var(--font);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--neon);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .loading-bar-wrap {
+      width: 180px;
+      height: 3px;
+      background: var(--bg3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .loading-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--neon), var(--green));
+      animation: slide 1.8s ease-in-out infinite;
+    }
+
+    @keyframes slide {
+      0% {
+        width: 0;
+        margin-left: 0
+      }
+
+      50% {
+        width: 60%
+      }
+
+      100% {
+        width: 0;
+        margin-left: 100%
+      }
+    }
+
+    #loading-msg {
+      font-family: var(--font);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    /* ===== AUTH GATE ===== */
+    #auth-gate {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 10, 18, 0.96);
+      backdrop-filter: blur(16px);
+      z-index: 88888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--neon-glow);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 400px;
+      padding: 32px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(34, 211, 238, 0.08), 0 20px 50px rgba(0, 0, 0, 0.8);
+    }
+
+    .auth-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .auth-card h2 {
+      font-family: var(--font);
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .auth-card p {
+      font-size: 13px;
+      color: var(--text-sec);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .auth-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sec);
+      display: block;
+      text-align: left;
+      margin-bottom: 6px;
+    }
+
+    .auth-input {
+      width: 100%;
+      padding: 13px 16px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 4px;
+      transition: border-color 0.2s;
+    }
+
+    .auth-input:focus {
+      border-color: var(--neon);
+    }
+
+    .auth-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      background: linear-gradient(135deg, #0891B2, var(--neon));
+      border: none;
+      border-radius: 12px;
+      color: #000;
+      font-weight: 800;
+      font-size: 15px;
+      font-family: var(--font);
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    .auth-btn:hover {
+      box-shadow: 0 0 24px var(--neon-glow);
+    }
+
+    .auth-btn:active {
+      transform: scale(0.98);
+    }
+
+    .auth-status {
+      margin-top: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+    }
+
+    /* ===== APP LAYOUT ===== */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ===== HEADER ===== */
+    #app-header {
+      flex-shrink: 0;
+      height: var(--header-h);
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(90deg, #070e1a 0%, var(--bg2) 100%);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #app-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, var(--neon-dim), transparent 50%);
+      pointer-events: none;
+    }
+
+    .header-badge {
+      font-family: var(--font);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--neon);
+      background: var(--neon-dim);
+      border: 1px solid var(--neon-glow);
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    #session-title {
+      font-family: var(--font);
+      font-size: 0.92rem;
+      font-weight: 700;
+      flex: 1;
+      background: linear-gradient(90deg, #fff 0%, #7DD3FC 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #session-meta {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      font-family: var(--font);
+    }
+
+    /* ===== STATS BAR ===== */
+    #stats-bar {
+      flex-shrink: 0;
+      height: var(--stats-h);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-cell {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 8px 6px;
+      gap: 2px;
+      border-right: 1px solid var(--border);
+    }
+
+    .stat-cell:last-child {
+      border-right: none;
+    }
+
+    .stat-label {
+      font-family: var(--font);
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-family: var(--font);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-value.green {
+      color: var(--green);
+    }
+
+    .stat-value.neon {
+      color: var(--neon);
+    }
+
+    .stat-value.amber {
+      color: var(--amber);
+    }
+
+    .stat-sub {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      font-family: var(--font);
+    }
+
+    /* ===== BOTTOM NAV ===== */
+    .bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-h);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      z-index: 500;
+      background: rgba(12, 19, 32, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+    }
+
+    .nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      gap: 3px;
+      font-family: var(--font);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .nav-btn.active {
+      color: var(--neon);
+    }
+
+    .nav-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    /* ===== CONTENT AREA ===== */
+    #content {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tab-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: var(--nav-h);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tab-view.active {
+      display: flex;
+    }
+
+    /* ===== MAP VIEW ===== */
+    #view-map {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #map {
+      flex: 1 1 0px;
+      min-height: 0;
+      width: 100%;
+      background: var(--bg);
+    }
+
+    .leaflet-container {
+      background: #04080f;
+    }
+
+    .leaflet-control-zoom {
+      border: 1px solid var(--border) !important;
+    }
+
+    .leaflet-control-zoom a {
+      background: var(--bg2) !important;
+      color: var(--text-sec) !important;
+      border-color: var(--border) !important;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(0, 0, 0, 0.6) !important;
+      color: var(--text-muted) !important;
+      font-size: 0.55rem !important;
+    }
+
+    /* Series Navigator overlay */
+    #series-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 10px;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .series-nav-label {
+      font-family: var(--font);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-sec);
+      flex-shrink: 0;
+    }
+
+    #series-selector {
+      display: flex;
+      gap: 5px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .serie-pill {
+      font-family: var(--font);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .serie-pill.active {
+      background: var(--neon-dim);
+      border-color: var(--neon);
+      color: var(--neon);
+      box-shadow: 0 0 8px var(--neon-glow);
+    }
+
+    /* Floating Replay Controls Bar over Map */
+    #map-controls {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(12, 19, 32, 0.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      border-radius: 12px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(34, 211, 238, 0.1);
+    }
+
+    .t-label {
+      font-family: var(--font);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--neon);
+      min-width: 42px;
+    }
+
+    #tl-wrap {
+      flex: 1;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    #tl-bg2 {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 5px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    #tl-fill2 {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 5px;
+      background: linear-gradient(90deg, var(--neon), var(--green));
+      border-radius: 3px;
+      width: 0;
+    }
+
+    #tl-handle2 {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translate(-50%, -50%);
+      width: 14px;
+      height: 14px;
+      background: var(--neon);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--neon-glow);
+    }
+
+    .ctrl-btn2 {
+      font-family: var(--font);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text-sec);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .ctrl-btn2:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+    }
+
+    #btn-play-series {
+      border: 1px solid var(--neon);
+      color: #060a12;
+      background: var(--neon);
+      font-size: 0.95rem;
+      font-weight: 800;
+      padding: 6px 16px;
+      border-radius: 8px;
+      box-shadow: 0 0 14px var(--neon-glow);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    #btn-play-series:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px var(--neon-glow);
+    }
+
+    .spd-row {
+      display: flex;
+      gap: 2px;
+    }
+
+    .spd2 {
+      font-family: var(--font);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 7px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .spd2.active {
+      background: var(--neon-dim);
+      border-color: var(--neon);
+      color: var(--neon);
+    }
+
+    /* Floating Drone Camera Director Widget */
+    #drone-camera-bar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1000;
+      background: rgba(12, 19, 32, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-family: var(--font);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .drone-bar-title {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #22D3EE;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .drone-btns {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .drone-btn {
+      font-family: var(--font);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #E2E8F0;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .drone-btn:hover {
+      border-color: #22D3EE;
+      color: #22D3EE;
+      background: rgba(34, 211, 238, 0.15);
+    }
+
+    .drone-btn.active {
+      border-color: #22D3EE;
+      color: #000;
+      background: #22D3EE;
+      font-weight: 800;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+    }
+
+    .drone-btn-mini {
+      font-family: var(--font);
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #94A3B8;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .drone-btn-mini:hover {
+      border-color: #22D3EE;
+      color: #fff;
+      background: rgba(34, 211, 238, 0.15);
+    }
+
+    .drone-btn-mini.active {
+      border-color: #22D3EE;
+      color: #000;
+      background: #22D3EE;
+      font-weight: 800;
+    }
+
+    /* Floating Heart Rate (FC) Zone Legend */
+    #hr-legend {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(12, 19, 32, 0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-family: var(--font);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+
+    .hr-legend-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-sec);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .hr-legend-bars {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .hr-item {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #F0F9FF;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .hr-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+    }
+
+    /* ===== SERIES TABLE VIEW ===== */
+    #view-series {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px;
+      gap: 12px;
+      flex-direction: column;
+    }
+
+    .series-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .sum-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sum-card-label {
+      font-family: var(--font);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .sum-card-value {
+      font-family: var(--font);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .sum-card-sub {
+      font-size: 0.62rem;
+      color: var(--text-sec);
+    }
+
+    .series-table-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    table.stbl {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table.stbl thead tr {
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.stbl th {
+      padding: 9px 10px;
+      font-family: var(--font);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      text-align: left;
+      text-transform: uppercase;
+    }
+
+    table.stbl th.right {
+      text-align: right;
+    }
+
+    table.stbl tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    table.stbl tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    table.stbl tbody tr:hover {
+      background: rgba(34, 211, 238, 0.04);
+    }
+
+    table.stbl tbody tr.active-row {
+      background: rgba(34, 211, 238, 0.08);
+      border-left: 2px solid var(--neon);
+    }
+
+    table.stbl td {
+      padding: 9px 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
+      vertical-align: middle;
+    }
+
+    .s-num {
+      font-weight: 700;
+      color: var(--neon);
+      font-size: 0.75rem;
+    }
+
+    .s-time {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .s-delta {
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .delta-best {
+      color: var(--green);
+    }
+
+    .delta-worse {
+      color: var(--red);
+    }
+
+    .delta-same {
+      color: var(--text-sec);
+    }
+
+    .s-spd {
+      text-align: right;
+      color: var(--text-sec);
+      font-size: 0.82rem;
+    }
+
+    .s-dist {
+      text-align: right;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    .s-view-btn {
+      font-family: var(--font);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--neon-glow);
+      background: var(--neon-dim);
+      color: var(--neon);
+      cursor: pointer;
+    }
+
+    /* ===== CHART VIEW ===== */
+    #view-chart {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 14px;
+      gap: 14px;
+      flex-direction: column;
+    }
+
+    .chart-title {
+      font-family: var(--font);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--neon);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .chart-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 180px;
+    }
+
+    .chart-insight {
+      font-size: 0.78rem;
+      color: var(--text-sec);
+      line-height: 1.6;
+      margin-top: 10px;
+      padding: 8px;
+      background: var(--bg3);
+      border-radius: 6px;
+    }
+
+    .chart-insight strong {
+      color: var(--neon);
+    }
+
+    /* ===== MISC ===== */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== LOADING ===== -->
+  <div id="loading">
+    <div class="loading-icon">🎯</div>
+    <div class="loading-title">VAAREC Treino Raia</div>
+    <div class="loading-bar-wrap">
+      <div class="loading-bar"></div>
+    </div>
+    <div id="loading-msg">Analisando séries...</div>
+  </div>
+
+  <!-- ===== APP ===== -->
+  <div id="app">
+
+    <!-- Header -->
+    <header id="app-header">
+      <span class="header-badge">🎯 TREINO RAIA</span>
+      <span id="session-title">Treino em Raia</span>
+      <span id="session-meta"></span>
+    </header>
+
+    <!-- Stats Bar -->
+    <div id="stats-bar">
+      <div class="stat-cell">
+        <div class="stat-label">Séries</div>
+        <div class="stat-value neon" id="stat-series-count">-</div>
+        <div class="stat-sub">detectadas</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Melhor Série</div>
+        <div class="stat-value green" id="stat-best-time">--:--</div>
+        <div class="stat-sub" id="stat-best-label">S-</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Velocidade Média</div>
+        <div class="stat-value amber" id="stat-avg-spd">-- km/h</div>
+        <div class="stat-sub">todas séries</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Distância Raia</div>
+        <div class="stat-value" id="stat-dist">-- m</div>
+        <div class="stat-sub">por série</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div id="content">
+
+      <!-- TAB: MAP -->
+      <div id="view-map" class="tab-view active">
+        <div id="map"></div>
+
+        <!-- Floating Drone Camera Director Widget -->
+        <div id="drone-camera-bar">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="drone-bar-title">🎥 Câmera Drone</span>
+            <span id="drone-zoom-indicator"
+              style="font-size:0.6rem; color:#22D3EE; font-weight:700; font-family:var(--font-mono, monospace);">Alt:
+              35m</span>
+          </div>
+          <div class="drone-btns">
+            <button class="drone-btn active" id="btn-cam-auto" onclick="setRaiaCamera('auto')">🎬 Auto</button>
+            <button class="drone-btn" id="btn-cam-leader" onclick="setRaiaCamera('follow-leader')">👑 Líder</button>
+            <button class="drone-btn" id="btn-cam-all" onclick="setRaiaCamera('follow-all')">👁️ Todas</button>
+            <div id="dynamic-canoe-cam-btns" style="display:inline-flex; gap:4px;"></div>
+            <button class="drone-btn" id="btn-cam-overview" onclick="setRaiaCamera('overview')">🗺️ Geral</button>
+          </div>
+          <div
+            style="display:flex; gap:3px; align-items:center; margin-top:2px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.08);">
+            <span style="font-size:0.58rem; color:#94A3B8; font-weight:700; margin-right:2px;">Altura:</span>
+            <button class="drone-btn-mini active" id="btn-alt-close" onclick="setDroneAltitude('close')"
+              title="Baixa Altitude (~30m) — Zoom Próximo e Imersivo">Cinemático</button>
+            <button class="drone-btn-mini" id="btn-alt-normal" onclick="setDroneAltitude('normal')"
+              title="Média Altitude (~60m)">Padrão</button>
+            <button class="drone-btn-mini" id="btn-alt-pano" onclick="setDroneAltitude('panoramic')"
+              title="Alta Altitude (~150m)">Alto</button>
+            <button class="drone-btn-mini" onclick="adjustDroneZoom(1)" title="Aproximar Drone (Zoom In)">🔍+</button>
+            <button class="drone-btn-mini" onclick="adjustDroneZoom(-1)" title="Afastar Drone (Zoom Out)">🔍-</button>
+          </div>
+        </div>
+
+        <!-- Floating Heart Rate (FC) Zone Legend -->
+        <div id="hr-legend">
+          <div class="hr-legend-title">❤️ Frequência Cardíaca (FC)</div>
+          <div class="hr-legend-bars">
+            <div class="hr-item"><span class="hr-dot" style="background:#06B6D4"></span> Z1 &lt;110</div>
+            <div class="hr-item"><span class="hr-dot" style="background:#10B981"></span> Z2 110-130</div>
+            <div class="hr-item"><span class="hr-dot" style="background:#F59E0B"></span> Z3 130-150</div>
+            <div class="hr-item"><span class="hr-dot" style="background:#F97316"></span> Z4 150-165</div>
+            <div class="hr-item"><span class="hr-dot" style="background:#EF4444"></span> Z5 &gt;165</div>
+          </div>
+        </div>
+        <div id="map-controls">
+          <div id="series-nav">
+            <div class="series-nav-label">SÉRIE:</div>
+            <div id="series-selector">
+              <!-- Pills added dynamically -->
+            </div>
+          </div>
+          <span class="t-label" id="t-cur2">00:00</span>
+          <div id="tl-wrap">
+            <div id="tl-bg2" style="width:100%"></div>
+            <div id="tl-fill2"></div>
+            <div id="tl-handle2"></div>
+          </div>
+          <span class="t-label" id="t-tot2" style="text-align:right">00:00</span>
+          <button class="ctrl-btn2" onclick="seekRel2(-5)">⏮5s</button>
+          <button class="ctrl-btn2" id="btn-play-series" onclick="togglePlaySeries()">▶ PLAY</button>
+          <button class="ctrl-btn2" onclick="seekRel2(5)">5s⏭</button>
+          <div class="spd-row">
+            <button class="spd2 active" data-s="1" onclick="setSpeed2(1)">1×</button>
+            <button class="spd2" data-s="5" onclick="setSpeed2(5)">5×</button>
+            <button class="spd2" data-s="10" onclick="setSpeed2(10)">10×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: SERIES TABLE -->
+      <div id="view-series" class="tab-view">
+        <div class="series-summary-grid" id="summary-grid">
+          <div class="sum-card">
+            <div class="sum-card-label">Séries</div>
+            <div class="sum-card-value neon" id="sum-series">-</div>
+            <div class="sum-card-sub">detectadas</div>
+          </div>
+          <div class="sum-card">
+            <div class="sum-card-label">Melhor</div>
+            <div class="sum-card-value" style="color:var(--green)" id="sum-best">--:--</div>
+            <div class="sum-card-sub" id="sum-best-label">S-</div>
+          </div>
+          <div class="sum-card">
+            <div class="sum-card-label">Progressão</div>
+            <div class="sum-card-value" id="sum-trend">--</div>
+            <div class="sum-card-sub">tendência</div>
+          </div>
+        </div>
+        <div class="series-table-wrap">
+          <table class="stbl">
+            <thead>
+              <tr>
+                <th>S#</th>
+                <th>Tempo</th>
+                <th>Δ</th>
+                <th class="right">Vel. Méd.</th>
+                <th class="right">Dist.</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="series-tbody">
+              <tr>
+                <td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font)">
+                  Aguardando dados de treino…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: CHART -->
+      <div id="view-chart" class="tab-view">
+        <div class="chart-card">
+          <div class="chart-title">⏱ Tempo por Série</div>
+          <div class="chart-wrap"><canvas id="canvas-series-times"></canvas></div>
+          <div class="chart-insight" id="insight-times">Carregando análise…</div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">⚡ Velocidade Média por Série</div>
+          <div class="chart-wrap"><canvas id="canvas-series-spd"></canvas></div>
+          <div class="chart-insight" id="insight-spd">Carregando análise…</div>
+        </div>
+      </div>
+
+      <!-- Bottom Nav -->
+      <nav class="bottom-nav">
+        <button class="nav-btn active" id="btn-nav-map" onclick="switchTab('map')">
+          <svg viewBox="0 0 24 24">
+            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+            <line x1="9" y1="3" x2="9" y2="18" />
+            <line x1="15" y1="6" x2="15" y2="21" />
+          </svg>
+          Mapa
+        </button>
+        <button class="nav-btn" id="btn-nav-series" onclick="switchTab('series')">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          Séries
+        </button>
+        <button class="nav-btn" id="btn-nav-chart" onclick="switchTab('chart')">
+          <svg viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          Gráficos
+        </button>
+      </nav>
+    </div>
+
+  </div><!-- /#app -->
+
+  <script>
+    // ===================================================
+    //  VAAREC VIEWER — TREINO RAIA (STANDALONE)
+    //  Reads from window.CONTRACT injected at export time
+    // ===================================================
+
+    if (!window.CONTRACT) {
+      window.CONTRACT = { name: 'Treino Raia Demo', sportPackage: { tracks: [] } };
+    }
+    const CONTRACT = window.CONTRACT;
+
+    // ===== STATE =====
+    let map = null, contract = {}, allPts = [], series = [];
+    let currentSerieIdx = -1; // -1 = Simultaneous Mode (All series canoes move together)
+    let serieMarker = null, serieTrail = null;
+    let serieMarkers = [], serieTrails = [], allTrailLayers = [];
+    let serieLeftTrails = [], serieRightTrails = [];
+    let isPlaying = false, speed = 1, playTimeMs = 0;
+    let masterDurationMs = 0, serieDurationMs = 0;
+    let dragging = false;
+    let lastTimestamp2 = null, lastRaf2 = null;
+    let chartTimes = null, chartSpd = null;
+    let droneCamera = null;
+    // ===== HELPERS =====
+    function getHRColor(hr) {
+      if (!hr || isNaN(hr) || hr <= 0) return '#22D3EE';
+      if (hr < 110) return '#06B6D4'; // Z1 Ciano
+      if (hr < 130) return '#10B981'; // Z2 Verde
+      if (hr < 150) return '#F59E0B'; // Z3 Amarelo
+      if (hr < 165) return '#F97316'; // Z4 Laranja
+      return '#EF4444'; // Z5 Vermelho
+    }
+
+    function computeParallelRailPoints(pts, offsetMeters = 4.5) {
+      if (!pts || pts.length < 2) return { left: [], right: [] };
+      const degOffset = offsetMeters / 111320;
+      const left = [];
+      const right = [];
+
+      for (let i = 0; i < pts.length; i++) {
+        let pPrev = pts[Math.max(0, i - 1)];
+        let pNext = pts[Math.min(pts.length - 1, i + 1)];
+        if (pPrev === pNext && i > 0) pPrev = pts[i - 1];
+
+        const dLat = pNext.lat - pPrev.lat;
+        const radLat = (pts[i].lat * Math.PI) / 180;
+        const dLon = (pNext.lon - pPrev.lon) * Math.cos(radLat);
+        const len = Math.sqrt(dLat * dLat + dLon * dLon);
+
+        let nx = 0, ny = 0;
+        if (len > 1e-9) {
+          nx = -dLon / len;
+          ny = dLat / len;
+        }
+
+        const cosLat = Math.cos(radLat) || 1;
+        const offLat = ny * degOffset;
+        const offLon = (nx * degOffset) / cosLat;
+
+        left.push({
+          lat: pts[i].lat + offLat,
+          lon: pts[i].lon + offLon,
+          t: pts[i].t,
+          hr: pts[i].hr,
+          spdKmh: pts[i].spdKmh
+        });
+
+        right.push({
+          lat: pts[i].lat - offLat,
+          lon: pts[i].lon - offLon,
+          t: pts[i].t,
+          hr: pts[i].hr,
+          spdKmh: pts[i].spdKmh
+        });
+      }
+
+      return { left, right };
+    }
+
+    function haversine(la1, lo1, la2, lo2) {
+      const R = 6371000, dLat = (la2 - la1) * Math.PI / 180, dLon = (lo2 - lo1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function calcBearing(la1, lo1, la2, lo2) {
+      const dL = (lo2 - lo1) * Math.PI / 180, rlat1 = la1 * Math.PI / 180, rlat2 = la2 * Math.PI / 180;
+      return (Math.atan2(Math.sin(dL) * Math.cos(rlat2), Math.cos(rlat1) * Math.sin(rlat2) - Math.sin(rlat1) * Math.cos(rlat2)) * 180 / Math.PI + 360) % 360;
+    }
+
+    function makeCanoeIcon(color, stroke, id, labelText) {
+      const svgHtml = `<div style="position:relative; width:140px; height:70px; overflow:visible;">
+    <!-- Marcador de Posição Exata no Ponto (70px, 35px) -->
+    <div style="position:absolute; left:70px; top:35px; transform:translate(-50%,-50%); width:8px; height:8px; border-radius:50%; background:${color}; border:2px solid #ffffff; box-shadow:0 0 8px ${color}; z-index:1100;"></div>
+    <!-- Desenho SVG da Canoa Rotacionado -->
+    <svg class="canoe-svg" viewBox="-70 -35 140 70" width="140" height="70" overflow="visible" style="position:absolute; left:0; top:0; z-index:1000;">
+      <path d="M -26 0 C -16 -2.8, 16 -2.8, 26 0 C 16 2.8, -16 2.8, -26 0 Z" fill="${color}" stroke="${stroke}" stroke-width="2"/>
+      <path d="M 26 0 C 21 -2.2, 21 2.2, 26 0 Z" fill="#ffffff" opacity="0.95"/>
+      <line x1="-12" y1="0" x2="-12" y2="-8" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="12" y1="0" x2="12" y2="-8" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M -18 -8 C -9 -9.5, 9 -9.5, 18 -8 C 9 -6.8, -9 -6.8, -18 -8 Z" fill="${stroke}" stroke="#ffffff" stroke-width="1.5"/>
+    </svg>
+    <div style="position:absolute; left:82px; top:42px; font-family:'Rajdhani',sans-serif; font-size:11px; font-weight:800; color:${color}; text-shadow:1px 1px 3px #000; white-space:nowrap; pointer-events:none; z-index:1110">
+      🛶 ${labelText} <span id="spd-marker-${id}">--</span> | <span id="hr-marker-${id}" style="color:#FF6B6B">--</span>
+    </div>
+  </div>`;
+
+      return L.divIcon({
+        html: `<div style="position:relative;overflow:visible">${svgHtml}</div>`,
+        className: 'canoe-icon-wrap',
+        iconSize: [140, 70],
+        iconAnchor: [70, 35]
+      });
+    }
+
+    function rotateCanoe(el, h) {
+      if (!el || !map) return;
+      const svg = el.querySelector('.canoe-svg');
+      if (!svg) return;
+      const z = map.getZoom(), lat = map.getCenter().lat;
+      const mpp = (156543.03392 * Math.cos(lat * Math.PI / 180)) / Math.pow(2, z);
+      const scale = Math.max(0.18, 13.71 / mpp / 52);
+      svg.style.transformOrigin = '70px 35px';
+      svg.style.transform = `scale(${scale.toFixed(4)}) rotate(${(h - 90).toFixed(1)}deg)`;
+    }
+
+    function interp(pts, t) {
+      if (!pts.length) return null;
+      if (t <= pts[0].t) return pts[0];
+      if (t >= pts[pts.length - 1].t) return pts[pts.length - 1];
+      let lo = 0, hi = pts.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (pts[m].t <= t) lo = m; else hi = m; }
+      const a = pts[lo], b = pts[hi], f = a.t === b.t ? 0 : (t - a.t) / (b.t - a.t);
+
+      const hA = a.heading != null ? a.heading : 0;
+      const hB = b.heading != null ? b.heading : 0;
+      let dh = hB - hA;
+      if (dh > 180) dh -= 360;
+      if (dh < -180) dh += 360;
+      const heading = (hA + dh * f + 360) % 360;
+
+      return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f, spdKmh: (a.spdKmh || 0) + ((b.spdKmh || 0) - (a.spdKmh || 0)) * f, heading };
+    }
+    function fmtMs(ms) { const s = Math.floor(ms / 1000), m = Math.floor(s / 60), ss = s % 60; return (m + '').padStart(2, '0') + ':' + (ss + '').padStart(2, '0'); }
+    function fmtSec(s) { const m = Math.floor(s / 60), ss = Math.round(s % 60); return (m + '').padStart(2, '0') + ':' + (ss + '').padStart(2, '0'); }
+    function calcDist(pts) { let d = 0; for (let i = 1; i < pts.length; i++)d += haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon); return d; }
+    function avgSpd(pts) { if (!pts.length) return 0; return pts.reduce((s, p) => s + (p.spdKmh || 0), 0) / pts.length; }
+
+    // ===== AUTH =====
+    function handleAuth() {
+      const email = document.getElementById('auth-email').value.trim();
+      const status = document.getElementById('auth-status');
+      if (!email || !email.includes('@')) {
+        status.style.display = 'block'; status.style.color = '#ef4444';
+        status.textContent = 'Por favor, informe um e-mail válido.'; return;
+      }
+      localStorage.setItem('vaarec_user_email', email);
+      document.getElementById('auth-gate').style.display = 'none';
+      try {
+        initApp();
+        setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+      } catch (err) {
+        console.error("Erro ao carregar o viewer de raia:", err);
+        alert("⚠️ Erro ao iniciar a visualização: " + err.message);
+      }
+    }
+    document.getElementById('auth-email')?.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth(); });
+
+    // ===== SERIES DETECTION =====
+    function detectSeries(pts, checkpoints) {
+      // If checkpoints are available, use them to slice series
+      if (checkpoints && checkpoints.length >= 2) {
+        const cps = checkpoints.filter(c => c.t != null).sort((a, b) => a.t - b.t);
+        const segs = [];
+        for (let i = 0; i < cps.length - 1; i++) {
+          const seg = pts.filter(p => p.t >= cps[i].t && p.t <= cps[i + 1].t);
+          if (seg.length >= 2) segs.push(seg);
+        }
+        if (segs.length >= 2) return segs;
+      }
+
+      // Auto-detect series by looking for large time gaps or direction reversals
+      if (!pts.length) return [];
+
+      // Strategy 1: Look for pauses (speed < 0.5 km/h for > 10s)
+      const pauseThreshold = 0.5, pauseMinMs = 10000;
+      let inPause = false, pauseStart = 0, lastSerieEnd = 0;
+      const serieRanges = [];
+
+      for (let i = 1; i < pts.length; i++) {
+        const spd = pts[i].spdKmh || 0;
+        if (spd < pauseThreshold) {
+          if (!inPause) { inPause = true; pauseStart = pts[i].t; }
+        } else {
+          if (inPause) {
+            const pauseLen = pts[i].t - pauseStart;
+            if (pauseLen >= pauseMinMs) {
+              // End of a serie
+              const seriePts = pts.filter(p => p.t >= lastSerieEnd && p.t <= pauseStart);
+              if (seriePts.length >= 2) serieRanges.push(seriePts);
+              lastSerieEnd = pts[i].t;
+            }
+            inPause = false;
+          }
+        }
+      }
+      // Last serie
+      const lastPts = pts.filter(p => p.t >= lastSerieEnd);
+      if (lastPts.length >= 2) serieRanges.push(lastPts);
+
+      // If we got >= 2 meaningful series, use them
+      if (serieRanges.length >= 2) return serieRanges.filter(s => s.length >= 5);
+
+      // Strategy 2: Divide into equal time segments (fallback)
+      const N = Math.min(6, Math.max(2, Math.round(pts.length / 150)));
+      const segSize = Math.floor(pts.length / N);
+      const segs2 = [];
+      for (let i = 0; i < N; i++) {
+        const seg = pts.slice(i * segSize, (i + 1) * segSize);
+        if (seg.length >= 5) segs2.push(seg);
+      }
+      return segs2;
+    }
+
+    // ===== INTERSECTION & TRIMMING =====
+    function intersects(p1, p2, l1, l2) {
+      if (!l1 || !l2 || l1.lat == null || l2.lat == null) return false;
+      const l1lng = l1.lng != null ? l1.lng : l1.lon;
+      const l2lng = l2.lng != null ? l2.lng : l2.lon;
+      const p1lng = p1.lon != null ? p1.lon : p1.lng;
+      const p2lng = p2.lon != null ? p2.lon : p2.lng;
+
+      const ccw = (A, B, C) => {
+        const Alng = A.lon != null ? A.lon : A.lng;
+        const Blng = B.lon != null ? B.lon : B.lng;
+        const Clng = C.lon != null ? C.lon : C.lng;
+        return (Clng - Alng) * (B.lat - A.lat) > (Blng - Alng) * (C.lat - A.lat);
+      };
+      const P1 = { lat: p1.lat, lon: p1lng };
+      const P2 = { lat: p2.lat, lon: p2lng };
+      const L1 = { lat: l1.lat, lon: l1lng };
+      const L2 = { lat: l2.lat, lon: l2lng };
+      return (ccw(P1, L1, L2) !== ccw(P2, L1, L2)) && (ccw(P1, P2, L1) !== ccw(P1, P2, L2));
+    }
+
+    function trimTrackByLines(pts, startLine, endLine) {
+      if (!pts || pts.length < 2) return pts;
+
+      let startIdx = 0;
+      let endIdx = pts.length - 1;
+
+      if (startLine && startLine.defined && startLine.p1 && startLine.p2) {
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (intersects(pts[i], pts[i + 1], startLine.p1, startLine.p2)) {
+            startIdx = i;
+            break;
+          }
+        }
+      }
+
+      if (endLine && endLine.defined && endLine.p1 && endLine.p2) {
+        for (let i = startIdx; i < pts.length - 1; i++) {
+          if (intersects(pts[i], pts[i + 1], endLine.p1, endLine.p2)) {
+            endIdx = i + 1;
+            break;
+          }
+        }
+      }
+
+      const sliced = pts.slice(startIdx, endIdx + 1);
+      return sliced.length >= 2 ? sliced : pts;
+    }
+
+    function renderContractCourseElements(map, contract) {
+      const c = contract || window.CONTRACT || {};
+      if (!map || !c) return;
+      const startLine = c.startLine;
+      const endLine = c.endLine;
+      const buoys = c.buoys || c.sportPackage?.buoys || [];
+
+      if (startLine && startLine.defined && startLine.p1 && startLine.p2) {
+        const p1 = [startLine.p1.lat, startLine.p1.lng != null ? startLine.p1.lng : startLine.p1.lon];
+        const p2 = [startLine.p2.lat, startLine.p2.lng != null ? startLine.p2.lng : startLine.p2.lon];
+        L.polyline([p1, p2], { color: '#10B981', weight: 4, opacity: 0.9 }).addTo(map);
+
+        const iconA1 = L.divIcon({
+          className: '',
+          html: `<div style="background:#10B981;color:#000;font-weight:800;font-family:'Rajdhani',sans-serif;font-size:11px;padding:2px 6px;border-radius:4px;box-shadow:0 0 8px #10B981;white-space:nowrap;">🚩 A1 (Largada)</div>`,
+          iconAnchor: [0, 10]
+        });
+        const iconA2 = L.divIcon({
+          className: '',
+          html: `<div style="background:#10B981;color:#000;font-weight:800;font-family:'Rajdhani',sans-serif;font-size:11px;padding:2px 6px;border-radius:4px;box-shadow:0 0 8px #10B981;white-space:nowrap;">🚩 A2</div>`,
+          iconAnchor: [0, 10]
+        });
+        L.marker(p1, { icon: iconA1 }).addTo(map);
+        L.marker(p2, { icon: iconA2 }).addTo(map);
+      }
+
+      if (endLine && endLine.defined && endLine.p1 && endLine.p2) {
+        const p1 = [endLine.p1.lat, endLine.p1.lng != null ? endLine.p1.lng : endLine.p1.lon];
+        const p2 = [endLine.p2.lat, endLine.p2.lng != null ? endLine.p2.lng : endLine.p2.lon];
+        L.polyline([p1, p2], { color: '#EF4444', weight: 4, opacity: 0.9 }).addTo(map);
+
+        const iconB1 = L.divIcon({
+          className: '',
+          html: `<div style="background:#EF4444;color:#fff;font-weight:800;font-family:'Rajdhani',sans-serif;font-size:11px;padding:2px 6px;border-radius:4px;box-shadow:0 0 8px #EF4444;white-space:nowrap;">🏁 B1 (Chegada)</div>`,
+          iconAnchor: [0, 10]
+        });
+        const iconB2 = L.divIcon({
+          className: '',
+          html: `<div style="background:#EF4444;color:#fff;font-weight:800;font-family:'Rajdhani',sans-serif;font-size:11px;padding:2px 6px;border-radius:4px;box-shadow:0 0 8px #EF4444;white-space:nowrap;">🏁 B2</div>`,
+          iconAnchor: [0, 10]
+        });
+        L.marker(p1, { icon: iconB1 }).addTo(map);
+        L.marker(p2, { icon: iconB2 }).addTo(map);
+      }
+
+      buoys.forEach((b, idx) => {
+        const lat = b.lat;
+        const lng = b.lng != null ? b.lng : b.lon;
+        if (lat != null && lng != null) {
+          L.circleMarker([lat, lng], { radius: 7, color: '#F59E0B', fillColor: '#F59E0B', fillOpacity: 0.9 })
+            .addTo(map)
+            .bindPopup(`<b>Boia ${idx + 1}:</b> ${b.name || 'Contorno'}`);
+        }
+      });
+    }
+
+    const SERIE_COLORS = ['#22D3EE', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#F43F5E', '#3B82F6', '#EC4899'];
+
+    // ===== INIT =====
+    function getTrackPoints(track) {
+      if (!track) return [];
+      const rawData = track.points || track.data || track.gpsData || [];
+      if (!Array.isArray(rawData)) return [];
+
+      return rawData.map(p => {
+        if (!p) return null;
+        const lat = p.lat != null ? p.lat : p.latitude;
+        const lon = p.lon != null ? p.lon : (p.lng != null ? p.lng : p.longitude);
+        const t = p.timestamp != null ? Number(p.timestamp) :
+          (p.t != null ? Number(p.t) :
+            (p.tRel != null ? Number(p.tRel) :
+              (p.time ? new Date(p.time).getTime() : null)));
+        const spdKmh = p.spdKmh != null ? Number(p.spdKmh) :
+          (p.speedKmh != null ? Number(p.speedKmh) :
+            (p.speed != null ? Number(p.speed) * 3.6 : 0));
+
+        if (lat == null || lon == null || t == null || isNaN(lat) || isNaN(lon) || isNaN(t)) return null;
+        return {
+          lat: Number(lat),
+          lon: Number(lon),
+          t: Number(t),
+          spdKmh: Number(spdKmh) || 0,
+          hr: p.hr || p.heartRate || null,
+          cadence: p.cadence || null
+        };
+      }).filter(Boolean);
+    }
+
+    function generateDemoRaiaSeries() {
+      const startLat = -27.4320, startLon = -48.4850;
+      const numPts = 60;
+      const tStep = 2500;
+      const seriesList = [];
+      const speeds = [11.2, 12.8, 13.6, 12.4];
+
+      for (let s = 0; s < 4; s++) {
+        const sPts = [];
+        const baseSpd = speeds[s];
+        for (let i = 0; i < numPts; i++) {
+          const frac = i / (numPts - 1);
+          const t = i * tStep;
+          const lat = startLat + frac * 0.015 + (s * 0.0004);
+          const lon = startLon + frac * 0.025 + (s * 0.0003);
+          const spd = baseSpd + Math.sin(i * 0.4) * 0.8;
+          const hr = 130 + s * 10 + Math.round(frac * 20);
+          sPts.push({ lat, lon, t, spdKmh: spd, hr });
+        }
+        seriesList.push(sPts);
+      }
+      return seriesList;
+    }
+
+    function initApp() {
+      contract = window.CONTRACT || {};
+      let tracks = contract.sportPackage?.tracks || contract.tracks || [];
+
+      document.getElementById('session-title').textContent = contract.name || 'Treino em Raia';
+      const meta = [(contract.category || 'Raia 500m'), (contract.date || 'Sessão de Séries'), (contract.location || 'Lagoa')].filter(Boolean).join(' · ');
+      document.getElementById('session-meta').textContent = meta;
+
+      const startLine = contract.startLine;
+      const endLine = contract.endLine;
+
+      let rawSeries = [];
+
+      if (tracks && tracks.length > 1) {
+        // MODE 1: Multi-track mode (each uploaded track is 1 serie)
+        rawSeries = tracks.map(t => {
+          const pts = getTrackPoints(t);
+          return trimTrackByLines(pts, startLine, endLine);
+        }).filter(pts => pts.length >= 2);
+      } else if (tracks && tracks.length === 1) {
+        // MODE 2: Single-track mode (auto-detect series within the single track)
+        const singlePts = getTrackPoints(tracks[0]);
+        const trimmedSingle = trimTrackByLines(singlePts, startLine, endLine);
+        if (trimmedSingle.length >= 2) {
+          const checkpoints = contract.checkpoints || contract.sportPackage?.checkpoints || [];
+          rawSeries = detectSeries(trimmedSingle, checkpoints);
+          if (!rawSeries.length) rawSeries = [trimmedSingle];
+        }
+      }
+
+      if (!rawSeries.length) {
+        rawSeries = generateDemoRaiaSeries();
+      }
+
+      // Anchor t = 0 at line A1-A2 crossing for each canoe/serie and calculate heading
+      series = rawSeries.map(pts => {
+        const t0 = pts[0].t;
+        const norm = pts.map(p => ({ ...p, t: p.t - t0, absT: p.t }));
+        for (let j = 0; j < norm.length; j++) {
+          let lookAhead = norm[Math.min(j + 3, norm.length - 1)];
+          let dist = haversine(norm[j].lat, norm[j].lon, lookAhead.lat, lookAhead.lon);
+          if (dist < 0.2 && j < norm.length - 1) {
+            lookAhead = norm[j + 1];
+            dist = haversine(norm[j].lat, norm[j].lon, lookAhead.lat, lookAhead.lon);
+          }
+          if (dist >= 0.2) {
+            norm[j].heading = calcBearing(norm[j].lat, norm[j].lon, lookAhead.lat, lookAhead.lon);
+          } else if (j > 0) {
+            norm[j].heading = norm[j - 1].heading;
+          } else {
+            norm[j].heading = 0;
+          }
+        }
+        return norm;
+      });
+
+      // Calculate series stats
+      const serieStats = series.map((pts, i) => {
+        const durationMs = pts[pts.length - 1].t - pts[0].t;
+        const dist = calcDist(pts);
+        const spd = avgSpd(pts);
+        return { idx: i, pts, durationMs, dist, spd };
+      });
+
+      masterDurationMs = Math.max(...serieStats.map(s => s.durationMs));
+
+      // Update stats bar
+      const bestIdx = serieStats.reduce((bi, s, i) => s.durationMs < serieStats[bi].durationMs ? i : bi, 0);
+      document.getElementById('stat-series-count').textContent = series.length;
+      document.getElementById('stat-best-time').textContent = fmtMs(serieStats[bestIdx].durationMs);
+      document.getElementById('stat-best-label').textContent = 'S' + (bestIdx + 1);
+      const allSpds = serieStats.map(s => s.spd);
+      document.getElementById('stat-avg-spd').textContent = (allSpds.reduce((a, b) => a + b, 0) / allSpds.length).toFixed(1) + ' km/h';
+      const avgDistM = serieStats.reduce((s, x) => s + x.dist, 0) / serieStats.length;
+      document.getElementById('stat-dist').textContent = Math.round(avgDistM) + ' m';
+
+      // Summary tab
+      document.getElementById('sum-series').textContent = series.length;
+      document.getElementById('sum-best').textContent = fmtMs(serieStats[bestIdx].durationMs);
+      document.getElementById('sum-best-label').textContent = 'Série ' + (bestIdx + 1);
+
+      // Trend
+      const trend = serieStats[series.length - 1].durationMs < serieStats[0].durationMs;
+      const trendEl = document.getElementById('sum-trend');
+      trendEl.textContent = trend ? '↓ Progresso' : (series.length > 1 && serieStats[series.length - 1].durationMs === serieStats[0].durationMs ? '→ Estável' : '↑ Fadiga');
+      trendEl.style.color = trend ? 'var(--green)' : (serieStats[series.length - 1].durationMs === serieStats[0].durationMs ? 'var(--text-sec)' : 'var(--amber)');
+
+      // Build table & pills
+      buildSeriesTable(serieStats, bestIdx);
+      buildSeriesPills(series.length);
+
+      // Init map & charts
+      initMap(tracks);
+      try {
+        initCharts(serieStats);
+      } catch (e) {
+        console.error('Chart init error:', e);
+      }
+
+      hideLoading();
+
+      // Start in Simultaneous Mode (-1)
+      selectSerie(-1);
+    }
+
+    function initCharts(serieStats) {
+      if (typeof Chart === 'undefined' || !serieStats || !serieStats.length) return;
+      const canvasTimes = document.getElementById('canvas-series-times');
+      const canvasSpd = document.getElementById('canvas-series-spd');
+      if (!canvasTimes || !canvasSpd) return;
+
+      const ctxTimes = canvasTimes.getContext('2d');
+      const ctxSpd = canvasSpd.getContext('2d');
+
+      if (chartTimes) try { chartTimes.destroy(); } catch (e) { }
+      if (chartSpd) try { chartSpd.destroy(); } catch (e) { }
+
+      const labels = serieStats.map(s => `S${s.idx + 1}`);
+      const timesSec = serieStats.map(s => +(s.durationMs / 1000).toFixed(1));
+      const spds = serieStats.map(s => +s.spd.toFixed(1));
+
+      chartTimes = new Chart(ctxTimes, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Tempo (s)',
+            data: timesSec,
+            backgroundColor: 'rgba(34, 211, 238, 0.6)',
+            borderColor: '#22D3EE',
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#9CA3AF' }, grid: { display: false } },
+            y: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
+
+      chartSpd = new Chart(ctxSpd, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Velocidade Média (km/h)',
+            data: spds,
+            borderColor: '#10B981',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: '#10B981',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#9CA3AF' }, grid: { display: false } },
+            y: { ticks: { color: '#9CA3AF' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
+
+      const best = serieStats.reduce((min, s) => s.durationMs < min.durationMs ? s : min, serieStats[0]);
+      const insTimes = document.getElementById('insight-times');
+      const insSpd = document.getElementById('insight-spd');
+      if (insTimes) insTimes.textContent = `⭐ Melhor tempo registrado na Série ${best.idx + 1} (${fmtMs(best.durationMs)}).`;
+      if (insSpd) insSpd.textContent = `⚡ Velocidade média máxima alcançada: ${best.spd.toFixed(1)} km/h.`;
+    }
+
+    function buildSeriesTable(serieStats, bestIdx) {
+      const tbody = document.getElementById('series-tbody');
+      tbody.innerHTML = '';
+      serieStats.forEach((s, i) => {
+        const isFirst = i === 0;
+        const isBest = i === bestIdx;
+        const prevDur = i > 0 ? serieStats[i - 1].durationMs : null;
+        const delta = prevDur !== null ? (s.durationMs - prevDur) / 1000 : null;
+        const deltaStr = delta === null ? '—' : (delta < 0 ? '▼' + Math.abs(delta).toFixed(1) + 's' : delta === 0 ? '▬' : '▲+' + delta.toFixed(1) + 's');
+        const deltaClass = delta === null ? 'delta-same' : (delta < 0 ? 'delta-best' : 'delta-worse');
+        const tr = document.createElement('tr');
+        if (i === currentSerieIdx) tr.classList.add('active-row');
+        tr.innerHTML = `
+      <td><span class="s-num">${isBest ? '⭐ ' : ''}S${i + 1}</span></td>
+      <td><span class="s-time">${fmtMs(s.durationMs)}</span></td>
+      <td><span class="s-delta ${deltaClass}">${deltaStr}</span></td>
+      <td class="s-spd">${s.spd.toFixed(1)} km/h</td>
+      <td class="s-dist">${Math.round(s.dist)} m</td>
+      <td><button class="s-view-btn" onclick="selectSerieFromTable(${i})">Ver</button></td>
+    `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function buildSeriesPills(count) {
+      const container = document.getElementById('series-selector');
+      const camCanoesWrap = document.getElementById('dynamic-canoe-cam-btns');
+      container.innerHTML = '';
+      if (camCanoesWrap) camCanoesWrap.innerHTML = '';
+
+      // Pill 0: All Series Simultaneous Replay
+      const btnAll = document.createElement('button');
+      btnAll.className = 'serie-pill active';
+      btnAll.textContent = '🛶 Todas (Simultâneo)';
+      btnAll.onclick = () => {
+        selectSerie(-1);
+        setRaiaCamera('follow-all');
+      };
+      btnAll.id = 'pill-s-all';
+      container.appendChild(btnAll);
+
+      for (let i = 0; i < count; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'serie-pill';
+        btn.textContent = 'S' + (i + 1);
+        btn.onclick = () => selectSerie(i);
+        btn.id = `pill-s${i}`;
+        container.appendChild(btn);
+
+        if (camCanoesWrap) {
+          const cBtn = document.createElement('button');
+          cBtn.className = 'drone-btn';
+          cBtn.id = `btn-cam-s${i}`;
+          cBtn.style.color = SERIE_COLORS[i % SERIE_COLORS.length];
+          cBtn.textContent = `🛶 S${i + 1}`;
+          cBtn.onclick = () => {
+            selectSerie(i);
+            setRaiaCamera('follow-canoe', i);
+          };
+          camCanoesWrap.appendChild(cBtn);
+        }
+      }
+    }
+
+    function initMap(tracks) {
+      if (map) {
+        try { map.remove(); } catch (e) { }
+        map = null;
+      }
+      map = L.map('map', { zoomControl: false }).setView([-27.43, -48.48], 13);
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 20, attribution: '© Esri'
+      }).addTo(map);
+
+      // Render course start line A1-A2 (green), finish line B1-B2 (red), and buoys (amber)
+      renderContractCourseElements(map, contract);
+
+      allTrailLayers = [];
+      serieTrails = [];
+      serieLeftTrails = [];
+      serieRightTrails = [];
+      serieMarkers = [];
+
+      series.forEach((pts, i) => {
+        const color = (tracks[i] && tracks[i].color) ? tracks[i].color : SERIE_COLORS[i % SERIE_COLORS.length];
+
+        // Active center trail layer
+        const trLayer = L.polyline([], {
+          color, weight: 3, opacity: 0.85
+        }).addTo(map);
+        serieTrails.push(trLayer);
+
+        // Canoe SVG Marker com Tooltip Integrado de Velocidade e FC
+        const mkIcon = makeCanoeIcon(color, '#ffffff', i, `S${i + 1}`);
+        const p0 = pts[0];
+        const marker = L.marker([p0.lat, p0.lon], { icon: mkIcon, zIndexOffset: 1000 + i }).addTo(map);
+        if (p0) {
+          marker._currentHeading = p0.heading || 0;
+          rotateCanoe(marker.getElement(), marker._currentHeading);
+        }
+        serieMarkers.push(marker);
+      });
+
+      // Fit map bounds to all points across all series
+      const allCoords = [];
+      series.forEach(pts => pts.forEach(p => allCoords.push([p.lat, p.lon])));
+      if (allCoords.length) map.fitBounds(allCoords, { padding: [35, 35] });
+
+      // Recalcular escala e rotação das canoas SVG ao dar zoom no mapa
+      map.on('zoomend', () => {
+        serieMarkers.forEach(m => {
+          if (m && m._currentHeading != null) {
+            rotateCanoe(m.getElement(), m._currentHeading);
+          }
+        });
+      });
+
+      // Inicializar Drone Camera Director (Look-Ahead e Séries)
+      if (typeof DroneCameraSkills !== 'undefined') {
+        droneCamera = new DroneCameraSkills({
+          map,
+          getEntities: () => {
+            if (currentSerieIdx >= 0 && series[currentSerieIdx]) {
+              const s = series[currentSerieIdx];
+              const m = serieMarkers[currentSerieIdx];
+              const latLng = m ? m.getLatLng() : null;
+              const curLat = latLng ? latLng.lat : (s._currentPos?.lat ?? s[0]?.lat);
+              const curLon = latLng ? latLng.lng : (s._currentPos?.lon ?? s[0]?.lon);
+              return [{
+                lat: Number(curLat),
+                lon: Number(curLon),
+                heading: Number(m?._currentHeading || s._currentHeading || s[0]?.heading || 0),
+                spdKmh: Number(s._currentSpd || 10),
+                accDist: Number(s._currentDistM || 0),
+                pts: s
+              }];
+            }
+            return series.map((s, idx) => {
+              const m = serieMarkers[idx];
+              const latLng = m ? m.getLatLng() : null;
+              const curLat = latLng ? latLng.lat : (s._currentPos?.lat ?? s[0]?.lat);
+              const curLon = latLng ? latLng.lng : (s._currentPos?.lon ?? s[0]?.lon);
+              return {
+                lat: Number(curLat),
+                lon: Number(curLon),
+                heading: Number(m?._currentHeading || s._currentHeading || s[0]?.heading || 0),
+                spdKmh: Number(s._currentSpd || 10),
+                accDist: Number(s._currentDistM || 0),
+                pts: s
+              };
+            });
+          },
+          getContract: () => contract || window.CONTRACT || {}
+        });
+      }
+
+      // Timeline scrubber drag handler
+      const tl = document.getElementById('tl-wrap');
+      function seekByEvent(e) {
+        const rect = tl.getBoundingClientRect();
+        const x = Math.max(0, Math.min((e.clientX || e.touches?.[0]?.clientX || 0) - rect.left, rect.width));
+        const activeDur = currentSerieIdx === -1 ? masterDurationMs : (series[currentSerieIdx]?.[series[currentSerieIdx].length - 1].t || 0);
+        if (!activeDur) return;
+        playTimeMs = (x / rect.width) * activeDur;
+        updateSerieFrame(playTimeMs);
+        updateTimeline2();
+      }
+      tl.addEventListener('mousedown', e => { dragging = true; seekByEvent(e); });
+      document.addEventListener('mousemove', e => { if (dragging) seekByEvent(e); });
+      document.addEventListener('mouseup', () => dragging = false);
+      tl.addEventListener('touchstart', e => { dragging = true; seekByEvent(e.touches[0]); }, { passive: true });
+      document.addEventListener('touchmove', e => { if (dragging && e.touches[0]) seekByEvent(e.touches[0]); }, { passive: true });
+      document.addEventListener('touchend', () => dragging = false);
+    }
+
+    let currentRaiaCameraMode = 'lookahead';
+
+    function setRaiaCamera(mode) {
+      currentRaiaCameraMode = mode;
+      document.querySelectorAll('.drone-btn').forEach(b => b.classList.remove('active'));
+
+      if (mode === 'lookahead') {
+        document.getElementById('btn-cam-lookahead')?.classList.add('active');
+        if (droneCamera) droneCamera.setMode('follow-canoe', { canoeIdx: currentSerieIdx >= 0 ? currentSerieIdx : 0 });
+      } else if (mode === 'all') {
+        document.getElementById('btn-cam-all')?.classList.add('active');
+        if (droneCamera) droneCamera.setMode('follow-all');
+      } else if (mode === 'overview') {
+        document.getElementById('btn-cam-overview')?.classList.add('active');
+        if (droneCamera) droneCamera.setMode('overview');
+      }
+    }
+
+    function selectSerie(idx) {
+      currentSerieIdx = idx;
+      if (isPlaying) {
+        isPlaying = false;
+        document.getElementById('btn-play-series').textContent = '▶';
+      }
+      playTimeMs = 0;
+
+      const activeDur = idx === -1 ? masterDurationMs : (series[idx]?.[series[idx].length - 1].t || 0);
+
+      // Update pills UI
+      document.querySelectorAll('.serie-pill').forEach(p => p.classList.remove('active'));
+      if (idx === -1) {
+        document.getElementById('pill-s-all')?.classList.add('active');
+        if (droneCamera) droneCamera.setMode('follow-all');
+      } else {
+        document.getElementById(`pill-s${idx}`)?.classList.add('active');
+        if (droneCamera) droneCamera.setMode('follow-canoe', { canoeIdx: 0 });
+      }
+
+      // Update visibility & styling of trails and markers
+      series.forEach((pts, i) => {
+        const isTarget = (idx === -1 || idx === i);
+        if (serieMarkers[i]) {
+          serieMarkers[i].setOpacity(isTarget ? 1 : 0.2);
+        }
+        if (allTrailLayers[i]) {
+          allTrailLayers[i].setStyle({
+            opacity: isTarget ? (idx === -1 ? 0.3 : 0.7) : 0.08,
+            weight: isTarget ? 3 : 1
+          });
+        }
+        if (serieTrails[i]) {
+          serieTrails[i].setLatLngs([]);
+        }
+      });
+
+      // Fit bounds
+      if (idx === -1) {
+        const allCoords = [];
+        series.forEach(pts => pts.forEach(p => allCoords.push([p.lat, p.lon])));
+        if (allCoords.length) map.fitBounds(allCoords, { padding: [35, 35] });
+      } else {
+        const pts = series[idx];
+        if (pts && pts.length > 1) map.fitBounds(pts.map(p => [p.lat, p.lon]), { padding: [35, 35], maxZoom: 16 });
+      }
+
+      document.getElementById('t-tot2').textContent = fmtMs(activeDur);
+      document.getElementById('t-cur2').textContent = '00:00';
+      updateSerieFrame(0);
+      updateTimeline2();
+
+      // Table row highlight
+      document.querySelectorAll('#series-tbody tr').forEach((tr, i) => tr.classList.toggle('active-row', i === idx));
+    }
+
+    function selectSerieFromTable(idx) {
+      selectSerie(idx);
+      switchTab('map');
+    }
+
+    function updateSerieFrame(t) {
+      series.forEach((pts, i) => {
+        if (!pts || !pts.length) return;
+        const isTarget = (currentSerieIdx === -1 || currentSerieIdx === i);
+        const dur = pts[pts.length - 1].t;
+        const curT = isTarget ? Math.min(t, dur) : 0;
+
+        const p = interp(pts, curT);
+        if (p && serieMarkers[i]) {
+          serieMarkers[i].setLatLng([p.lat, p.lon]);
+          serieMarkers[i]._currentHeading = p.heading != null ? p.heading : 0;
+          pts._currentPos = { lat: p.lat, lon: p.lon };
+          pts._currentHeading = serieMarkers[i]._currentHeading;
+          rotateCanoe(serieMarkers[i].getElement(), serieMarkers[i]._currentHeading);
+
+          const spdEl = document.getElementById(`spd-marker-${i}`);
+          if (spdEl) spdEl.textContent = (p.spdKmh || 0).toFixed(1) + ' km/h';
+
+          const hrEl = document.getElementById(`hr-marker-${i}`);
+          if (hrEl) {
+            if (p.hr) {
+              const hrColor = getHRColor(p.hr);
+              hrEl.innerHTML = `<span style="color:${hrColor}">❤️ ${Math.round(p.hr)} bpm</span>`;
+            } else {
+              hrEl.textContent = '';
+            }
+          }
+        }
+
+        // Center trail
+        const tr = pts.filter(pt => pt.t <= curT).map(pt => [pt.lat, pt.lon]);
+        if (serieTrails[i]) serieTrails[i].setLatLngs(isTarget ? tr : []);
+      });
+
+      // Atualizar Câmera Drone Virtual no Treino Raia
+      if (droneCamera) {
+        droneCamera.update(t);
+      }
+
+      document.getElementById('t-cur2').textContent = fmtMs(t);
+    }
+
+    function updateTimeline2() {
+      const activeDur = currentSerieIdx === -1 ? masterDurationMs : (series[currentSerieIdx]?.[series[currentSerieIdx].length - 1].t || 0);
+      const pct = activeDur > 0 ? Math.min(1, playTimeMs / activeDur) : 0;
+      document.getElementById('tl-fill2').style.width = (pct * 100) + '%';
+      document.getElementById('tl-handle2').style.left = (pct * 100) + '%';
+    }
+
+    function rafLoop2(ts) {
+      if (lastTimestamp2 !== null && isPlaying) {
+        const el = ts - lastTimestamp2;
+        playTimeMs += el * speed;
+        const activeDur = currentSerieIdx === -1 ? masterDurationMs : (series[currentSerieIdx]?.[series[currentSerieIdx].length - 1].t || 0);
+        if (playTimeMs >= activeDur) {
+          playTimeMs = activeDur;
+          isPlaying = false;
+          document.getElementById('btn-play-series').textContent = '▶';
+        }
+        updateSerieFrame(playTimeMs);
+        updateTimeline2();
+      }
+      lastTimestamp2 = ts;
+      if (isPlaying) lastRaf2 = requestAnimationFrame(rafLoop2);
+    }
+
+    function togglePlaySeries() {
+      isPlaying = !isPlaying;
+      document.getElementById('btn-play-series').textContent = isPlaying ? '⏸' : '▶';
+      if (isPlaying) { lastTimestamp2 = null; lastRaf2 = requestAnimationFrame(rafLoop2); }
+      else if (lastRaf2) cancelAnimationFrame(lastRaf2);
+    }
+
+    function setSpeed2(s) {
+      speed = s;
+      document.querySelectorAll('.spd2').forEach(b => b.classList.toggle('active', +b.dataset.s === s));
+    }
+
+    function seekRel2(sec) {
+      const activeDur = currentSerieIdx === -1 ? masterDurationMs : (series[currentSerieIdx]?.[series[currentSerieIdx].length - 1].t || 0);
+      playTimeMs = Math.max(0, Math.min(playTimeMs + sec * 1000, activeDur));
+      updateSerieFrame(playTimeMs); updateTimeline2();
+    }
+
+    // ===== NAVIGATION =====
+    function switchTab(name) {
+      document.querySelectorAll('.tab-view').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('view-' + name).classList.add('active');
+      document.getElementById('btn-nav-' + name).classList.add('active');
+      if (name === 'map' && map) setTimeout(() => map.invalidateSize(), 50);
+    }
+
+    function hideLoading() {
+      const el = document.getElementById('loading');
+      el.style.opacity = '0';
+      setTimeout(() => el.style.display = 'none', 500);
+    }
+
+    // ===== CAMERA DRONE HANDLERS =====
+    function setCameraDirector(mode, param) {
+      setRaiaCamera(mode, param);
+    }
+
+    function setRaiaCamera(mode, param) {
+      if (!droneCamera) return;
+      document.querySelectorAll('.drone-btn').forEach(b => b.classList.remove('active'));
+
+      if (mode === 'auto' || mode === 'smart') {
+        document.getElementById('btn-cam-auto')?.classList.add('active');
+        droneCamera.setMode('auto');
+      } else if (mode === 'follow-leader' || mode === 'leader') {
+        document.getElementById('btn-cam-leader')?.classList.add('active');
+        droneCamera.setMode('follow-leader');
+      } else if (mode === 'all' || mode === 'follow-all' || mode === 'todas') {
+        document.getElementById('btn-cam-all')?.classList.add('active');
+        droneCamera.setMode('follow-all');
+      } else if (mode === 'follow-canoe' || mode === 'canoe' || mode === 'serie') {
+        const idx = typeof param === 'number' ? param : 0;
+        document.getElementById(`btn-cam-s${idx}`)?.classList.add('active');
+        droneCamera.setMode('follow-canoe', { canoeIdx: idx });
+      } else if (mode === 'overview') {
+        document.getElementById('btn-cam-overview')?.classList.add('active');
+        droneCamera.setMode('overview');
+      }
+    }
+
+    function setDroneAltitude(preset) {
+      if (!droneCamera) return;
+      document.querySelectorAll('.drone-btn-mini').forEach(b => {
+        if (b.id && b.id.startsWith('btn-alt-')) b.classList.remove('active');
+      });
+      if (preset === 'close') document.getElementById('btn-alt-close')?.classList.add('active');
+      else if (preset === 'normal') document.getElementById('btn-alt-normal')?.classList.add('active');
+      else if (preset === 'panoramic') document.getElementById('btn-alt-pano')?.classList.add('active');
+
+      droneCamera.setAltitudePreset(preset);
+      updateDroneIndicator();
+    }
+
+    function adjustDroneZoom(delta) {
+      if (!droneCamera) return;
+      droneCamera.adjustZoomOffset(delta);
+      updateDroneIndicator();
+    }
+
+    function updateDroneIndicator() {
+      const ind = document.getElementById('drone-zoom-indicator');
+      if (!ind || !droneCamera) return;
+      const p = droneCamera.config.altitudePreset;
+      const off = droneCamera.config.zoomOffset || 0;
+      const altMap = { close: 35, normal: 65, panoramic: 150 };
+      const baseAlt = altMap[p] || 45;
+      const calcAlt = Math.max(15, Math.round(baseAlt * Math.pow(1.3, -off)));
+      ind.textContent = `Alt: ${calcAlt}m`;
+    }
+
+    // ===== STARTUP =====
+    window.addEventListener('load', () => {
+      try {
+        initApp();
+        setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+      } catch (err) {
+        console.error("Erro ao iniciar visualizador de raia:", err);
+      }
+    });
+  </script>
+</body>
+
+</html>

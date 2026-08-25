@@ -115,16 +115,23 @@ async function startServer() {
 
   app.post("/api/vessel/reject", (req, res) => {
     const { vesselId, vesselNumber } = req.body;
-    removeVesselFromState(vesselNumber || vesselId);
+    removeVesselFromState(vesselNumber || vesselId, false, vesselId);
     io.emit("vessel:rejected", { vesselId, vesselNumber });
     res.json({ success: true });
   });
 
   app.post("/api/vessel/remove", (req, res) => {
     const { vesselId, vesselNumber, clearAll } = req.body;
-    removeVesselFromState(vesselNumber || vesselId, clearAll);
+    removeVesselFromState(vesselNumber || vesselId, clearAll, vesselId);
     io.emit("vessel:removed", { vesselId, vesselNumber, clearAll });
     res.json({ success: true });
+  });
+
+  app.post("/api/vessel/clear-all", (req, res) => {
+    removeVesselFromState(undefined, true);
+    io.emit("vessel:removed", { clearAll: true });
+    io.emit("system:cache_cleared");
+    res.json({ success: true, message: "Todas as embarcações foram removidas." });
   });
 
   // Report endpoints
