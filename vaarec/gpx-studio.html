@@ -1,0 +1,2189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VAAREC GPX Studio — DAW de Telemetria & Edição Temporal</title>
+  <meta name="description" content="Estação de trabalho estilo CapCut / DAW para edição de trilhas temporais, multi-gráficos empilhados e decupagem dimensional de telemetria esportiva.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* ===== DESIGN SYSTEM ===== */
+    :root {
+      --bg: #07090e;
+      --bg-panel: #0d131f;
+      --bg-card: #121b2d;
+      --bg-card-hover: #1a273f;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(0, 242, 254, 0.4);
+      --cyan: #00F2FE;
+      --cyan-dim: rgba(0, 242, 254, 0.12);
+      --cyan-glow: rgba(0, 242, 254, 0.3);
+      --gold: #F59E0B;
+      --gold-dim: rgba(245, 158, 11, 0.15);
+      --green: #10B981;
+      --green-dim: rgba(16, 185, 129, 0.15);
+      --red: #EF4444;
+      --purple: #8B5CF6;
+      --text: #F8FAFC;
+      --text-sec: #94A3B8;
+      --text-muted: #64748B;
+      --font: 'Rajdhani', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; height: 100dvh; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow: hidden; }
+
+    #studio-app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+    /* Top Bar */
+    header#studio-header {
+      height: 48px; background: linear-gradient(90deg, #090e17 0%, var(--bg-panel) 100%);
+      border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px; gap: 10px; z-index: 100; flex-shrink: 0;
+    }
+    .brand-wrap { display: flex; align-items: center; gap: 8px; }
+    .brand-icon { font-size: 18px; color: var(--cyan); text-shadow: 0 0 12px var(--cyan-glow); }
+    .brand-title { font-family: var(--font); font-size: 1.1rem; font-weight: 800; color: #fff; letter-spacing: 1px; }
+    .brand-badge { font-size: 0.6rem; font-weight: 800; font-family: var(--font); background: var(--cyan-dim); border: 1px solid var(--cyan); color: var(--cyan); padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+
+    .header-actions { display: flex; align-items: center; gap: 6px; }
+    .btn-studio {
+      font-family: var(--font); font-size: 0.78rem; font-weight: 700; padding: 5px 10px;
+      border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-sec);
+      cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s; text-decoration: none;
+    }
+    .btn-studio:hover { color: #fff; border-color: var(--cyan); background: var(--bg-card-hover); }
+    .btn-studio.primary { background: linear-gradient(135deg, rgba(0,242,254,0.2), rgba(0,242,254,0.05)); border-color: var(--cyan); color: var(--cyan); }
+    .btn-studio.primary:hover { box-shadow: 0 0 14px var(--cyan-glow); color: #fff; }
+    .btn-studio.primary.active { background: rgba(0,242,254,0.25); border-color: var(--cyan); color: #fff; box-shadow: 0 0 16px var(--cyan-glow); }
+    .btn-studio.gold { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+    .btn-studio.green { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+
+    /* Dropdown */
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-content {
+      display: none; position: absolute; right: 0; top: 100%; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: 8px; min-width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      z-index: 1000; padding: 6px 0; margin-top: 4px;
+    }
+    .dropdown:hover .dropdown-content { display: block; }
+    .dropdown-item {
+      padding: 8px 12px; font-family: var(--font); font-size: 0.8rem; font-weight: 700; color: var(--text-sec);
+      display: flex; align-items: center; gap: 8px; cursor: pointer; text-decoration: none; transition: all 0.12s;
+    }
+    .dropdown-item:hover { background: var(--bg-card-hover); color: var(--cyan); }
+
+    /* Main Workspace Grid */
+    #studio-body { flex: 1; display: grid; grid-template-columns: 310px 1fr; overflow: hidden; }
+
+    /* Left Sidebar */
+    aside#studio-sidebar {
+      background: var(--bg-panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto; padding: 10px; gap: 10px;
+    }
+    .sidebar-section-title { font-family: var(--font); font-size: 0.74rem; font-weight: 800; color: var(--cyan); text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+
+    .tracks-stack { display: flex; flex-direction: column; gap: 5px; }
+    .track-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px; cursor: pointer; transition: all 0.15s; position: relative;
+    }
+    .track-card:hover { border-color: rgba(255,255,255,0.2); }
+    .track-card.active { border-color: var(--cyan); background: linear-gradient(135deg, rgba(0,242,254,0.08), var(--bg-card)); box-shadow: 0 0 14px rgba(0,242,254,0.1); }
+    .track-card-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+    .track-name-wrap { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+    .track-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+    .track-name-text { font-family: var(--font); font-size: 0.88rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-metrics-pills { display: flex; gap: 5px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-sec); }
+    .track-actions-mini { display: flex; gap: 3px; align-items: center; }
+    .btn-mini { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; font-size: 11px; border-radius: 4px; }
+    .btn-mini:hover { color: #fff; }
+
+    .transform-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .tool-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .btn-tool-act { font-family: var(--font); font-size: 0.74rem; font-weight: 700; padding: 5px 6px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-sec); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .btn-tool-act:hover { border-color: var(--cyan); color: var(--cyan); }
+    .btn-tool-act.danger:hover { border-color: var(--red); color: var(--red); }
+
+    .stats-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-family: var(--font-mono); }
+    .stat-box { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; }
+    .stat-box-lbl { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; font-family: var(--font); font-weight: 700; }
+    .stat-box-val { font-size: 0.84rem; font-weight: 700; color: #fff; margin-top: 2px; }
+
+    /* Right Main Canvas */
+    main#studio-canvas { display: grid; grid-template-rows: 1fr 240px; overflow: hidden; background: #05070c; }
+
+    /* Top Graphs Area with Integrated Ruler & Zoom */
+    .graphs-container { display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid var(--border); background: #05070c; position: relative; }
+    
+    .chart-top-toolbar {
+      height: 40px; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 10px; gap: 8px; flex-shrink: 0;
+    }
+    .layout-mode-group { display: flex; gap: 2px; background: rgba(0,0,0,0.4); padding: 2px; border-radius: 6px; border: 1px solid var(--border); }
+    .btn-layout-mode {
+      font-family: var(--font); font-size: 0.72rem; font-weight: 700; padding: 3px 8px;
+      border: none; border-radius: 4px; background: transparent; color: var(--text-sec); cursor: pointer; transition: all 0.12s;
+    }
+    .btn-layout-mode.active { background: var(--cyan); color: #000; font-weight: 800; box-shadow: 0 0 10px var(--cyan-glow); }
+
+    .chart-tabs-group { display: flex; gap: 3px; overflow-x: auto; align-items: center; }
+    .chart-tab-btn {
+      font-family: var(--font); font-size: 0.73rem; font-weight: 700; padding: 3px 7px;
+      border-radius: 5px; border: 1px solid transparent; background: transparent; color: var(--text-sec);
+      cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; transition: all 0.12s;
+    }
+    .chart-tab-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .chart-tab-btn.active { color: var(--cyan); background: var(--cyan-dim); border-color: var(--cyan); font-weight: 800; }
+
+    /* Zoom & Race Actions Toolbar */
+    .actions-sub-toolbar {
+      height: 34px; background: #080c14; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 10px; gap: 8px; flex-shrink: 0; font-family: var(--font);
+    }
+    .action-tools-group { display: flex; align-items: center; gap: 5px; }
+    .btn-act-sub {
+      font-family: var(--font); font-size: 0.72rem; font-weight: 700; padding: 3px 7px;
+      border-radius: 4px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-sec);
+      cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.12s;
+    }
+    .btn-act-sub:hover { color: #fff; border-color: var(--cyan); }
+    .btn-act-sub.primary { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+    .btn-act-sub.gold { color: var(--gold); border-color: var(--gold); background: var(--gold-dim); }
+    .btn-act-sub.green { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+    .btn-act-sub.danger { color: var(--red); border-color: var(--red); }
+
+    /* Integrated Unified Timeline Ruler directly above Charts */
+    .unified-ruler-wrap {
+      height: 24px; background: #06090f; border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: relative; width: 100%; cursor: pointer; flex-shrink: 0;
+    }
+    #unified-ruler-canvas { width: 100%; height: 24px; display: block; }
+
+    /* Multi-Chart View Grid */
+    .chart-multi-wrap { flex: 1; display: grid; grid-template-rows: 1fr; padding: 4px 10px; overflow: hidden; position: relative; gap: 6px; }
+    .chart-multi-wrap.dual { grid-template-rows: 1fr; }
+    .chart-multi-wrap.stacked { grid-template-rows: 1fr 1fr; }
+    .chart-pane-single { position: relative; width: 100%; height: 100%; min-height: 80px; }
+
+    /* Vertical Playhead Needle traversing all charts */
+    .chart-playhead-line {
+      position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); z-index: 30;
+      pointer-events: none; box-shadow: 0 0 8px rgba(239,68,68,0.8); display: block;
+    }
+    .chart-playhead-handle {
+      position: absolute; top: 0; width: 12px; height: 14px; background: var(--red);
+      transform: translateX(-50%); clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
+      cursor: grab; pointer-events: auto; z-index: 31; box-shadow: 0 0 8px rgba(239,68,68,0.8);
+    }
+
+    /* Range Selection Action Banner with Micro-Inputs & Handles */
+    .range-banner {
+      background: linear-gradient(90deg, rgba(0,242,254,0.18) 0%, rgba(13,19,31,0.98) 100%);
+      border-bottom: 1px solid var(--cyan-glow); padding: 6px 12px; display: none;
+      align-items: center; justify-content: space-between; gap: 10px; font-family: var(--font); flex-shrink: 0;
+    }
+    .range-banner.show { display: flex; }
+    .range-inputs-group { display: flex; align-items: center; gap: 6px; }
+    .range-num-box { display: flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 5px; border: 1px solid var(--border); }
+    .range-num-box label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+    .range-num-box input {
+      width: 60px; background: transparent; border: none; color: #fff; font-family: var(--font-mono);
+      font-size: 11px; font-weight: 700; text-align: center; outline: none;
+    }
+    .btn-step { background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 3px; width: 18px; height: 18px; font-size: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-step:hover { background: var(--cyan); color: #000; }
+
+    .range-stats-badge {
+      font-family: var(--font-mono); font-size: 0.72rem; color: #E2E8F0; background: rgba(0,242,254,0.1);
+      padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(0,242,254,0.3);
+    }
+    .range-actions { display: flex; gap: 5px; }
+
+    /* Transport Bar at Bottom of Charts */
+    .timeline-transport-bar {
+      height: 36px; background: #090e17; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 10px; flex-shrink: 0;
+    }
+    .transport-controls { display: flex; align-items: center; gap: 4px; }
+    .btn-transport {
+      width: 26px; height: 26px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-card);
+      color: #E2E8F0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
+    }
+    .btn-transport:hover { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+    .btn-transport.play-btn { background: var(--cyan); color: #000; border-color: var(--cyan); font-size: 12px; font-weight: bold; width: 30px; height: 30px; }
+
+    .playhead-display {
+      font-family: var(--font-mono); font-size: 0.74rem; font-weight: 700; color: #fff;
+      display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.5); padding: 3px 8px;
+      border-radius: 4px; border: 1px solid var(--border);
+    }
+    .playhead-time-badge { color: var(--cyan); }
+    .playhead-dist-badge { color: var(--gold); }
+    .playhead-spd-badge { color: var(--green); }
+
+    /* Lower Split: Map + Decupagem Tabs */
+    .lower-split { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+
+    .map-pane { position: relative; border-right: 1px solid var(--border); }
+    #studio-map { width: 100%; height: 100%; background: #070a10; }
+
+    .decupagem-pane { display: flex; flex-direction: column; background: var(--bg-panel); overflow: hidden; }
+    .decupagem-header {
+      height: 36px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 10px; flex-shrink: 0;
+    }
+    .decupagem-tabs { display: flex; gap: 3px; overflow-x: auto; }
+    .dec-tab-btn { font-family: var(--font); font-size: 0.72rem; font-weight: 700; padding: 3px 7px; border-radius: 4px; border: none; background: transparent; color: var(--text-sec); cursor: pointer; white-space: nowrap; }
+    .dec-tab-btn.active { color: var(--cyan); background: var(--cyan-dim); }
+
+    .decupagem-content { flex: 1; overflow-y: auto; padding: 8px; }
+    .studio-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.72rem; text-align: left; }
+    .studio-table th { background: rgba(0,0,0,0.4); color: var(--cyan); font-family: var(--font); font-weight: 700; font-size: 0.75rem; padding: 5px 7px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+    .studio-table td { padding: 5px 7px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #E2E8F0; }
+    .studio-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+    .events-stack { display: flex; flex-direction: column; gap: 5px; }
+    .event-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; display: flex; align-items: center; justify-content: space-between; font-family: var(--font); }
+    .event-badge { font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+
+    /* Modals */
+    .studio-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+      z-index: 2000; display: none; align-items: center; justify-content: center; padding: 16px;
+    }
+    .studio-modal-overlay.show { display: flex; }
+    .studio-modal-card {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px;
+      width: 100%; max-width: 560px; max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.8); overflow: hidden;
+    }
+    .studio-modal-header {
+      padding: 12px 16px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; font-family: var(--font);
+    }
+    .studio-modal-title { font-size: 1.05rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .studio-modal-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; font-family: var(--font-body); font-size: 0.85rem; }
+    .studio-modal-footer {
+      padding: 10px 16px; background: rgba(0,0,0,0.3); border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+
+    /* Modal Form Controls */
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-family: var(--font); font-size: 0.78rem; font-weight: 700; color: var(--text-sec); text-transform: uppercase; }
+    .form-input {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+      color: #fff; font-family: var(--font-mono); font-size: 0.85rem; padding: 8px 10px; outline: none;
+    }
+    .form-input:focus { border-color: var(--cyan); box-shadow: 0 0 10px var(--cyan-glow); }
+    .form-select {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+      color: #fff; font-family: var(--font); font-size: 0.85rem; padding: 8px 10px; outline: none;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div id="studio-app">
+
+  <!-- TOP BAR -->
+  <header id="studio-header">
+    <div class="brand-wrap">
+      <i class="fa-solid fa-sliders brand-icon"></i>
+      <span class="brand-title">VAAREC GPX STUDIO</span>
+      <span class="brand-badge">DAW & Skills</span>
+    </div>
+
+    <!-- Presets de Demonstração -->
+    <div style="display:flex; align-items:center; gap:5px;">
+      <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Presets:</span>
+      <button class="btn-studio" onclick="loadDemoPreset('pro-masc')">
+        <i class="fa-solid fa-trophy" style="color:var(--gold);"></i> Pro Masc
+      </button>
+      <button class="btn-studio" onclick="loadDemoPreset('treino-series')">
+        <i class="fa-solid fa-chart-line" style="color:var(--cyan);"></i> Séries
+      </button>
+      <button class="btn-studio" onclick="loadDemoPreset('pro-mista')">
+        <i class="fa-solid fa-bolt" style="color:#A78BFA;"></i> Pro Mista
+      </button>
+    </div>
+
+    <!-- Ações de Exportação e Saída -->
+    <div class="header-actions">
+      <input type="file" id="file-uploader" accept=".gpx,.json,.txt,.fit" multiple style="display:none;" />
+      <button class="btn-studio" onclick="document.getElementById('file-uploader').click()">
+        <i class="fa-solid fa-cloud-arrow-up"></i> Carregar GPX / Contrato
+      </button>
+
+      <!-- Botão Manual do Studio -->
+      <button class="btn-studio" onclick="openManualModal()" style="border-color:var(--cyan); color:var(--cyan);">
+        <i class="fa-solid fa-book-open"></i> Manual do Studio
+      </button>
+
+      <!-- Dropdown Exportar -->
+      <div class="dropdown">
+        <button class="btn-studio green">
+          <i class="fa-solid fa-download"></i> Exportar <i class="fa-solid fa-chevron-down" style="font-size:10px"></i>
+        </button>
+        <div class="dropdown-content">
+          <a class="dropdown-item" onclick="exportCleanContract()"><i class="fa-solid fa-floppy-disk text-cyan"></i> Salvar Contrato VAAREC JSON</a>
+          <a class="dropdown-item" onclick="exportBaselineJSON()"><i class="fa-solid fa-chart-area text-gold"></i> Exportar Baseline JSON (comparison)</a>
+          <a class="dropdown-item" onclick="exportEventsJSON()"><i class="fa-solid fa-crosshairs text-red"></i> Exportar Eventos JSON (events)</a>
+          <a class="dropdown-item" onclick="exportSplitsCSV()"><i class="fa-solid fa-file-csv text-green"></i> Exportar Splits CSV (segments)</a>
+          <a class="dropdown-item" onclick="exportCleanGPXFile()"><i class="fa-solid fa-file-code" style="color:#60A5FA"></i> Exportar GPX Sanitizado</a>
+        </div>
+      </div>
+
+      <button class="btn-studio gold" onclick="launchViewer('desafio')">
+        <i class="fa-solid fa-trophy"></i> Desafio
+      </button>
+      <button class="btn-studio primary" onclick="launchViewer('raia')">
+        <i class="fa-solid fa-flag-checkered"></i> Raia
+      </button>
+      <a href="/" class="btn-studio" title="Voltar ao Generator Principal">
+        <i class="fa-solid fa-arrow-left"></i> Generator
+      </a>
+    </div>
+  </header>
+
+  <!-- WORKSPACE BODY -->
+  <div id="studio-body">
+
+    <!-- LEFT SIDEBAR: TRACKS & TRANSFORM TOOLS -->
+    <aside id="studio-sidebar">
+      
+      <!-- Tracks List -->
+      <div>
+        <div class="sidebar-section-title">
+          <span><i class="fa-solid fa-layer-group"></i> Trilhas Carregadas</span>
+          <span id="tracks-count-badge" style="font-family:var(--font-mono); color:var(--text-sec)">0</span>
+        </div>
+        <div class="tracks-stack" id="tracks-list-container">
+          <!-- Renderizado dinamicamente -->
+        </div>
+      </div>
+
+      <!-- Transform Tools -->
+      <div class="transform-box">
+        <div class="sidebar-section-title">
+          <span><i class="fa-solid fa-wand-magic-sparkles"></i> Edição Rápida</span>
+        </div>
+        <div class="tool-btn-grid">
+          <button class="btn-tool-act" onclick="splitAtPlayheadAction()" title="Fatiar clipe na posição da agulha (Atalho C)">
+            <i class="fa-solid fa-scissors" style="color:var(--cyan)"></i> Fatiar (C)
+          </button>
+          <button class="btn-tool-act" onclick="applyTrimAction()" title="Cortar para faixa selecionada">
+            <i class="fa-solid fa-crop-simple" style="color:var(--green)"></i> Cortar (Trim)
+          </button>
+          <button class="btn-tool-act" onclick="openStartModal()" title="Definir largada oficial por horário ou agulha">
+            <i class="fa-solid fa-flag" style="color:var(--gold)"></i> 🏁 Largada
+          </button>
+          <button class="btn-tool-act" onclick="openFinishModal()" title="Definir chegada oficial por tempo ou agulha">
+            <i class="fa-solid fa-trophy" style="color:var(--cyan)"></i> 🏆 Chegada
+          </button>
+          <button class="btn-tool-act" onclick="openThresholdModal()" title="Eliminar trechos por velocidade/FC mínima">
+            <i class="fa-solid fa-broom" style="color:#A78BFA"></i> Linha de Corte
+          </button>
+          <button class="btn-tool-act" onclick="openAdaptiveSeriesModal()" title="Auto-detectar séries de treino adaptativas">
+            <i class="fa-solid fa-diagram-project" style="color:var(--gold)"></i> Auto-Séries
+          </button>
+          <button class="btn-tool-act" onclick="undoTrimAction()" title="Desfazer">
+            <i class="fa-solid fa-rotate-left"></i> Desfazer
+          </button>
+          <button class="btn-tool-act danger" onclick="resetTrackAction()" title="Restaurar bruta">
+            <i class="fa-solid fa-arrows-rotate"></i> Resetar
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Track Stats -->
+      <div>
+        <div class="sidebar-section-title">
+          <span><i class="fa-solid fa-chart-pie"></i> Resumo Estatístico</span>
+        </div>
+        <div class="stats-summary-grid" id="active-track-stats-grid">
+          <div class="stat-box"><div class="stat-box-lbl">Distância</div><div class="stat-box-val" id="st-dist">--</div></div>
+          <div class="stat-box"><div class="stat-box-lbl">Duração</div><div class="stat-box-val" id="st-dur">--</div></div>
+          <div class="stat-box"><div class="stat-box-lbl">Vel. Média</div><div class="stat-box-val" id="st-spd-avg">--</div></div>
+          <div class="stat-box"><div class="stat-box-lbl">Vel. Máx</div><div class="stat-box-val" id="st-spd-max">--</div></div>
+          <div class="stat-box"><div class="stat-box-lbl">FC Média</div><div class="stat-box-val" id="st-hr-avg">--</div></div>
+          <div class="stat-box"><div class="stat-box-lbl">FC Máx</div><div class="stat-box-val" id="st-hr-max">--</div></div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- RIGHT CANVAS: MULTI-GRAPHS WITH UNIFIED RULER & PLAYHEAD + MAP/DECUPAGEM -->
+    <main id="studio-canvas">
+
+      <!-- 1. TOP GRAPHS AREA WITH INTEGRATED RULER, ZOOM & RACE TOOLS -->
+      <section class="graphs-container" id="graphs-container-el">
+        
+        <!-- Top Toolbar: Layout Selector & Metric Tabs -->
+        <div class="chart-top-toolbar">
+          <div class="layout-mode-group">
+            <button class="btn-layout-mode active" id="btn-mode-single" onclick="setLayoutMode('single')" title="Gráfico Único">
+              <i class="fa-solid fa-square"></i> Único
+            </button>
+            <button class="btn-layout-mode" id="btn-mode-dual" onclick="setLayoutMode('dual')" title="Eixo Duplo: Velocidade + FC no mesmo gráfico">
+              <i class="fa-solid fa-chart-line"></i> Eixo Duplo (Vel+FC)
+            </button>
+            <button class="btn-layout-mode" id="btn-mode-stacked" onclick="setLayoutMode('stacked')" title="Painéis Empilhados Simultâneos">
+              <i class="fa-solid fa-table-rows"></i> Empilhado (2x)
+            </button>
+          </div>
+
+          <div class="chart-tabs-group">
+            <button class="chart-tab-btn active" id="tab-btn-speed" onclick="switchChartTab('speed')"><i class="fa-solid fa-bolt"></i> Velocidade</button>
+            <button class="chart-tab-btn" id="tab-btn-hr" onclick="switchChartTab('hr')"><i class="fa-solid fa-heart"></i> FC (bpm)</button>
+            <button class="chart-tab-btn" id="tab-btn-ele" onclick="switchChartTab('ele')"><i class="fa-solid fa-mountain"></i> Altimetria</button>
+            <button class="chart-tab-btn" id="tab-btn-heading" onclick="switchChartTab('heading')"><i class="fa-solid fa-compass"></i> Rumo (°)</button>
+            <button class="chart-tab-btn" id="tab-btn-duel" onclick="switchChartTab('duel')"><i class="fa-solid fa-people-arrows"></i> Duelo</button>
+            <button class="chart-tab-btn" id="tab-btn-splits" onclick="switchChartTab('splits')"><i class="fa-solid fa-chart-simple"></i> Splits</button>
+            <button class="chart-tab-btn" id="tab-btn-baseline" onclick="switchChartTab('baseline')"><i class="fa-solid fa-chart-area"></i> Baseline</button>
+            <button class="chart-tab-btn" id="tab-btn-proximity" onclick="switchChartTab('proximity')"><i class="fa-solid fa-arrows-left-right-to-line"></i> Proximidade</button>
+            <button class="chart-tab-btn" id="tab-btn-bins" onclick="switchChartTab('bins')"><i class="fa-solid fa-chart-column"></i> Bins</button>
+            <button class="chart-tab-btn" id="tab-btn-efficiency" onclick="switchChartTab('efficiency')"><i class="fa-solid fa-gauge-high"></i> Eficiência</button>
+            <button class="chart-tab-btn" id="tab-btn-scatter" onclick="switchChartTab('scatter')"><i class="fa-solid fa-braille"></i> Dispersão</button>
+          </div>
+        </div>
+
+        <!-- Secondary Action Toolbar: Zoom Controls & Event Creation -->
+        <div class="actions-sub-toolbar">
+          <div class="action-tools-group">
+            <span style="font-size:10px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Zoom:</span>
+            <button class="btn-act-sub" onclick="zoomChartAction(0.75)" title="Zoom In (ou gire o MouseWheel)"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            <button class="btn-act-sub" onclick="zoomChartAction(1.33)" title="Zoom Out (ou gire o MouseWheel)"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+            <button class="btn-act-sub" onclick="resetChartZoomAction()" title="Resetar Zoom"><i class="fa-solid fa-arrows-rotate"></i> Reset</button>
+            <span style="color:rgba(255,255,255,0.1); margin:0 4px;">|</span>
+            <button class="btn-act-sub primary" id="btn-toggle-range-mode" onclick="toggleRangeSelectionMode()">
+              <i class="fa-solid fa-crosshairs"></i> <span id="lbl-range-mode">🎯 Faixa</span>
+            </button>
+            <button class="btn-act-sub" onclick="removeIntervalAction()" title="Excluir trecho selecionado no gráfico">
+              <i class="fa-solid fa-trash-can" style="color:var(--red)"></i> Excluir Trecho
+            </button>
+          </div>
+
+          <div class="action-tools-group">
+            <button class="btn-act-sub gold" onclick="openStartModal()">
+              <i class="fa-solid fa-flag"></i> 🏁 Largada
+            </button>
+            <button class="btn-act-sub primary" onclick="openFinishModal()">
+              <i class="fa-solid fa-trophy"></i> 🏆 Chegada
+            </button>
+            <button class="btn-act-sub green" onclick="openCustomEventModal()">
+              <i class="fa-solid fa-plus-circle"></i> ➕ Criar Evento
+            </button>
+            <button class="btn-act-sub primary" onclick="autoDetectEventsAction()" title="Detectar combates, ultrapassagens, sprints e curvas automaticamente">
+              <i class="fa-solid fa-bolt"></i> ⚡ Auto-Eventos
+            </button>
+          </div>
+        </div>
+
+        <!-- Integrated Unified Timeline Ruler (Sits right above the charts) -->
+        <div class="unified-ruler-wrap" id="unified-ruler-wrap">
+          <canvas id="unified-ruler-canvas"></canvas>
+          <div class="chart-playhead-line" id="chart-playhead-line" style="left:0px;">
+            <div class="chart-playhead-handle" id="chart-playhead-handle"></div>
+          </div>
+        </div>
+
+        <!-- Range Selection Action Banner with Micro-Inputs -->
+        <div class="range-banner" id="range-selection-banner">
+          <div class="range-inputs-group">
+            <div class="range-num-box">
+              <label><i class="fa-solid fa-play" style="color:var(--green)"></i> Início:</label>
+              <button class="btn-step" onclick="stepRange('start', -50)">-50</button>
+              <input type="number" id="input-range-start-m" min="0" step="10" onchange="updateRangeFromInputs()" />
+              <button class="btn-step" onclick="stepRange('start', 50)">+50</button>
+              <span style="font-size:9px; color:var(--text-muted)">m</span>
+            </div>
+            <div class="range-num-box">
+              <label><i class="fa-solid fa-flag-checkered" style="color:var(--red)"></i> Fim:</label>
+              <button class="btn-step" onclick="stepRange('end', -50)">-50</button>
+              <input type="number" id="input-range-end-m" min="0" step="10" onchange="updateRangeFromInputs()" />
+              <button class="btn-step" onclick="stepRange('end', 50)">+50</button>
+              <span style="font-size:9px; color:var(--text-muted)">m</span>
+            </div>
+            <div class="range-stats-badge" id="range-stats-badge">
+              Extensão: 0 m · 00:00 · Vel: 0.0 km/h
+            </div>
+          </div>
+
+          <div class="range-actions">
+            <button class="btn-studio primary" onclick="applyTrimAction()"><i class="fa-solid fa-crop-simple"></i> Cortar</button>
+            <button class="btn-studio" onclick="removeIntervalAction()"><i class="fa-solid fa-trash" style="color:var(--red)"></i> Excluir</button>
+            <button class="btn-studio green" onclick="extractSeriesAction()"><i class="fa-solid fa-plus"></i> Nova Série</button>
+            <button class="btn-studio" onclick="studio.clearRangeSelection()"><i class="fa-solid fa-xmark"></i> Fechar</button>
+          </div>
+        </div>
+
+        <!-- Multi-Chart Canvas Grid (Supports MouseWheel Zoom) -->
+        <div class="chart-multi-wrap" id="chart-multi-container">
+          <div class="chart-pane-single" id="pane-chart-1">
+            <canvas id="studio-main-chart"></canvas>
+          </div>
+          <div class="chart-pane-single" id="pane-chart-2" style="display:none;">
+            <canvas id="studio-sub-chart-1"></canvas>
+          </div>
+        </div>
+
+        <!-- Integrated Transport Bar -->
+        <div class="timeline-transport-bar">
+          <div class="transport-controls">
+            <button class="btn-transport" onclick="seekToStart()" title="Voltar ao início"><i class="fa-solid fa-backward-step"></i></button>
+            <button class="btn-transport" onclick="stepSeconds(-5)" title="Recuar 5s"><i class="fa-solid fa-rotate-left"></i></button>
+            <button class="btn-transport play-btn" id="btn-play-pause" onclick="togglePlayback()" title="Play/Pause (Espaço)">
+              <i class="fa-solid fa-play" id="icon-play-pause"></i>
+            </button>
+            <button class="btn-transport" onclick="stepSeconds(5)" title="Avançar 5s"><i class="fa-solid fa-rotate-right"></i></button>
+            <button class="btn-transport" id="btn-loop" onclick="toggleLoop()" title="Repetir em Loop"><i class="fa-solid fa-repeat"></i></button>
+
+            <select id="select-playback-spd" onchange="setPlaySpeed(parseFloat(this.value))" style="background:var(--bg-card); border:1px solid var(--border); color:#fff; font-family:var(--font-mono); font-size:11px; padding:2px 5px; border-radius:4px; outline:none; margin-left:4px;">
+              <option value="1">1x</option>
+              <option value="2">2x</option>
+              <option value="4" selected>4x</option>
+              <option value="8">8x</option>
+              <option value="16">16x</option>
+            </select>
+          </div>
+
+          <div class="playhead-display">
+            <span>⏱ <strong class="playhead-time-badge" id="ph-time-str">00:00:00</strong></span>
+            <span>📍 <strong class="playhead-dist-badge" id="ph-dist-str">0.00 km</strong></span>
+            <span>⚡ <strong class="playhead-spd-badge" id="ph-spd-str">0.0 km/h</strong></span>
+            <span>❤️ <strong style="color:var(--red)" id="ph-hr-str">-- bpm</strong></span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button class="btn-act-sub" onclick="splitAtPlayheadAction()" title="Fatiar clipe na agulha (Atalho C)">
+              <i class="fa-solid fa-scissors" style="color:var(--cyan)"></i> Fatiar (C)
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 2. LOWER SPLIT: MAP + DECUPAGEM DIMENSIONAL TABS -->
+      <section class="lower-split">
+
+        <!-- Leaflet Map -->
+        <div class="map-pane">
+          <div id="studio-map"></div>
+        </div>
+
+        <!-- Decupagem Dimensional Pane -->
+        <div class="decupagem-pane">
+          <div class="decupagem-header">
+            <div class="decupagem-tabs">
+              <button class="dec-tab-btn active" id="dec-btn-splits" onclick="switchDecupagemTab('splits')">
+                📊 Splits (<span id="lbl-split-interval">500m</span>)
+              </button>
+              <button class="dec-tab-btn" id="dec-btn-baseline" onclick="switchDecupagemTab('baseline')">
+                📈 Envelope Baseline
+              </button>
+              <button class="dec-tab-btn" id="dec-btn-anomalies" onclick="switchDecupagemTab('anomalies')">
+                🚨 Anomalias
+              </button>
+              <button class="dec-tab-btn" id="dec-btn-events" onclick="switchDecupagemTab('events')">
+                ⚔️ Combates & Eventos (<span id="lbl-events-count">0</span>)
+              </button>
+              <button class="dec-tab-btn" id="dec-btn-bins" onclick="switchDecupagemTab('bins')">
+                📊 Bins Vel/FC
+              </button>
+              <button class="dec-tab-btn" id="dec-btn-raw" onclick="switchDecupagemTab('raw')">
+                📋 Pontos GPS
+              </button>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+              <select id="select-split-dist" onchange="changeSplitInterval(this.value)" style="background:var(--bg-card); border:1px solid var(--border); color:#fff; font-family:var(--font); font-size:11px; padding:2px 6px; border-radius:4px; outline:none;">
+                <option value="250">Splits 250m</option>
+                <option value="500" selected>Splits 500m</option>
+                <option value="1000">Splits 1000m</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="decupagem-content" id="decupagem-view-container">
+            <!-- Renderizado dinamicamente -->
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+</div>
+
+<!-- ==========================================
+ * MODAIS DE CONTROLE E DIÁLOGOS
+ * ========================================== -->
+
+<!-- Modal 1: Definir Largada Oficial -->
+<div class="studio-modal-overlay" id="modal-start-race">
+  <div class="studio-modal-card">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-flag" style="color:var(--gold)"></i> Definir Largada Oficial (t = 0)</div>
+      <button class="btn-mini" onclick="closeModal('modal-start-race')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body">
+      <p style="color:var(--text-sec);">Escolha como definir o marco zero oficial da prova. O trecho anterior (aquecimento) será cortado e o cronômetro começará exatamente neste ponto.</p>
+      
+      <div class="form-group">
+        <label class="form-label">Opção A: Por Hora Específica (HH:MM:SS)</label>
+        <input type="text" id="input-start-hms" class="form-input" placeholder="ex: 08:30:00" />
+      </div>
+
+      <div style="text-align:center; color:var(--text-muted); font-weight:bold; font-family:var(--font);">— OU —</div>
+
+      <div class="form-group">
+        <label class="form-label">Opção B: Usar Posição da Agulha (Playhead)</label>
+        <button class="btn-studio primary" style="width:100%; justify-content:center;" onclick="applyStartFromPlayhead()">
+          <i class="fa-solid fa-location-crosshairs"></i> Definir Largada na Agulha Atual (<span id="lbl-start-cur-playhead">00:00:00</span>)
+        </button>
+      </div>
+
+      <div class="form-group" style="margin-top:6px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff;">
+          <input type="checkbox" id="chk-start-all-tracks" checked />
+          <span>Aplicar corte de largada a todas as trilhas sincronizadas</span>
+        </label>
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio" onclick="closeModal('modal-start-race')">Cancelar</button>
+      <button class="btn-studio green" onclick="applyStartFromTime()">Confirmar Horário</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 2: Definir Chegada Oficial -->
+<div class="studio-modal-overlay" id="modal-finish-race">
+  <div class="studio-modal-card">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-trophy" style="color:var(--cyan)"></i> Definir Chegada Oficial</div>
+      <button class="btn-mini" onclick="closeModal('modal-finish-race')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body">
+      <p style="color:var(--text-sec);">Estabeleça a linha de chegada oficial. Todos os dados posteriores (arrefecimento/retorno) serão eliminados.</p>
+      
+      <div class="form-group">
+        <label class="form-label">Opção A: Por Tempo de Prova (HH:MM:SS)</label>
+        <input type="text" id="input-finish-duration" class="form-input" placeholder="ex: 01:15:30" />
+      </div>
+
+      <div style="text-align:center; color:var(--text-muted); font-weight:bold; font-family:var(--font);">— OU —</div>
+
+      <div class="form-group">
+        <label class="form-label">Opção B: Usar Posição da Agulha (Playhead)</label>
+        <button class="btn-studio primary" style="width:100%; justify-content:center;" onclick="applyFinishFromPlayhead()">
+          <i class="fa-solid fa-flag-checkered"></i> Definir Chegada na Agulha Atual (<span id="lbl-finish-cur-playhead">00:00:00</span>)
+        </button>
+      </div>
+
+      <div class="form-group" style="margin-top:6px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff;">
+          <input type="checkbox" id="chk-finish-all-tracks" checked />
+          <span>Aplicar corte de chegada a todas as trilhas</span>
+        </label>
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio" onclick="closeModal('modal-finish-race')">Cancelar</button>
+      <button class="btn-studio green" onclick="applyFinishFromDuration()">Confirmar Duração</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 3: Linha de Corte por Limiares (Filtro Vel/FC) -->
+<div class="studio-modal-overlay" id="modal-threshold-filter">
+  <div class="studio-modal-card">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-broom" style="color:#A78BFA"></i> Linha de Corte por Limiar</div>
+      <button class="btn-mini" onclick="closeModal('modal-threshold-filter')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body">
+      <p style="color:var(--text-sec);">Elimine automaticamente pontos de parada, descanso na água ou aquecimento lento com base em limiares mínimos.</p>
+      
+      <div class="form-group">
+        <label class="form-label">Velocidade Mínima de Corte (km/h):</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="range" id="range-threshold-speed" min="0" max="12" step="0.5" value="6" oninput="document.getElementById('val-threshold-spd').textContent = this.value + ' km/h'" style="flex:1;" />
+          <strong id="val-threshold-spd" style="font-family:var(--font-mono); color:var(--cyan); width:65px;">6.0 km/h</strong>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Frequência Cardíaca Mínima (bpm):</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="range" id="range-threshold-hr" min="0" max="150" step="5" value="100" oninput="document.getElementById('val-threshold-hr').textContent = (this.value == 0 ? 'Desativado' : this.value + ' bpm')" style="flex:1;" />
+          <strong id="val-threshold-hr" style="font-family:var(--font-mono); color:var(--red); width:85px;">100 bpm</strong>
+        </div>
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio" onclick="closeModal('modal-threshold-filter')">Cancelar</button>
+      <button class="btn-studio green" onclick="applyThresholdFilter()">Aplicar Corte</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 4: Auto-Séries Adaptativo -->
+<div class="studio-modal-overlay" id="modal-adaptive-series">
+  <div class="studio-modal-card">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-diagram-project" style="color:var(--gold)"></i> Auto-Séries de Treino Adaptativo</div>
+      <button class="btn-mini" onclick="closeModal('modal-adaptive-series')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body">
+      <p style="color:var(--text-sec);">Escolha o método de fatiamento inteligente para extrair séries de tiro e recuperação.</p>
+      
+      <div class="form-group">
+        <label class="form-label">Método de Fatiamento:</label>
+        <select id="select-series-mode" class="form-select" onchange="updateSeriesModalFields(this.value)">
+          <option value="speed">Por Limiar de Velocidade (Tiro vs Pausa)</option>
+          <option value="distance">Por Distâncias Fixas (ex: Tiros de 1000m)</option>
+          <option value="time">Por Tempos Fixos (ex: Séries de 5 min)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="group-series-spd">
+        <label class="form-label">Velocidade Mínima do Tiro (km/h):</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="range" id="range-series-min-spd" min="6" max="16" step="0.5" value="10" oninput="document.getElementById('val-series-min-spd').textContent = this.value + ' km/h'" style="flex:1;" />
+          <strong id="val-series-min-spd" style="font-family:var(--font-mono); color:var(--cyan); width:65px;">10.0 km/h</strong>
+        </div>
+      </div>
+
+      <div class="form-group" id="group-series-dist" style="display:none;">
+        <label class="form-label">Extensão de Cada Série (metros):</label>
+        <input type="number" id="input-series-dist-m" class="form-input" value="1000" step="100" />
+      </div>
+
+      <div class="form-group" id="group-series-time" style="display:none;">
+        <label class="form-label">Duração de Cada Série (segundos):</label>
+        <input type="number" id="input-series-time-s" class="form-input" value="300" step="30" />
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio" onclick="closeModal('modal-adaptive-series')">Cancelar</button>
+      <button class="btn-studio green" onclick="applyAdaptiveSeries()">Detectar e Criar Séries</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 5: Criar Evento Personalizado -->
+<div class="studio-modal-overlay" id="modal-custom-event">
+  <div class="studio-modal-card">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-plus-circle" style="color:var(--green)"></i> Criar Novo Evento</div>
+      <button class="btn-mini" onclick="closeModal('modal-custom-event')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body">
+      <div class="form-group">
+        <label class="form-label">Tipo de Evento:</label>
+        <select id="select-evt-type" class="form-select">
+          <option value="BUOY_TURN">🚩 Curva de Boia / Guinada</option>
+          <option value="SPRINT">⚡ Ataque / Sprint</option>
+          <option value="PACE_DROP">📉 Queda de Ritmo / Fadiga</option>
+          <option value="PADDLER_CHANGE">👥 Troca de Remadores</option>
+          <option value="COMBAT">⚔️ Combate / Lado a Lado</option>
+          <option value="DOWNWIND">🌊 Vaga / Downwind</option>
+          <option value="WAYPOINT">📍 Ponto de Referência / Bóia</option>
+          <option value="NOTE">📝 Nota Livre / Comentário</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Título do Evento:</label>
+        <input type="text" id="input-evt-name" class="form-input" placeholder="ex: Contorno da Bóia Norte" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Observações / Detalhes:</label>
+        <input type="text" id="input-evt-details" class="form-input" placeholder="ex: Entrada agressiva de leme e aceleração" />
+      </div>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio" onclick="closeModal('modal-custom-event')">Cancelar</button>
+      <button class="btn-studio green" onclick="applySaveCustomEvent()">Salvar Evento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 6: Manual Completo de Uso do GPX Studio -->
+<div class="studio-modal-overlay" id="modal-user-manual">
+  <div class="studio-modal-card" style="max-width:760px; max-height:90vh;">
+    <div class="studio-modal-header">
+      <div class="studio-modal-title"><i class="fa-solid fa-book-open" style="color:var(--cyan)"></i> Manual do Usuário — VAAREC GPX Studio</div>
+      <button class="btn-mini" onclick="closeModal('modal-user-manual')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="studio-modal-body" style="line-height:1.6; color:#E2E8F0;">
+      <h3 style="color:var(--cyan); font-family:var(--font); margin-bottom:4px;">1. Visão Geral & DAW Esportiva</h3>
+      <p>O <strong>GPX Studio</strong> é uma estação profissional de edição não-linear e decupagem dimensional de telemetria GPS (GPX, FIT, JSON) para canoagem polinésia (VAA) e provas esportivas.</p>
+
+      <h3 style="color:var(--gold); font-family:var(--font); margin-top:12px; margin-bottom:4px;">2. Definição de Largada & Chegada Oficial</h3>
+      <p>• <strong>🏁 Largada:</strong> Defina o horário oficial <code>HH:MM:SS</code> ou clique na agulha de Playhead para cortar o aquecimento e iniciar o cronômetro em <code>t = 00:00:00</code> em todas as canoas simultaneamente.<br>
+      • <strong>🏆 Chegada:</strong> Digite o tempo de prova oficial ou posicione a agulha na linha de chegada para eliminar a desaceleração pós-prova.</p>
+
+      <h3 style="color:var(--green); font-family:var(--font); margin-top:12px; margin-bottom:4px;">3. Zoom & Régua Temporal Integrada</h3>
+      <p>• <strong>MouseWheel Zoom:</strong> Posicione o mouse sobre qualquer gráfico e <strong>gire a roda do mouse (scroll)</strong> para dar zoom in/out suave centrado na posição do cursor!<br>
+      • <strong>Régua Temporal Unificada:</strong> Localizada no topo dos gráficos com a agulha vermelha de Playhead sincronizada cruzando todos os painéis e o mapa Leaflet a 60fps.</p>
+
+      <h3 style="color:#A78BFA; font-family:var(--font); margin-top:12px; margin-bottom:4px;">4. Eliminação de Trechos & Linhas de Corte</h3>
+      <p>• <strong>Excluir Trecho:</strong> Selecione qualquer intervalo no gráfico e clique em <code>Excluir Trecho</code> para remover trechos indesejados (miolo ou pontas).<br>
+      • <strong>Linha de Corte:</strong> Use o botão <code>Linha de Corte</code> para eliminar automaticamente paradas com velocidade <code>&lt; 6 km/h</code> ou <code>FC &lt; 100 bpm</code>.</p>
+
+      <h3 style="color:var(--red); font-family:var(--font); margin-top:12px; margin-bottom:4px;">5. Eventos Manuais e Auto-Detecção</h3>
+      <p>• <strong>➕ Criar Evento:</strong> Catalogue curvas de boia, sprints, quedas de ritmo, trocas de remadores e pontos notáveis.<br>
+      • <strong>⚡ Auto-Eventos:</strong> Identifica combates ($\le 5\text{m}$), ultrapassagens, ataques e guinadas automaticamente com 1 clique.</p>
+
+      <h3 style="color:var(--cyan); font-family:var(--font); margin-top:12px; margin-bottom:4px;">6. Atalhos de Teclado</h3>
+      <p>• <code>Espaço</code>: Play / Pause<br>
+      • <code>C</code>: Fatiar Trilha na Agulha (Razor Cut)<br>
+      • <code>MouseWheel</code>: Zoom In / Zoom Out nos Gráficos</p>
+    </div>
+    <div class="studio-modal-footer">
+      <button class="btn-studio primary" onclick="closeModal('modal-user-manual')">Entendi / Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script type="module">
+import { GPXStudioController } from './src/gpx_studio.js';
+import {
+  haversineM,
+  bearingDeg,
+  calculateBaselineEnvelope,
+  detectSegmentAnomalies,
+  calculateTwoCanoesApproachProfile,
+  detectOvertakingEvents,
+  calculateSpeedAndHRBins
+} from './src/gpx_skills.js';
+
+// Instância Global do Controller
+const studio = new GPXStudioController();
+window.studio = studio;
+
+let mainChartInstance = null;
+let subChartInstance = null;
+let currentDecupagemTab = 'splits';
+let isRangeSelectionActive = false;
+
+// ==========================================
+// Chart Layout & Dual/Stacked Support
+// ==========================================
+
+window.setLayoutMode = function(mode) {
+  studio.chartLayoutMode = mode;
+  document.querySelectorAll('.btn-layout-mode').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-mode-${mode}`)?.classList.add('active');
+
+  const container = document.getElementById('chart-multi-container');
+  const paneSub = document.getElementById('pane-chart-2');
+
+  if (mode === 'stacked') {
+    container.className = 'chart-multi-wrap stacked';
+    paneSub.style.display = 'block';
+    if (!subChartInstance) initSubChart();
+  } else {
+    container.className = 'chart-multi-wrap';
+    paneSub.style.display = 'none';
+  }
+
+  updateChart();
+};
+
+function initSubChart() {
+  const ctx = document.getElementById('studio-sub-chart-1').getContext('2d');
+  subChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', size: 9 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', size: 9 } }
+        }
+      },
+      plugins: {
+        legend: { display: true, labels: { color: '#E2E8F0', font: { family: 'Rajdhani', size: 11, weight: 'bold' } } }
+      }
+    }
+  });
+}
+
+// Distance <-> Pixel Conversion Helpers
+function getPixelForDistanceM(distM, chart, pts, totalDistM) {
+  if (!pts || !pts.length || !chart || !chart.scales.x) return null;
+  const xScale = chart.scales.x;
+  const maxD = Math.max(1, totalDistM);
+  const frac = Math.max(0, Math.min(1, distM / maxD));
+  const idxFloat = frac * (pts.length - 1);
+  const i0 = Math.floor(idxFloat);
+  const i1 = Math.min(pts.length - 1, i0 + 1);
+  const px0 = xScale.getPixelForValue(i0);
+  const px1 = xScale.getPixelForValue(i1);
+  if (px0 == null || isNaN(px0)) return null;
+  if (px1 == null || isNaN(px1)) return px0;
+  const subFrac = idxFloat - i0;
+  return px0 + (px1 - px0) * subFrac;
+}
+
+// Range Overlay Plugin
+const rangeOverlayPlugin = {
+  id: 'rangeOverlay',
+  afterDraw: (chart) => {
+    if (!studio.rangeSelection) return;
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    if (!xScale || !yScale) return;
+
+    const track = studio.getActiveTrack();
+    if (!track || !track.points.length) return;
+
+    const pts = track.points;
+    const totalDistM = track.summary.distanceM || 1;
+
+    const x0 = getPixelForDistanceM(studio.rangeSelection.startM, chart, pts, totalDistM);
+    const x1 = getPixelForDistanceM(studio.rangeSelection.endM, chart, pts, totalDistM);
+
+    if (x0 == null || x1 == null || isNaN(x0) || isNaN(x1)) return;
+
+    ctx.save();
+    const leftX = Math.min(x0, x1);
+    const widthX = Math.max(2, Math.abs(x1 - x0));
+    ctx.fillStyle = 'rgba(0, 242, 254, 0.16)';
+    ctx.fillRect(leftX, yScale.top, widthX, yScale.bottom - yScale.top);
+
+    // Start Line (Green)
+    ctx.strokeStyle = '#10B981';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x0, yScale.top);
+    ctx.lineTo(x0, yScale.bottom);
+    ctx.stroke();
+
+    // End Line (Red)
+    ctx.strokeStyle = '#EF4444';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x1, yScale.top);
+    ctx.lineTo(x1, yScale.bottom);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+};
+
+Chart.register(rangeOverlayPlugin);
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+  studio.initMap('studio-map');
+  initChart();
+  initUnifiedRulerAndPlayhead();
+  bindStudioEvents();
+
+  // Preset inicial
+  loadDemoPreset('pro-masc');
+});
+
+function initChart() {
+  const ctx = document.getElementById('studio-main-chart').getContext('2d');
+  mainChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#94A3B8', font: { family: 'JetBrains Mono', size: 10 } }
+        }
+      },
+      plugins: {
+        legend: { display: true, labels: { color: '#E2E8F0', font: { family: 'Rajdhani', size: 11, weight: 'bold' } } }
+      },
+      onHover: (event, activeElements) => {
+        if (activeElements && activeElements.length > 0) {
+          const idx = activeElements[0].index;
+          const track = studio.getActiveTrack();
+          if (track && track.points[idx]) {
+            const dM = idx > 0 ? (track.summary.distanceM * (idx / track.points.length)) : 0;
+            studio.hoverPointAtDistance(dM);
+          }
+        }
+      }
+    }
+  });
+
+  // Attach MouseWheel Zoom Listener on Charts Container
+  const chartMultiWrap = document.getElementById('chart-multi-container');
+  chartMultiWrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = chartMultiWrap.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const centerFrac = Math.max(0, Math.min(1, mouseX / rect.width));
+
+    const factor = e.deltaY < 0 ? 0.82 : 1.22;
+    studio.zoomChart(factor, centerFrac);
+    updateChart();
+    drawUnifiedRuler();
+  }, { passive: false });
+}
+
+function updateChart() {
+  if (!mainChartInstance) return;
+  const activeTrack = studio.getActiveTrack();
+  if (!activeTrack || !activeTrack.points.length) {
+    mainChartInstance.data.labels = [];
+    mainChartInstance.data.datasets = [];
+    mainChartInstance.update();
+    return;
+  }
+
+  const tab = studio.activeChartTab;
+  const mode = studio.chartLayoutMode;
+  let accumD = 0;
+  const labels = [];
+  const pts = activeTrack.points;
+
+  pts.forEach((p, i) => {
+    if (i > 0) accumD += haversineM(pts[i-1].lat, pts[i-1].lon, p.lat, p.lon);
+    labels.push((accumD / 1000).toFixed(2));
+  });
+
+  let finalPts = pts;
+  let finalLabels = labels;
+
+  if (studio.chartZoom.isZoomed) {
+    const sIdx = Math.floor(studio.chartZoom.minFrac * (pts.length - 1));
+    const eIdx = Math.ceil(studio.chartZoom.maxFrac * (pts.length - 1));
+    finalPts = pts.slice(sIdx, eIdx + 1);
+    finalLabels = labels.slice(sIdx, eIdx + 1);
+  }
+
+  mainChartInstance.data.labels = finalLabels;
+
+  if (mode === 'dual') {
+    mainChartInstance.options.scales.y = {
+      type: 'linear',
+      display: true,
+      position: 'left',
+      title: { display: true, text: 'Velocidade (km/h)', color: '#00F2FE' },
+      grid: { color: 'rgba(255,255,255,0.05)' },
+      ticks: { color: '#00F2FE' }
+    };
+    mainChartInstance.options.scales.y1 = {
+      type: 'linear',
+      display: true,
+      position: 'right',
+      title: { display: true, text: 'Frequência Cardíaca (bpm)', color: '#EF4444' },
+      grid: { drawOnChartArea: false },
+      ticks: { color: '#EF4444' }
+    };
+
+    mainChartInstance.data.datasets = [
+      {
+        label: `${activeTrack.name} — Velocidade (km/h)`,
+        data: finalPts.map(p => p.spdKmh || 0),
+        borderColor: activeTrack.color,
+        backgroundColor: activeTrack.color + '22',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0,
+        yAxisID: 'y'
+      },
+      {
+        label: `${activeTrack.name} — FC (bpm)`,
+        data: finalPts.map(p => p.hr || null),
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0,
+        yAxisID: 'y1'
+      }
+    ];
+  } else {
+    delete mainChartInstance.options.scales.y1;
+    mainChartInstance.options.scales.y = {
+      grid: { color: 'rgba(255,255,255,0.05)' },
+      ticks: { color: '#94A3B8' }
+    };
+
+    if (tab === 'speed') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Velocidade (km/h)', color: '#00F2FE' };
+      mainChartInstance.data.datasets = [{
+        label: `${activeTrack.name} — Velocidade (km/h)`,
+        data: finalPts.map(p => p.spdKmh || 0),
+        borderColor: activeTrack.color,
+        backgroundColor: activeTrack.color + '22',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0
+      }];
+    } else if (tab === 'hr') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Frequência Cardíaca (bpm)', color: '#EF4444' };
+      mainChartInstance.data.datasets = [{
+        label: `${activeTrack.name} — FC (bpm)`,
+        data: finalPts.map(p => p.hr || null),
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0
+      }];
+    } else if (tab === 'ele') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Altitude (m)', color: '#10B981' };
+      mainChartInstance.data.datasets = [{
+        label: `${activeTrack.name} — Altitude (m)`,
+        data: finalPts.map(p => p.ele || 0),
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0
+      }];
+    } else if (tab === 'heading') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Rumo (0-360°)', color: '#A78BFA' };
+      mainChartInstance.data.datasets = [{
+        label: `${activeTrack.name} — Rumo (°)`,
+        data: finalPts.map(p => p.heading || 0),
+        borderColor: '#A78BFA',
+        tension: 0.1,
+        borderWidth: 2,
+        pointRadius: 0
+      }];
+    } else if (tab === 'duel') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Velocidade Comparada (km/h)', color: '#F59E0B' };
+      mainChartInstance.data.datasets = studio.tracks.filter(t => t.visible).map(t => {
+        let tPts = t.points;
+        if (studio.chartZoom.isZoomed) {
+          const sIdx = Math.floor(studio.chartZoom.minFrac * (tPts.length - 1));
+          const eIdx = Math.ceil(studio.chartZoom.maxFrac * (tPts.length - 1));
+          tPts = tPts.slice(sIdx, eIdx + 1);
+        }
+        return {
+          label: t.name,
+          data: tPts.map(p => p.spdKmh || 0),
+          borderColor: t.color,
+          borderWidth: t.id === activeTrack.id ? 3 : 1.5,
+          tension: 0.2,
+          pointRadius: 0
+        };
+      });
+    } else if (tab === 'splits') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Velocidade por Split (km/h)', color: '#00F2FE' };
+      mainChartInstance.data.labels = activeTrack.segments.map(s => `${s.startM}-${s.endM}m`);
+      mainChartInstance.data.datasets = [{
+        type: 'bar',
+        label: 'Velocidade Média por Split (km/h)',
+        data: activeTrack.segments.map(s => s.speedAvgKmh),
+        backgroundColor: activeTrack.color + '88',
+        borderColor: activeTrack.color,
+        borderWidth: 1
+      }];
+    } else if (tab === 'baseline') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Envelope Baseline (km/h)', color: '#10B981' };
+      const comp = studio.generateComparisonJSON();
+      const base = comp.baseline || [];
+      mainChartInstance.data.labels = base.map(b => `${b.segmentId}m`);
+      mainChartInstance.data.datasets = [
+        { label: 'Mediana (km/h)', data: base.map(b => b.speed_avg_kmh_median), borderColor: '#10B981', borderWidth: 3, tension: 0.2 },
+        { label: 'Máx (km/h)', data: base.map(b => b.speed_avg_kmh_max), borderColor: 'rgba(16, 185, 129, 0.4)', borderDash: [4,4], pointRadius: 0 },
+        { label: 'Mín (km/h)', data: base.map(b => b.speed_avg_kmh_min), borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4,4], pointRadius: 0 }
+      ];
+    } else if (tab === 'proximity') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Distância entre Canoas (m)', color: '#EF4444' };
+      if (studio.tracks.length >= 2) {
+        const approach = calculateTwoCanoesApproachProfile(studio.tracks[0].points, studio.tracks[1].points, 3.0);
+        mainChartInstance.data.labels = approach.map(a => fmtSeconds(Math.round(a.timeMs / 1000)));
+        mainChartInstance.data.datasets = [
+          { label: `Distância ${studio.tracks[0].name} ➔ ${studio.tracks[1].name} (m)`, data: approach.map(a => a.distanceM), borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.15)', fill: true, tension: 0.2, borderWidth: 2, pointRadius: 0 },
+          { label: 'Limiar Crítico (5m)', data: approach.map(() => 5.0), borderColor: '#F59E0B', borderDash: [6,4], borderWidth: 1.5, pointRadius: 0, fill: false }
+        ];
+      }
+    } else if (tab === 'bins') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Tempo em Segundos', color: '#38BDF8' };
+      const bins = calculateSpeedAndHRBins(activeTrack.points);
+      if (bins && bins.speedBins) {
+        const bKeys = Object.keys(bins.speedBins);
+        mainChartInstance.data.labels = bKeys;
+        mainChartInstance.data.datasets = [{
+          type: 'bar',
+          label: 'Tempo por Faixa de Velocidade',
+          data: bKeys.map(k => Math.round(bins.speedBins[k].timeS)),
+          backgroundColor: bKeys.map(k => bins.speedBins[k].color + '99'),
+          borderColor: bKeys.map(k => bins.speedBins[k].color),
+          borderWidth: 1
+        }];
+      }
+    } else if (tab === 'efficiency') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'Eficiência (m/batimento)', color: '#10B981' };
+      const effData = finalPts.map(p => (p.spdKmh && p.hr && p.hr > 60) ? Number(((p.spdKmh / 3.6) / (p.hr / 60)).toFixed(2)) : null);
+      mainChartInstance.data.datasets = [{
+        label: 'Metros Avançados por Batimento Cardíaco (m/bat)',
+        data: effData,
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0
+      }];
+    } else if (tab === 'scatter') {
+      mainChartInstance.options.scales.y.title = { display: true, text: 'FC (bpm) × Velocidade (km/h)', color: '#8B5CF6' };
+      mainChartInstance.data.labels = [];
+      mainChartInstance.data.datasets = [{
+        type: 'scatter',
+        label: 'Dispersão FC × Velocidade',
+        data: activeTrack.efficiency?.correlationData || [],
+        backgroundColor: activeTrack.color,
+        pointRadius: 3
+      }];
+    }
+
+    if (mode === 'stacked' && subChartInstance) {
+      subChartInstance.data.labels = finalLabels;
+      subChartInstance.options.scales.y.title = { display: true, text: 'Frequência Cardíaca (bpm)', color: '#EF4444' };
+      subChartInstance.data.datasets = [{
+        label: `${activeTrack.name} — FC (bpm)`,
+        data: finalPts.map(p => p.hr || null),
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 0
+      }];
+      subChartInstance.update();
+    }
+  }
+
+  mainChartInstance.update();
+}
+
+// ==========================================
+// UNIFIED TIMELINE RULER & PLAYHEAD ENGINE
+// ==========================================
+
+function initUnifiedRulerAndPlayhead() {
+  const rulerCanvas = document.getElementById('unified-ruler-canvas');
+  const rulerWrap = document.getElementById('unified-ruler-wrap');
+  const handle = document.getElementById('chart-playhead-handle');
+
+  drawUnifiedRuler();
+
+  rulerCanvas.addEventListener('mousedown', e => {
+    const rect = rulerCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const maxDur = studio.getMaxDurationMs();
+    const frac = Math.max(0, Math.min(1, x / rulerCanvas.width));
+    studio.seekTimeMs(frac * maxDur);
+  });
+
+  let isDraggingPlayhead = false;
+  handle.addEventListener('mousedown', e => {
+    isDraggingPlayhead = true;
+    e.stopPropagation();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!isDraggingPlayhead) return;
+    const rect = rulerWrap.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const maxDur = studio.getMaxDurationMs();
+    const frac = Math.max(0, Math.min(1, x / rulerWrap.clientWidth));
+    studio.seekTimeMs(frac * maxDur);
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDraggingPlayhead = false;
+  });
+
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      togglePlayback();
+    } else if (e.code === 'KeyC') {
+      e.preventDefault();
+      splitAtPlayheadAction();
+    }
+  });
+}
+
+function drawUnifiedRuler() {
+  const canvas = document.getElementById('unified-ruler-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.parentElement.clientWidth;
+  canvas.width = w;
+  canvas.height = 24;
+
+  ctx.clearRect(0, 0, w, 24);
+  ctx.fillStyle = '#06090f';
+  ctx.fillRect(0, 0, w, 24);
+
+  const maxDurS = Math.round(studio.getMaxDurationMs() / 1000);
+  if (maxDurS <= 0) return;
+
+  const numMarks = 12;
+  for (let i = 0; i <= numMarks; i++) {
+    const x = (i / numMarks) * w;
+    const tSec = Math.round((i / numMarks) * maxDurS);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 12);
+    ctx.lineTo(x, 24);
+    ctx.stroke();
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = i === 0 ? 'left' : (i === numMarks ? 'right' : 'center');
+    ctx.fillText(fmtSeconds(tSec), x, 10);
+  }
+}
+
+function updatePlayheadUI() {
+  const curMs = studio.playback.currentTimeMs;
+  const maxMs = studio.getMaxDurationMs();
+  const frac = maxMs > 0 ? (curMs / maxMs) : 0;
+
+  const wrap = document.getElementById('unified-ruler-wrap');
+  if (wrap) {
+    const px = frac * wrap.clientWidth;
+    const playheadLine = document.getElementById('chart-playhead-line');
+    if (playheadLine) playheadLine.style.left = `${px}px`;
+  }
+
+  const t = studio.getActiveTrack();
+  const durSec = Math.round(curMs / 1000);
+  document.getElementById('ph-time-str').textContent = fmtSeconds(durSec);
+  
+  if (t && t.points.length) {
+    const isMs = (t.points[t.points.length - 1].t - t.points[0].t) > 100000;
+    const t0 = t.points[0].t;
+    const targetAbsT = isMs ? (t0 + curMs) : (t0 + (curMs / 1000));
+
+    let p = t.points[0];
+    for (let i = 1; i < t.points.length; i++) {
+      if (t.points[i].t >= targetAbsT) {
+        p = t.points[i];
+        break;
+      }
+    }
+    const curDistKm = (t.summary.distanceM * frac) / 1000;
+    document.getElementById('ph-dist-str').textContent = `${curDistKm.toFixed(2)} km`;
+    document.getElementById('ph-spd-str').textContent = `${(p.spdKmh || 0).toFixed(1)} km/h`;
+    document.getElementById('ph-hr-str').textContent = p.hr ? `${p.hr} bpm` : '-- bpm';
+  }
+}
+
+// ==========================================
+// MODAL CONTROLS & WINDOW GLOBAL ACTIONS
+// ==========================================
+
+window.openModal = function(id) {
+  document.getElementById(id)?.classList.add('show');
+};
+
+window.closeModal = function(id) {
+  document.getElementById(id)?.classList.remove('show');
+};
+
+window.openStartModal = function() {
+  const curSec = Math.round(studio.playback.currentTimeMs / 1000);
+  document.getElementById('lbl-start-cur-playhead').textContent = fmtSeconds(curSec);
+  openModal('modal-start-race');
+};
+
+window.openFinishModal = function() {
+  const curSec = Math.round(studio.playback.currentTimeMs / 1000);
+  document.getElementById('lbl-finish-cur-playhead').textContent = fmtSeconds(curSec);
+  openModal('modal-finish-race');
+};
+
+window.openThresholdModal = function() {
+  openModal('modal-threshold-filter');
+};
+
+window.openAdaptiveSeriesModal = function() {
+  openModal('modal-adaptive-series');
+};
+
+window.openCustomEventModal = function() {
+  openModal('modal-custom-event');
+};
+
+window.openManualModal = function() {
+  openModal('modal-user-manual');
+};
+
+window.applyStartFromTime = function() {
+  const hms = document.getElementById('input-start-hms').value.trim();
+  if (!hms) return alert("Digite o horário no formato HH:MM:SS");
+  const allTracks = document.getElementById('chk-start-all-tracks').checked;
+  studio.setRaceStartByTime(hms, allTracks);
+  closeModal('modal-start-race');
+};
+
+window.applyStartFromPlayhead = function() {
+  const allTracks = document.getElementById('chk-start-all-tracks').checked;
+  studio.setRaceStartAtPlayhead(allTracks);
+  closeModal('modal-start-race');
+};
+
+window.applyFinishFromDuration = function() {
+  const durStr = document.getElementById('input-finish-duration').value.trim();
+  if (!durStr) return alert("Digite a duração no formato HH:MM:SS");
+  const parts = durStr.split(':').map(Number);
+  let durS = 0;
+  if (parts.length === 3) durS = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 2) durS = parts[0] * 60 + parts[1];
+  else durS = parts[0];
+
+  const allTracks = document.getElementById('chk-finish-all-tracks').checked;
+  studio.setRaceFinishByDuration(durS, allTracks);
+  closeModal('modal-finish-race');
+};
+
+window.applyFinishFromPlayhead = function() {
+  const allTracks = document.getElementById('chk-finish-all-tracks').checked;
+  studio.setRaceFinishAtPlayhead(allTracks);
+  closeModal('modal-finish-race');
+};
+
+window.removeIntervalAction = function() {
+  if (!studio.rangeSelection) return alert("Selecione primeiro uma faixa para excluir.");
+  studio.removeSelectedInterval();
+};
+
+window.applyThresholdFilter = function() {
+  const spd = parseFloat(document.getElementById('range-threshold-speed').value);
+  const hrVal = parseInt(document.getElementById('range-threshold-hr').value, 10);
+  const hr = hrVal > 0 ? hrVal : null;
+  studio.filterByThresholds(spd, hr);
+  closeModal('modal-threshold-filter');
+};
+
+window.updateSeriesModalFields = function(val) {
+  document.getElementById('group-series-spd').style.display = val === 'speed' ? 'flex' : 'none';
+  document.getElementById('group-series-dist').style.display = val === 'distance' ? 'flex' : 'none';
+  document.getElementById('group-series-time').style.display = val === 'time' ? 'flex' : 'none';
+};
+
+window.applyAdaptiveSeries = function() {
+  const mode = document.getElementById('select-series-mode').value;
+  const config = { mode };
+
+  if (mode === 'speed') {
+    config.minSpeedKmh = parseFloat(document.getElementById('range-series-min-spd').value);
+    config.minDurationS = 20;
+    config.minPauseS = 10;
+  } else if (mode === 'distance') {
+    config.intervalM = parseInt(document.getElementById('input-series-dist-m').value, 10) || 1000;
+  } else if (mode === 'time') {
+    config.intervalS = parseInt(document.getElementById('input-series-time-s').value, 10) || 300;
+  }
+
+  studio.autoDetectSeriesAdaptive(config);
+  closeModal('modal-adaptive-series');
+};
+
+window.applySaveCustomEvent = function() {
+  const type = document.getElementById('select-evt-type').value;
+  const name = document.getElementById('input-evt-name').value.trim() || 'Evento Notável';
+  const details = document.getElementById('input-evt-details').value.trim();
+
+  const activeTrack = studio.getActiveTrack();
+  let lat = null, lon = null;
+  if (activeTrack && activeTrack.points.length) {
+    const curMs = studio.playback.currentTimeMs;
+    const pts = activeTrack.points;
+    const isMs = (pts[pts.length - 1].t - pts[0].t) > 100000;
+    const targetAbsT = isMs ? (pts[0].t + curMs) : (pts[0].t + (curMs / 1000));
+    
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].t >= targetAbsT) { lat = pts[i].lat; lon = pts[i].lon; break; }
+    }
+    if (!lat) { lat = pts[0].lat; lon = pts[0].lon; }
+  }
+
+  studio.addCustomEvent({
+    type,
+    name,
+    details,
+    lat,
+    lon
+  });
+
+  closeModal('modal-custom-event');
+  switchDecupagemTab('events');
+};
+
+window.autoDetectEventsAction = function() {
+  studio.autoDetectAllEvents();
+  switchDecupagemTab('events');
+};
+
+window.zoomChartAction = function(factor) {
+  studio.zoomChart(factor, 0.5);
+  updateChart();
+  drawUnifiedRuler();
+};
+
+window.resetChartZoomAction = function() {
+  studio.resetChartZoom();
+  updateChart();
+  drawUnifiedRuler();
+};
+
+// Transport Actions
+window.togglePlayback = function() {
+  studio.togglePlay();
+  const icon = document.getElementById('icon-play-pause');
+  if (studio.playback.isPlaying) icon.className = 'fa-solid fa-pause';
+  else icon.className = 'fa-solid fa-play';
+};
+
+window.seekToStart = function() { studio.seekTimeMs(0); };
+window.stepSeconds = function(s) { studio.seekTimeMs(studio.playback.currentTimeMs + (s * 1000)); };
+window.toggleLoop = function() {
+  studio.playback.loop = !studio.playback.loop;
+  document.getElementById('btn-loop').classList.toggle('active', studio.playback.loop);
+};
+window.setPlaySpeed = function(speed) { studio.setPlaybackSpeed(speed); };
+window.splitAtPlayheadAction = function() { studio.splitTrackAtPlayhead(); };
+
+// State & UI Sync
+function bindStudioEvents() {
+  studio.subscribe((changeType) => {
+    if (changeType === 'playhead-tick' || changeType === 'playback-seek') {
+      updatePlayheadUI();
+      return;
+    }
+
+    renderTracksList();
+    renderActiveTrackStats();
+    renderDecupagemContent();
+    updateRangeBanner();
+    drawUnifiedRuler();
+    updateChart();
+  });
+
+  document.getElementById('file-uploader').addEventListener('change', async e => {
+    const files = Array.from(e.target.files);
+    for (const file of files) {
+      await processUploadedFile(file);
+    }
+    e.target.value = '';
+  });
+
+  // Suporte a Drag and Drop Global de Arquivos (GPX, JSON, TXT)
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  window.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      const files = Array.from(e.dataTransfer.files);
+      for (const file of files) {
+        await processUploadedFile(file);
+      }
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    drawUnifiedRuler();
+  });
+}
+
+function showToast(msg, type = 'info') {
+  let toastContainer = document.getElementById('studio-toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'studio-toast-container';
+    toastContainer.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:99999; display:flex; flex-direction:column; gap:8px; pointer-events:none;';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  const borderColor = type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#00F2FE';
+  toast.style.cssText = `
+    background: rgba(13, 19, 31, 0.95);
+    border: 1px solid ${borderColor};
+    color: #F8FAFC;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: auto;
+  `;
+  toast.textContent = msg;
+  toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+function parseGPXTextUniversal(xmlText) {
+  const rawPoints = [];
+  const ptRegex = /<(?:trkpt|wpt|rtept)\s+([^>]+)>([\s\S]*?)<\/(?:trkpt|wpt|rtept)>/gi;
+  let match;
+  let tCounter = Date.now();
+
+  while ((match = ptRegex.exec(xmlText)) !== null) {
+    const attrStr = match[1];
+    const body = match[2];
+
+    const latM = /lat=["']([^"']+)["']/i.exec(attrStr);
+    const lonM = /(?:lon|lng)=["']([^"']+)["']/i.exec(attrStr);
+    if (!latM || !lonM) continue;
+
+    const lat = parseFloat(latM[1]);
+    const lon = parseFloat(lonM[1]);
+
+    const eleMatch = /<ele>([^<]+)<\/ele>/i.exec(body);
+    const timeMatch = /<time>([^<]+)<\/time>/i.exec(body);
+    const hrMatch = /<(?:[a-zA-Z0-9_-]+:)?hr>([^<]+)<\/(?:[a-zA-Z0-9_-]+:)?hr>/i.exec(body);
+    const spdMatch = /<(?:[a-zA-Z0-9_-]+:)?speed>([^<]+)<\/(?:[a-zA-Z0-9_-]+:)?speed>/i.exec(body);
+    const cadMatch = /<(?:[a-zA-Z0-9_-]+:)?(?:cad|cadence)>([^<]+)<\/(?:[a-zA-Z0-9_-]+:)?(?:cad|cadence)>/i.exec(body);
+
+    const alt = eleMatch ? parseFloat(eleMatch[1]) : 0;
+    let timestamp = timeMatch ? new Date(timeMatch[1].trim()).getTime() : null;
+    if (timestamp == null || isNaN(timestamp)) {
+      timestamp = tCounter;
+      tCounter += 1000;
+    }
+    const heartRate = hrMatch ? parseInt(hrMatch[1]) : null;
+    const speedKmh = spdMatch ? parseFloat(spdMatch[1]) * 3.6 : undefined;
+    const cadence = cadMatch ? parseInt(cadMatch[1]) : null;
+
+    if (!isNaN(lat) && !isNaN(lon)) {
+      rawPoints.push({ lat, lon, ele: alt, t: timestamp, hr: heartRate, spdKmh: speedKmh, cadence });
+    }
+  }
+
+  return rawPoints;
+}
+
+async function processUploadedFile(file) {
+  try {
+    const text = await file.text();
+    const fileNameLower = file.name.toLowerCase();
+    const name = file.name.replace(/\.[^/.]+$/, '');
+    
+    if (fileNameLower.endsWith('.gpx') || text.includes('<gpx') || text.includes('<trkpt') || text.includes('<trk>')) {
+      const pts = parseGPXTextUniversal(text);
+      if (pts.length < 2) {
+        alert(`Aviso: O arquivo GPX "${file.name}" não contém pontos de coordenadas válidos.`);
+        return;
+      }
+      studio.addTrack(name, pts, null, file.name);
+      showToast(`✓ Trilha GPX "${name}" carregada (${pts.length} pontos).`, 'success');
+    } else if (fileNameLower.endsWith('.json') || fileNameLower.endsWith('.txt') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+      const json = JSON.parse(text);
+      if (json.sportPackage && Array.isArray(json.sportPackage.tracks)) {
+        // Contrato VAAREC completo
+        json.sportPackage.tracks.forEach(t => {
+          studio.addTrack(t.name || name, t.points || t.data || t.gpsData, t.color, file.name);
+        });
+        if (json.events) {
+          const evts = json.events.all || json.events.custom || json.events.interference || [];
+          if (evts.length > 0) {
+            evts.forEach(evt => studio.addCustomEvent(evt));
+          }
+        }
+        showToast(`✓ Contrato VAAREC "${json.name || name}" carregado (${json.sportPackage.tracks.length} trilhas).`, 'success');
+      } else if (Array.isArray(json)) {
+        studio.addTrack(name, json, null, file.name);
+        showToast(`✓ Trilha JSON "${name}" carregada (${json.length} pontos).`, 'success');
+      } else if (json.points || json.records || json.track || json.locations) {
+        const pts = json.points || json.records || json.track || json.locations;
+        studio.addTrack(name, pts, null, file.name);
+        showToast(`✓ Trilha "${name}" carregada (${pts.length} pontos).`, 'success');
+      } else if (json.activityDetailMetrics) {
+        // Garmin JSON / TXT
+        const descriptors = json.metricDescriptors || [];
+        const metricsList = json.activityDetailMetrics || [];
+        let latIdx = descriptors.findIndex(d => d.key === 'directLatitude');
+        let lngIdx = descriptors.findIndex(d => d.key === 'directLongitude');
+        let timeIdx = descriptors.findIndex(d => d.key === 'directTimestamp');
+        let hrIdx = descriptors.findIndex(d => d.key === 'directHeartRate');
+        let speedIdx = descriptors.findIndex(d => d.key === 'directSpeed');
+        let cadenceIdx = descriptors.findIndex(d => d.key === 'directStrokeCadence');
+
+        if (latIdx === -1) latIdx = 0;
+        if (lngIdx === -1) lngIdx = 1;
+        if (timeIdx === -1) timeIdx = 3;
+        if (hrIdx === -1) hrIdx = 4;
+        if (speedIdx === -1) speedIdx = 9;
+        if (cadenceIdx === -1) cadenceIdx = 6;
+
+        const pts = [];
+        metricsList.forEach(item => {
+          const m = item.metrics;
+          if (m && m.length > Math.max(latIdx, lngIdx)) {
+            const lat = m[latIdx], lon = m[lngIdx];
+            let t = m[timeIdx];
+            if (t && t < 1e11) t = t * 1000;
+            const hr = m[hrIdx] ? Math.round(m[hrIdx]) : null;
+            const spdKmh = m[speedIdx] ? m[speedIdx] * 3.6 : undefined;
+            const cadence = m[cadenceIdx] ? Math.round(m[cadenceIdx]) : null;
+            if (lat && lon && !isNaN(lat) && !isNaN(lon)) pts.push({ lat, lon, t: t || Date.now(), hr, spdKmh, cadence });
+          }
+        });
+
+        if (pts.length < 2) {
+          alert(`Aviso: O arquivo Garmin "${file.name}" não contém pontos válidos.`);
+          return;
+        }
+        studio.addTrack(name, pts, null, file.name);
+        showToast(`✓ Trilha Garmin "${name}" carregada (${pts.length} pontos).`, 'success');
+      }
+    }
+  } catch(err) {
+    console.error("Erro ao ler arquivo:", err);
+    alert(`Erro ao ler arquivo: ${err.message}`);
+  }
+}
+
+function renderTracksList() {
+  const container = document.getElementById('tracks-list-container');
+  document.getElementById('tracks-count-badge').textContent = studio.tracks.length;
+  container.innerHTML = '';
+
+  studio.tracks.forEach((track, idx) => {
+    const card = document.createElement('div');
+    card.className = `track-card ${idx === studio.activeTrackIdx ? 'active' : ''}`;
+    card.onclick = (e) => {
+      if (e.target.closest('.btn-mini')) return;
+      studio.setActiveTrack(idx);
+    };
+
+    card.innerHTML = `
+      <div class="track-card-header">
+        <div class="track-name-wrap">
+          <span class="track-color-dot" style="background:${track.color}"></span>
+          <span class="track-name-text">${track.name}</span>
+        </div>
+        <div class="track-actions-mini">
+          <button class="btn-mini" onclick="studio.toggleTrackVisibility(${idx})" title="Ocultar/Exibir">
+            <i class="fa-solid ${track.visible ? 'fa-eye text-cyan' : 'fa-eye-slash text-muted'}"></i>
+          </button>
+          <button class="btn-mini" onclick="studio.removeTrack(${idx})" title="Remover">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+      <div class="track-metrics-pills">
+        <span><i class="fa-solid fa-ruler"></i> ${(track.summary.distanceM / 1000).toFixed(2)} km</span>
+        <span><i class="fa-solid fa-gauge"></i> ${track.summary.speedAvgKmh || 0} km/h</span>
+        ${track.summary.hrAvg ? `<span><i class="fa-solid fa-heart" style="color:#EF4444"></i> ${track.summary.hrAvg} bpm</span>` : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function renderActiveTrackStats() {
+  const t = studio.getActiveTrack();
+  if (!t) return;
+  const s = t.summary;
+  document.getElementById('st-dist').textContent = `${(s.distanceM / 1000).toFixed(2)} km`;
+  document.getElementById('st-dur').textContent = fmtSeconds(s.durationS);
+  document.getElementById('st-spd-avg').textContent = `${s.speedAvgKmh || 0} km/h`;
+  document.getElementById('st-spd-max').textContent = `${s.speedMaxKmh || 0} km/h`;
+  document.getElementById('st-hr-avg').textContent = s.hrAvg ? `${s.hrAvg} bpm` : '--';
+  document.getElementById('st-hr-max').textContent = s.hrMax ? `${s.hrMax} bpm` : '--';
+}
+
+function updateRangeBanner() {
+  const banner = document.getElementById('range-selection-banner');
+  if (studio.rangeSelection) {
+    const sel = studio.rangeSelection;
+    const extM = sel.endM - sel.startM;
+    const durS = Math.round((sel.endT - sel.startT) / 1000);
+    const avgSpd = durS > 0 ? ((extM / durS) * 3.6).toFixed(1) : '0.0';
+
+    document.getElementById('input-range-start-m').value = sel.startM;
+    document.getElementById('input-range-end-m').value = sel.endM;
+    document.getElementById('range-stats-badge').textContent = 
+      `Extensão: ${extM} m · ${fmtSeconds(durS)} · Vel: ${avgSpd} km/h`;
+    
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+function renderDecupagemContent() {
+  const container = document.getElementById('decupagem-view-container');
+  const t = studio.getActiveTrack();
+  if (!t) return;
+
+  if (currentDecupagemTab === 'splits') {
+    container.innerHTML = `
+      <table class="studio-table">
+        <thead><tr><th>Segmento</th><th>Distância</th><th>Tempo</th><th>Vel. Média</th><th>Pace</th><th>FC Média</th></tr></thead>
+        <tbody>
+          ${t.segments.map(s => `
+            <tr>
+              <td style="color:var(--cyan); font-weight:700;">${s.segmentId}</td>
+              <td>${s.distanceM} m</td>
+              <td>${fmtSeconds(s.durationS)}</td>
+              <td style="font-weight:700; color:#fff;">${s.speedAvgKmh} km/h</td>
+              <td style="color:var(--gold); font-weight:700;">${s.paceStr || '--'}</td>
+              <td>${s.hrAvg ? `❤️ ${s.hrAvg} bpm` : '--'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (currentDecupagemTab === 'baseline') {
+    const comp = studio.generateComparisonJSON();
+    const base = comp.baseline || [];
+    container.innerHTML = `
+      <table class="studio-table">
+        <thead><tr><th>Segmento</th><th>Nº Trilhas</th><th>Vel. Mediana</th><th>Vel. Mín</th><th>Vel. Máx</th><th>FC Mediana</th></tr></thead>
+        <tbody>
+          ${base.map(b => `
+            <tr>
+              <td style="color:var(--cyan); font-weight:700;">${b.segmentId}</td>
+              <td>${b.nFiles}</td>
+              <td style="font-weight:700; color:#10B981;">${b.speed_avg_kmh_median?.toFixed(1) || '--'} km/h</td>
+              <td>${b.speed_avg_kmh_min?.toFixed(1) || '--'} km/h</td>
+              <td>${b.speed_avg_kmh_max?.toFixed(1) || '--'} km/h</td>
+              <td>${b.hr_avg_median ? `❤️ ${b.hr_avg_median.toFixed(0)} bpm` : '--'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (currentDecupagemTab === 'anomalies') {
+    const comp = studio.generateComparisonJSON();
+    const anomalies = detectSegmentAnomalies(t.segments, comp.baseline);
+    if (!anomalies.length) {
+      container.innerHTML = `<div style="padding:15px; text-align:center; color:var(--green); font-family:var(--font);">✅ Nenhuma anomalia crítica detectada.</div>`;
+      return;
+    }
+    container.innerHTML = `
+      <div class="events-stack">
+        ${anomalies.map(a => `
+          <div class="event-card">
+            <div><span class="event-badge anomaly">${a.type}</span> <strong style="margin-left:6px; color:#fff;">${a.message}</strong></div>
+            <div style="font-family:var(--font-mono); font-size:11px; color:var(--red);">Delta: ${a.delta}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else if (currentDecupagemTab === 'events') {
+    const events = studio.customEvents || [];
+    document.getElementById('lbl-events-count').textContent = events.length;
+
+    if (!events.length) {
+      container.innerHTML = `<div style="padding:15px; text-align:center; color:var(--text-muted); font-family:var(--font);">Nenhum evento registrado. Clique em "➕ Criar Evento" ou "⚡ Auto-Eventos".</div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="events-stack">
+        ${events.map(e => `
+          <div class="event-card">
+            <div>
+              <span class="event-badge" style="background:${e.color}33; color:${e.color}; border:1px solid ${e.color};">
+                <i class="fa-solid ${e.icon || 'fa-tag'}"></i> ${e.typeLabel || e.type}
+              </span>
+              <strong style="margin-left:6px; color:#fff;">${e.name}</strong>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; color:var(--text-sec);">
+              <span>${e.details || ''}</span>
+              ${e.id.startsWith('evt-usr-') ? `<button class="btn-mini" onclick="studio.removeCustomEvent('${e.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else if (currentDecupagemTab === 'bins') {
+    const bins = calculateSpeedAndHRBins(t.points);
+    if (!bins) return;
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <table class="studio-table">
+          <thead><tr><th>Faixa Vel</th><th>Tempo</th><th>Distância</th></tr></thead>
+          <tbody>
+            ${Object.keys(bins.speedBins).map(k => `<tr><td style="color:${bins.speedBins[k].color}">${k}</td><td>${fmtSeconds(Math.round(bins.speedBins[k].timeS))}</td><td>${(bins.speedBins[k].distM/1000).toFixed(2)}km</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <table class="studio-table">
+          <thead><tr><th>Faixa FC</th><th>Tempo</th><th>Distância</th></tr></thead>
+          <tbody>
+            ${Object.keys(bins.hrBins).map(k => `<tr><td style="color:${bins.hrBins[k].color}">${k}</td><td>${fmtSeconds(Math.round(bins.hrBins[k].timeS))}</td><td>${(bins.hrBins[k].distM/1000).toFixed(2)}km</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else if (currentDecupagemTab === 'raw') {
+    container.innerHTML = `
+      <table class="studio-table">
+        <thead><tr><th>#</th><th>Lat</th><th>Lon</th><th>Tempo</th><th>Vel (km/h)</th><th>FC</th></tr></thead>
+        <tbody>
+          ${t.points.slice(0, 100).map((p, i) => `<tr><td>${i+1}</td><td>${p.lat.toFixed(5)}</td><td>${p.lon.toFixed(5)}</td><td>${fmtSeconds(Math.round(p.t/1000))}</td><td>${(p.spdKmh||0).toFixed(1)}</td><td>${p.hr||'--'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+}
+
+// Window Global Actions
+window.switchChartTab = function(tabName) {
+  studio.activeChartTab = tabName;
+  document.querySelectorAll('.chart-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-btn-${tabName}`)?.classList.add('active');
+  updateChart();
+};
+
+window.switchDecupagemTab = function(tabName) {
+  currentDecupagemTab = tabName;
+  document.querySelectorAll('.dec-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`dec-btn-${tabName}`)?.classList.add('active');
+  renderDecupagemContent();
+};
+
+window.toggleRangeSelectionMode = function() {
+  isRangeSelectionActive = !isRangeSelectionActive;
+  const btn = document.getElementById('btn-toggle-range-mode');
+  const lbl = document.getElementById('lbl-range-mode');
+  if (isRangeSelectionActive) {
+    btn.classList.add('active');
+    lbl.textContent = '🎯 Faixa Ativa';
+    if (!studio.rangeSelection && studio.getActiveTrack()) {
+      const totalM = studio.getActiveTrack().summary.distanceM;
+      studio.setRangeSelection(Math.round(totalM * 0.2), Math.round(totalM * 0.8));
+    }
+  } else {
+    btn.classList.remove('active');
+    lbl.textContent = '🎯 Faixa';
+  }
+};
+
+window.changeSplitInterval = function(val) {
+  studio.splitIntervalM = parseInt(val, 10);
+  document.getElementById('lbl-split-interval').textContent = `${val}m`;
+  studio.tracks.forEach(t => {
+    t.segments = segmentTrackByDistance(t.points, studio.splitIntervalM, t.id);
+  });
+  renderDecupagemContent();
+  if (studio.activeChartTab === 'splits' || studio.activeChartTab === 'baseline') updateChart();
+};
+
+window.applyTrimAction = function() {
+  if (!studio.rangeSelection) return alert("Selecione primeiro uma faixa.");
+  studio.applyTrimToSelection();
+};
+
+window.extractSeriesAction = function() {
+  if (!studio.rangeSelection) return alert("Selecione primeiro uma faixa.");
+  studio.extractNewSeriesFromSelection();
+};
+
+window.undoTrimAction = function() {
+  studio.undoLastTrim();
+};
+
+window.resetTrackAction = function() {
+  studio.resetTrackToOriginal();
+};
+
+window.exportSplitsCSV = function() {
+  const csv = studio.exportCSVData();
+  if (!csv) return;
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `segments-${Date.now()}.csv`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.exportBaselineJSON = function() {
+  const comp = studio.generateComparisonJSON();
+  const blob = new Blob([JSON.stringify(comp, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `comparison-${Date.now()}.json`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.exportEventsJSON = function() {
+  const evts = studio.generateEventsJSON();
+  const blob = new Blob([JSON.stringify(evts, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `events-${Date.now()}.json`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.exportCleanGPXFile = function() {
+  const gpxXml = studio.exportGPXXML();
+  if (!gpxXml) return;
+  const blob = new Blob([gpxXml], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `track-sanitized-${Date.now()}.gpx`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+window.exportCleanContract = function() {
+  const contract = studio.generateVAARECContract();
+  const blob = new Blob([JSON.stringify(contract, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `contrato-studio-${Date.now()}.json`; a.click();
+  URL.revokeObjectURL(url);
+  alert("✅ Contrato VAAREC exportado com sucesso!");
+};
+
+window.launchViewer = function(type) {
+  const contract = studio.generateVAARECContract();
+  localStorage.setItem('vaarec_studio_contract', JSON.stringify(contract));
+  window.CONTRACT = contract;
+  if (type === 'desafio') window.open('/viewer-desafio.html', '_blank');
+  else window.open('/viewer-treino-raia.html', '_blank');
+};
+
+window.loadDemoPreset = function(preset) {
+  studio.tracks = [];
+  const startLat = -27.4320, startLon = -48.4850;
+  const numPts = 90;
+  const tStep = 3000;
+
+  if (preset === 'pro-masc') {
+    const pts1 = [], pts2 = [];
+    for (let i = 0; i < numPts; i++) {
+      const frac = i / (numPts - 1);
+      const t = i * tStep;
+      const curve = Math.sin(frac * Math.PI * 2) * 0.003;
+      const lat = startLat + frac * 0.025 + curve;
+      const lon = startLon + frac * 0.040;
+      
+      const spd1 = 12.2 + Math.sin(i * 0.3) * 1.5 + (i > 50 ? 0.8 : 0);
+      const hr1 = 135 + Math.round(frac * 30 + Math.sin(i * 0.2) * 8);
+      pts1.push({ lat: lat + 0.0002, lon: lon - 0.0001, t, spdKmh: spd1, hr: hr1, ele: 1.0, temp: 23 });
+
+      const spd2 = 12.0 + Math.cos(i * 0.3) * 1.4 + (i > 40 && i < 65 ? 1.2 : 0);
+      const hr2 = 138 + Math.round(frac * 28 + Math.cos(i * 0.2) * 7);
+      pts2.push({ lat: lat - 0.0002, lon: lon + 0.0001, t, spdKmh: spd2, hr: hr2, ele: 1.0, temp: 23 });
+    }
+    studio.addTrack('Natureza Valter (Pro Masc)', pts1, '#F59E0B');
+    studio.addTrack('PRG Filipe (Pro Masc)', pts2, '#60A5FA');
+  } else if (preset === 'treino-series') {
+    const speeds = [11.5, 12.8, 13.5, 12.2];
+    for (let s = 0; s < 4; s++) {
+      const sPts = [];
+      const baseSpd = speeds[s];
+      for (let i = 0; i < 60; i++) {
+        const frac = i / 59;
+        const t = i * 2500;
+        const lat = startLat + frac * 0.015 + (s * 0.0004);
+        const lon = startLon + frac * 0.025 + (s * 0.0003);
+        const spd = baseSpd + Math.sin(i * 0.4) * 0.8;
+        const hr = 130 + s * 10 + Math.round(frac * 20);
+        sPts.push({ lat, lon, t, spdKmh: spd, hr, ele: 1.0, temp: 24 });
+      }
+      studio.addTrack(`Série ${s + 1} (${speeds[s]} km/h)`, sPts);
+    }
+  } else if (preset === 'pro-mista') {
+    const pts1 = [], pts2 = [];
+    for (let i = 0; i < numPts; i++) {
+      const frac = i / (numPts - 1);
+      const t = i * tStep;
+      const lat = startLat + frac * 0.020;
+      const lon = startLon + frac * 0.035;
+      pts1.push({ lat: lat + 0.0001, lon: lon, t, spdKmh: 12.0 + Math.sin(i*0.2)*1.2, hr: 142 + Math.round(frac*22), ele: 1.0, temp: 22 });
+      pts2.push({ lat: lat - 0.0001, lon: lon + 0.0001, t, spdKmh: 11.8 + Math.cos(i*0.2)*1.3, hr: 145 + Math.round(frac*20), ele: 1.0, temp: 22 });
+    }
+    studio.addTrack('Jean (Pro Mista)', pts1, '#A78BFA');
+    studio.addTrack('Luiz (Pro Mista)', pts2, '#10B981');
+  }
+
+  drawUnifiedRuler();
+};
+
+function fmtSeconds(sec) {
+  if (!sec || isNaN(sec)) return '00:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+</script>
+
+</body>
+</html>
