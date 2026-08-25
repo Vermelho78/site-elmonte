@@ -357,6 +357,9 @@
         </div>
       </div>
 
+      <button class="btn-studio" onclick="launchViewer('slim')" style="border-color:var(--cyan); color:var(--cyan);">
+        <i class="fa-solid fa-expand"></i> Slim
+      </button>
       <button class="btn-studio gold" onclick="launchViewer('desafio')">
         <i class="fa-solid fa-trophy"></i> Desafio
       </button>
@@ -4464,7 +4467,8 @@ window.launchViewer = function(type) {
   const contract = studio.generateVAARECContract();
   localStorage.setItem('vaarec_studio_contract', JSON.stringify(contract));
   window.CONTRACT = contract;
-  if (type === 'desafio') window.open('/viewer-desafio.html', '_blank');
+  if (type === 'slim') window.open('/viewer-slim.html', '_blank');
+  else if (type === 'desafio') window.open('/viewer-desafio.html', '_blank');
   else window.open('/viewer-treino-raia.html', '_blank');
 };
 

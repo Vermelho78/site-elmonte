@@ -2389,8 +2389,19 @@ function initMap() {
   }
 
   // Inicializar Diretor de Câmera Drone
-  if (typeof VaarecDroneDirector !== 'undefined') {
-    droneCamera = new VaarecDroneDirector(map);
+  if (typeof DroneCameraSkills !== 'undefined') {
+    droneCamera = new DroneCameraSkills({
+      map: map,
+      getEntities: () => athletes.map(a => ({
+        lat: a.curPt?.lat,
+        lon: a.curPt?.lon,
+        heading: a.curPt?.heading || 0,
+        speed: a.curPt?.spdKmh || 0,
+        name: a.name,
+        color: a.color
+      })),
+      getContract: () => window.CONTRACT || {}
+    });
   }
 
   initTimelineEvents();
@@ -2480,7 +2491,7 @@ function updateFrame(ms) {
 
   // Atualizar Câmera Drone
   if (droneCamera && !draggingTimeline) {
-    updateDroneCameraPosition();
+    droneCamera.update(playTimeMs);
   }
 
   // Verificar final de prova
@@ -2514,6 +2525,18 @@ function selectCameraMode(mode, canoeIdx) {
   activeCameraMode = mode;
   activeCanoeFocusIdx = canoeIdx;
 
+  if (droneCamera) {
+    if (mode === 'auto') {
+      droneCamera.setMode('auto');
+    } else if (mode === 'all') {
+      droneCamera.setMode('follow-all');
+    } else if (mode === 'leader') {
+      droneCamera.setMode('follow-leader');
+    } else if (mode === 'canoe' && canoeIdx != null) {
+      droneCamera.setMode('follow-canoe', { canoeIdx: canoeIdx });
+    }
+  }
+
   document.querySelectorAll('.slim-cam-item').forEach(el => el.classList.remove('active'));
 
   const label = document.getElementById('slim-cam-mode-label');
@@ -2533,42 +2556,32 @@ function selectCameraMode(mode, canoeIdx) {
   if (popover) popover.classList.remove('show');
 }
 
-function updateDroneCameraPosition() {
-  if (!droneCamera || !athletes.length) return;
-
-  if (activeCameraMode === 'auto') {
-    // Auto Direct Inteligente
-    droneCamera.updateAutoDirector(athletes, playTimeMs);
-  } else if (activeCameraMode === 'all') {
-    const bounds = L.latLngBounds(athletes.map(a => [a.curPt.lat, a.curPt.lon]));
-    map.fitBounds(bounds, { padding: [60, 60], animate: true, duration: 0.5 });
-  } else if (activeCameraMode === 'leader') {
-    const leader = athletes.reduce((prev, curr) => (curr.distanceTraveledM > prev.distanceTraveledM) ? curr : prev, athletes[0]);
-    map.panTo([leader.curPt.lat, leader.curPt.lon], { animate: true, duration: 0.3 });
-  } else if (activeCameraMode === 'canoe' && activeCanoeFocusIdx != null && athletes[activeCanoeFocusIdx]) {
-    const target = athletes[activeCanoeFocusIdx];
-    map.panTo([target.curPt.lat, target.curPt.lon], { animate: true, duration: 0.3 });
-  }
-}
-
-// Focused Canoe Card (Req 8 - Top Left)
+// Focused Canoe Card (Req 8 - Right Side below Elapsed Time)
 function updateFocusedCanoeCard(sortedAthletes) {
   const card = document.getElementById('slim-focused-canoe-card');
   if (!card) return;
 
+  let targetAth = null;
   if (activeCameraMode === 'canoe' && activeCanoeFocusIdx != null && athletes[activeCanoeFocusIdx]) {
-    const ath = athletes[activeCanoeFocusIdx];
-    card.style.display = 'block';
+    targetAth = athletes[activeCanoeFocusIdx];
+  } else if (activeCameraMode === 'auto' && droneCamera && droneCamera._autoDirector) {
+    const phase = droneCamera._autoDirector.phase;
+    if ((phase === 'CANOE_CHASE' || phase === 'CANOE_FRONT' || phase === 'OVERTAKE_DUEL') && droneCamera._autoDirector.targetCanoeIdx != null) {
+      targetAth = athletes[droneCamera._autoDirector.targetCanoeIdx];
+    }
+  }
 
+  if (targetAth) {
+    card.style.display = 'block';
     const leader = sortedAthletes[0];
-    const gapM = leader ? Math.round(leader.distanceTraveledM - ath.distanceTraveledM) : 0;
+    const gapM = leader ? Math.round(leader.distanceTraveledM - targetAth.distanceTraveledM) : 0;
     const gapText = gapM <= 5 ? '🏆 Líder' : `+${gapM}m`;
 
-    document.getElementById('fc-canoe-name').innerHTML = `<span style="width:10px; height:10px; border-radius:50%; background:${ath.color}; display:inline-block;"></span> ${ath.name}`;
-    document.getElementById('fc-canoe-rank').textContent = `${ath.rank}º LUGAR`;
-    document.getElementById('fc-stat-cur-spd').textContent = `${ath.curPt.spdKmh.toFixed(1)} km/h`;
-    document.getElementById('fc-stat-avg-spd').textContent = `${ath.avgSpeedKmh.toFixed(1)} km/h`;
-    document.getElementById('fc-stat-dist').textContent = `${(ath.distanceTraveledM / 1000).toFixed(2)} km`;
+    document.getElementById('fc-canoe-name').innerHTML = `<span style="width:10px; height:10px; border-radius:50%; background:${targetAth.color}; display:inline-block;"></span> ${targetAth.name}`;
+    document.getElementById('fc-canoe-rank').textContent = `${targetAth.rank}º LUGAR`;
+    document.getElementById('fc-stat-cur-spd').textContent = `${targetAth.curPt.spdKmh.toFixed(1)} km/h`;
+    document.getElementById('fc-stat-avg-spd').textContent = `${targetAth.avgSpeedKmh.toFixed(1)} km/h`;
+    document.getElementById('fc-stat-dist').textContent = `${(targetAth.distanceTraveledM / 1000).toFixed(2)} km`;
     document.getElementById('fc-stat-gap').textContent = gapText;
   } else {
     card.style.display = 'none';
