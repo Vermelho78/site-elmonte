@@ -2035,13 +2035,13 @@
     <div class="header-right">
       <span id="challenge-meta" style="white-space:nowrap"></span>
       <button class="header-collapse-btn" id="btn-duel-collapse" onclick="toggleDuelHeaderCollapse()" title="Recolher / Expandir Cards das Canoas">
-        🛶 Canoas <span id="duel-collapse-arrow">▾</span>
+        🛶 Canoas <span id="duel-collapse-arrow">▸</span>
       </button>
     </div>
   </header>
 
   <!-- Collapsible Duel Telemetry Panel (Cards + Progress Bars) -->
-  <div id="duel-telemetry-panel">
+  <div id="duel-telemetry-panel" class="collapsed">
     <!-- Athletes Cards Header -->
     <div id="duel-header">
       <!-- Dynamic athlete cards rendered here -->
@@ -2082,7 +2082,7 @@
     </div>
 
     <!-- Floating Camera Drone Widget (Colapsável) -->
-    <div id="drone-camera-bar">
+    <div id="drone-camera-bar" class="collapsed">
       <div class="drone-bar-header" onclick="toggleDroneBarCollapse()" style="cursor:pointer;" title="Clique para recolher/expandir controles da Câmera Drone">
         <div style="display:flex; align-items:center; gap:4px; overflow:hidden;">
           <span class="drone-bar-title">🎥 Câmera Drone</span>
@@ -2091,7 +2091,7 @@
         <div style="display:flex; align-items:center; gap:6px;">
           <span id="map-layer-indicator" style="font-size:0.58rem; background:rgba(0,0,0,0.6); border:1px solid rgba(56,239,125,0.4); border-radius:4px; padding:1px 5px; color:#38EF7D; font-weight:700; font-family:var(--font); cursor:help;" title="Camada StreetMap ativa automaticamente abaixo de 30m de altitude">🗺️ StreetMap (&lt;30m)</span>
           <span id="drone-zoom-indicator" style="font-size:0.6rem; color:var(--accent); font-weight:700; font-family:monospace;">Alt: 35m</span>
-          <button class="drone-collapse-btn" id="btn-drone-collapse" title="Recolher/Expandir" onclick="event.stopPropagation(); toggleDroneBarCollapse();">▾</button>
+          <button class="drone-collapse-btn" id="btn-drone-collapse" title="Recolher/Expandir" onclick="event.stopPropagation(); toggleDroneBarCollapse();">▸</button>
         </div>
       </div>
 
@@ -2529,6 +2529,13 @@ async function handleAuth() {
     status.textContent = 'Por favor, informe um e-mail válido.'; return;
   }
   localStorage.setItem('vaarec_user_email', email);
+  
+  const params = new URLSearchParams(window.location.search);
+  const shareToken = params.get('t');
+  if (shareToken) {
+    try { sessionStorage.setItem('vaarec_redeemed_token_' + shareToken, '1'); } catch(e){}
+  }
+
   if (typeof VaarecClient !== 'undefined') {
     try {
       await VaarecClient.redeemShareToken(email);
@@ -3576,22 +3583,29 @@ function spawnConfetti(){
 
 // ===== STARTUP =====
 window.addEventListener('load', async () => {
+  const params = new URLSearchParams(window.location.search);
+  const shareToken = params.get('t');
   const savedEmail = localStorage.getItem('vaarec_user_email');
   const gate = document.getElementById('auth-gate');
   const inputEl = document.getElementById('auth-email');
-  if (inputEl) inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth(); });
 
-  const savedDroneCollapse = localStorage.getItem('vaarec_drone_bar_collapsed');
-  if (savedDroneCollapse === '1') {
-    toggleDroneBarCollapse(true);
+  if (inputEl) {
+    if (savedEmail) inputEl.value = savedEmail;
+    inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') handleAuth(); });
   }
+
+  // Menus Canoas e Câmera Drone fechados por padrão para maximizar a área de visualização do mapa
+  const savedDroneCollapse = localStorage.getItem('vaarec_drone_bar_collapsed');
+  toggleDroneBarCollapse(savedDroneCollapse === '0' ? false : true);
 
   const savedDuelCollapse = localStorage.getItem('vaarec_duel_header_collapsed');
-  if (savedDuelCollapse === '1') {
-    toggleDuelHeaderCollapse(true);
-  }
+  toggleDuelHeaderCollapse(savedDuelCollapse === '0' ? false : true);
 
-  if (savedEmail) {
+  // Se o link possui token de compartilhamento (?t=...), SEMPRE exigir que o usuário confirme o e-mail nesta sessão
+  const isTokenRedeemed = shareToken ? sessionStorage.getItem('vaarec_redeemed_token_' + shareToken) : null;
+  const requiresAuth = shareToken ? !isTokenRedeemed : !savedEmail;
+
+  if (!requiresAuth && savedEmail) {
     if (gate) gate.style.display = 'none';
     try {
       await initApp();

@@ -42,6 +42,20 @@
       localStorage.setItem('vaarec_session_token', token);
     },
 
+    isAuthRequired() {
+      const shareToken = this.getShareToken();
+      const email = this.getUserEmail();
+      if (shareToken) {
+        try {
+          const isTokenRedeemed = sessionStorage.getItem('vaarec_redeemed_token_' + shareToken);
+          return !isTokenRedeemed;
+        } catch(e) {
+          return true;
+        }
+      }
+      return !email;
+    },
+
     /**
      * Fetch meta.json directly from Supabase Storage
      */
@@ -149,6 +163,9 @@
       // Save email locally
       this.setUserEmail(email);
       this.setSessionToken(window.VAAREC_CONFIG.supabaseKey);
+      if (shareToken) {
+        try { sessionStorage.setItem('vaarec_redeemed_token_' + shareToken, '1'); } catch(e){}
+      }
 
       const headers = {
         'apikey': window.VAAREC_CONFIG.supabaseKey,
