@@ -2462,19 +2462,45 @@ function formatDeltaHMS(ms) {
 // Init App
 async function initApp() {
   let contractData = window.CONTRACT || null;
+  const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
 
-  if (!contractData && typeof VaarecClient !== 'undefined') {
-    const slug = VaarecClient.getSlugFromUrl();
-    if (slug) {
-      try {
-        contractData = await VaarecClient.loadViewerData(slug);
-      } catch (err) {
-        console.warn("Falha no loadViewerData do Supabase:", err);
+  // 1. Se o contrato não estiver embutido no HTML, buscar do Supabase Storage
+  if ((!contractData || !contractData.sportPackage || !contractData.sportPackage.tracks) && typeof VaarecClient !== 'undefined' && slug) {
+    try {
+      const msgEl = document.getElementById('loading-msg');
+      if (msgEl) msgEl.textContent = 'Buscando metadados no Supabase...';
+      contractData = await VaarecClient.fetchMeta(slug);
+      window.CONTRACT = contractData;
+      VaarecClient.logViewEvent(slug);
+    } catch (errMeta) {
+      console.warn('[Slim] Falha ao buscar meta via Supabase:', errMeta);
+    }
+  }
+
+  contractData = contractData || window.CONTRACT || null;
+  let tracks = contractData?.sportPackage?.tracks || contractData?.tracks || [];
+
+  // 2. Se as tracks vierem sem pontos (fatiadas pelo Admin), carregar individualmente do Supabase Storage
+  if (typeof VaarecClient !== 'undefined' && slug && tracks.length > 0) {
+    const msgEl = document.getElementById('loading-msg');
+    for (let i = 0; i < tracks.length; i++) {
+      const tr = tracks[i];
+      const pts = tr.points || tr.data || tr.gpsData;
+      if (!pts || pts.length === 0) {
+        if (msgEl) msgEl.textContent = `Carregando GPS ${i + 1}/${tracks.length} (${tr.name || 'Canoa'})...`;
+        try {
+          const rawId = tr.id || tr.trackId || (i + 1);
+          const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, rawId);
+          tr.points = fetchedPoints;
+        } catch (errTrack) {
+          console.warn(`[Slim] Falha ao carregar track ${i + 1}:`, errTrack);
+        }
       }
     }
   }
 
-  if (!contractData) {
+  // 3. Se ainda não houver dados, carregar demonstração
+  if (!contractData || !tracks.length || !tracks[0].points || !tracks[0].points.length) {
     contractData = generateDemoSlimTracks();
   }
 
