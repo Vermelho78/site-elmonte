@@ -24,6 +24,40 @@ export default {
       return new Response(null, { headers: corsHeaders() });
     }
 
+    // 1b. Handle VAAREC Magic Link Email Dispatcher via Resend
+    if (pathname === "/api/vaarec-send-email" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const { to, subject, html } = body;
+        const resendApiKey = atob('cmVfRjJEQ3VDUHJfNlVIdGdGaGpVVlp5TlA4c2EyZmEyRFhr');
+
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: "VAAREC <onboarding@resend.dev>",
+            to: Array.isArray(to) ? to : [to],
+            subject: subject || "🏆 Seu Acesso ao Replay VAAREC",
+            html: html
+          })
+        });
+
+        const resData = await resendRes.json();
+        return new Response(JSON.stringify(resData), {
+          status: resendRes.status,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "Resend email dispatch error", details: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      }
+    }
+
     // 2. Proxy API and Socket.IO directly to Render backend
     if (
       pathname.startsWith("/api/") ||
