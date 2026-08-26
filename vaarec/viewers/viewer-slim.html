@@ -1961,21 +1961,21 @@
     .focused-stat-lbl { font-size: 0.65rem; color: var(--text-sec); text-transform: uppercase; font-weight: 600; }
     .focused-stat-val { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: var(--accent); }
 
-    /* Overview Leaderboard Card (Visão Geral - Classificação em Tempo Real) */
+    /* Overview Leaderboard Card (Visão Geral - Fino, Transparente: Pos, Nome, Gap) */
     #slim-overview-leaderboard-card {
       position: fixed;
-      top: 56px;
-      right: 16px;
-      width: 290px;
+      top: 54px;
+      right: 14px;
+      width: 190px;
       max-height: calc(100vh - 140px);
-      background: var(--bg-glass);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border: 1px solid var(--border-glass);
-      border-radius: var(--radius-md);
-      padding: 12px 14px;
+      background: rgba(8, 14, 24, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 6px 8px;
       z-index: 1000;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.45);
       transition: opacity 0.3s ease;
       display: none;
     }
@@ -1988,63 +1988,60 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 4px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .overview-card-title {
       font-family: var(--font-title);
-      font-size: 0.85rem;
+      font-size: 0.72rem;
       font-weight: 800;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
       color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 6px;
       text-transform: uppercase;
     }
     .overview-card-badge {
       font-family: var(--font-mono);
-      font-size: 0.65rem;
+      font-size: 0.58rem;
       font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 1px 4px;
+      border-radius: 3px;
       background: rgba(0,242,254,0.12);
-      border: 1px solid rgba(0,242,254,0.3);
+      border: 1px solid rgba(0,242,254,0.25);
       color: var(--accent);
     }
     .overview-leaderboard-list {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      max-height: calc(100vh - 220px);
+      gap: 3px;
+      max-height: calc(100vh - 200px);
       overflow-y: auto;
     }
     .overview-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 8px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: 6px;
-      font-size: 0.78rem;
+      padding: 3px 5px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.03);
+      border-radius: 4px;
+      font-size: 0.74rem;
     }
     .overview-row.leader {
-      background: rgba(245,158,11,0.08);
-      border-color: rgba(245,158,11,0.3);
+      background: rgba(245,158,11,0.07);
+      border-color: rgba(245,158,11,0.25);
     }
     .overview-row-left {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       overflow: hidden;
     }
     .overview-pos-badge {
       font-family: var(--font-title);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 800;
-      min-width: 20px;
+      min-width: 14px;
       text-align: center;
       color: #fff;
     }
@@ -2055,24 +2052,15 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 105px;
-    }
-    .overview-row-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      text-align: right;
+      max-width: 82px;
     }
     .overview-gap {
       font-family: var(--font-mono);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--accent);
-    }
-    .overview-spd {
-      font-family: var(--font-mono);
-      font-size: 0.65rem;
-      color: var(--text-sec);
+      white-space: nowrap;
+      text-align: right;
     }
 
     /* Simplified Marker Tooltip (Req 6 - Name & Avg Speed only, no emoji, no hr) */
@@ -2939,8 +2927,26 @@ function updateFrame(ms) {
     }
   });
 
-  // Ordenar ranking em tempo real estritamente pelo avanço projetado sobre o percurso oficial
-  const sorted = [...athletes].sort((a, b) => b.projectedProgressM - a.projectedProgressM);
+  // 1. Separar atletas que já cruzaram a linha de chegada dos que ainda estão remando
+  const finished = [];
+  const active = [];
+
+  athletes.forEach(ath => {
+    if (playTimeMs >= ath.durationMs) {
+      finished.push(ath);
+    } else {
+      active.push(ath);
+    }
+  });
+
+  // Atletas que já cruzaram a chegada: classificação congelada pela ordem de chegada (menor tempo)
+  finished.sort((a, b) => (a.durationMs || 0) - (b.durationMs || 0));
+
+  // Atletas ativos na água: ordenados pelo avanço projetado sobre o percurso
+  active.sort((a, b) => b.projectedProgressM - a.projectedProgressM);
+
+  // Classificação unificada: quem já cruzou a linha de chegada não pode ser ultrapassado
+  const sorted = [...finished, ...active];
   sorted.forEach((ath, r) => ath.rank = r + 1);
 
   // Atualizar Card da Canoa Focada (Req 8)
@@ -3016,7 +3022,7 @@ function updateFocusedCanoeCard(sortedAthletes) {
   const focusedCard = document.getElementById('slim-focused-canoe-card');
   const overviewCard = document.getElementById('slim-overview-leaderboard-card');
 
-  // 1. Visão Geral (Camera 'all') -> Apresentar Card com a Classificação Atual
+  // 1. Visão Geral (Camera 'all') -> Apresentar Card com a Classificação Atual (Fino, Transparente: Pos, Nome, Gap)
   if (activeCameraMode === 'all') {
     if (focusedCard) focusedCard.style.display = 'none';
     if (overviewCard) {
@@ -3025,21 +3031,23 @@ function updateFocusedCanoeCard(sortedAthletes) {
       if (listContainer) {
         const leader = sortedAthletes[0];
         listContainer.innerHTML = sortedAthletes.map((ath, r) => {
+          const isFinished = playTimeMs >= ath.durationMs;
           const gapM = leader ? Math.round(leader.projectedProgressM - ath.projectedProgressM) : 0;
-          const gapText = r === 0 ? '🏆 Líder' : `+${gapM}m`;
+          let gapText = r === 0 ? '🏆 Líder' : `+${gapM}m`;
+          if (isFinished && r > 0 && leader) {
+            const timeDiffSec = Math.max(1, Math.round((ath.durationMs - leader.durationMs) / 1000));
+            gapText = `+${timeDiffSec}s`;
+          }
           const posBadge = r === 0 ? '🥇' : (r === 1 ? '🥈' : (r === 2 ? '🥉' : `${r + 1}º`));
           const isLeader = r === 0 ? 'leader' : '';
           return `
             <div class="overview-row ${isLeader}">
               <div class="overview-row-left">
                 <span class="overview-pos-badge">${posBadge}</span>
-                <span style="width:8px; height:8px; border-radius:50%; background:${ath.color}; flex-shrink:0;"></span>
+                <span style="width:7px; height:7px; border-radius:50%; background:${ath.color}; flex-shrink:0;"></span>
                 <span class="overview-name" title="${ath.name}">${ath.name}</span>
               </div>
-              <div class="overview-row-right">
-                <span class="overview-gap">${gapText}</span>
-                <span class="overview-spd">${(ath.avgSpeedKmh || 0).toFixed(1)} km/h · ${(ath.projectedProgressM / 1000).toFixed(2)}km</span>
-              </div>
+              <div class="overview-gap">${gapText}</div>
             </div>
           `;
         }).join('');
