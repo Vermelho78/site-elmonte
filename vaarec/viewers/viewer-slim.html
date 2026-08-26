@@ -1843,10 +1843,10 @@
       box-shadow: 0 0 14px rgba(245,158,11,0.3);
     }
 
-    /* Single Drone Camera Button & Menu (Req 5) */
+    /* Single Drone Camera Button & Menu (Posicionado à direita dos botões de zoom +/-) */
     #slim-drone-control {
       top: 14px;
-      left: 16px;
+      left: 64px;
       z-index: 1000;
     }
     .slim-cam-btn {
@@ -2171,7 +2171,7 @@ let totalDurationMs = 0;
 let playTimeMs = 0;
 let isPlaying = false;
 let speed = 1;
-const SPEEDS = [1, 5, 10, 30, 60];
+const SPEEDS = [1, 5, 10, 30];
 let lastRaf = null;
 let draggingTimeline = false;
 let resultShown = false;
@@ -2451,9 +2451,10 @@ function setupData(contract) {
       }
     });
     ath.totalDistanceM = totalAccM;
+    ath.durationMs = ath.points[ath.points.length - 1].relT;
   });
 
-  totalDurationMs = Math.max(...athletes.map(a => a.points[a.points.length - 1].relT));
+  totalDurationMs = Math.max(...athletes.map(a => a.durationMs));
   buildCameraMenuList();
 }
 
@@ -2785,7 +2786,7 @@ function checkFinishCondition(sorted) {
       finishDelayTimer = setTimeout(() => {
         showFinalResult(sorted);
         finishDelayTimer = null;
-      }, 5000); // 5 segundos de delay antes de abrir o quadro
+      }, 2000); // 2 segundos de delay antes de abrir o quadro
     }
   }
 }
@@ -2824,23 +2825,25 @@ function toggleAudioMute() {
   }
 }
 
-// Final Results (Modelo Desafio com Diferença de Tempo e Estatísticas)
-function showFinalResult(sorted) {
+// Final Results (Organização Estrita por Tempo Crescente — Menor Tempo é o Campeão)
+function showFinalResult() {
   resultShown = true;
   const overlay = document.getElementById('modal-result');
   const tbody = document.getElementById('result-rank-tbody');
   if (!overlay || !tbody) return;
 
-  const winner = sorted[0];
-  const winnerDistKm = ((winner.totalDistanceM || 0) / 1000).toFixed(2);
-  const winnerDurationMs = winner.points[winner.points.length - 1].relT || totalDurationMs;
+  // Ordenação por tempo crescente de duração da prova (menor tempo = 1º lugar)
+  const ranked = [...athletes].sort((x, y) => (x.durationMs || 0) - (y.durationMs || 0));
+  const winner = ranked[0];
+  const winnerDistKm = ((winner?.totalDistanceM || 0) / 1000).toFixed(2);
+  const winnerDurationMs = winner?.durationMs || totalDurationMs;
 
-  document.getElementById('res-winner-name').textContent = `🥇 ${winner.name}`;
-  document.getElementById('res-winner-time').textContent = `Tempo Oficial: ${formatTimeHMS(winnerDurationMs)} · Distância: ${winnerDistKm} km · Vel. Média: ${winner.avgSpeedKmh.toFixed(1)} km/h`;
+  document.getElementById('res-winner-name').textContent = `🥇 ${winner?.name}`;
+  document.getElementById('res-winner-time').textContent = `Tempo Oficial: ${formatTimeHMS(winnerDurationMs)} · Distância: ${winnerDistKm} km · Vel. Média: ${winner?.avgSpeedKmh.toFixed(1)} km/h`;
 
   tbody.innerHTML = '';
-  sorted.forEach((a, r) => {
-    const aDurationMs = a.points[a.points.length - 1].relT || totalDurationMs;
+  ranked.forEach((a, r) => {
+    const aDurationMs = a.durationMs || totalDurationMs;
     const deltaMs = aDurationMs - winnerDurationMs;
     const deltaStr = r === 0 ? '🏆 Vencedor' : `+${(deltaMs / 1000).toFixed(1)}s`;
     const medals = ['🥇 1º', '🥈 2º', '🥉 3º'];
