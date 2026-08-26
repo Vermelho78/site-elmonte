@@ -805,55 +805,87 @@
         }
       }
 
-      // ==========================================
-      // GIMBAL DAMPING INTERPOLATOR (ZERO FLICKER / ZERO BLACK TILES)
-      // ==========================================
-      if (targetCenter && validPoint(targetCenter[0], targetCenter[1])) {
-        const finalZoom = clamp((targetZoom || this.config.followZoom) + (this.config.zoomOffset || 0), this.config.minZoom, this.config.maxZoom);
+    setPlaybackSpeed(speed) {
+      this.speedMultiplier = Math.max(1, Number(speed) || 1);
+    }
 
-        if (force || !this._smoothDrone.initialized) {
-          this._smoothDrone.currentLat = targetCenter[0];
-          this._smoothDrone.currentLon = targetCenter[1];
-          this._smoothDrone.currentZoom = finalZoom;
-          this._smoothDrone.initialized = true;
-          this._isProgrammaticMovement = true;
-          this.map.setView(targetCenter, finalZoom, { animate: false });
-          setTimeout(() => { this._isProgrammaticMovement = false; }, 40);
-        } else {
-          const dmpPos = clamp(this.config.damping || 0.075, 0.02, 0.25);
-          const dmpZoom = clamp(this.config.zoomDamping || 0.045, 0.01, 0.15);
+    _isPortraitMode() {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1000;
+      const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+      return w < h || w < 650;
+    }
 
-          this._smoothDrone.currentLat += (targetCenter[0] - this._smoothDrone.currentLat) * dmpPos;
-          this._smoothDrone.currentLon += (targetCenter[1] - this._smoothDrone.currentLon) * dmpPos;
-          this._smoothDrone.currentZoom += (finalZoom - this._smoothDrone.currentZoom) * dmpZoom;
+    // ==========================================
+    // GIMBAL DAMPING INTERPOLATOR (ZERO FLICKER / ZERO BLACK TILES)
+    // ==========================================
+    if (targetCenter && validPoint(targetCenter[0], targetCenter[1])) {
+      const isPortrait = this._isPortraitMode();
+      const portraitZoomOffset = isPortrait ? -0.8 : 0;
+      const finalZoom = clamp((targetZoom || this.config.followZoom) + portraitZoomOffset + (this.config.zoomOffset || 0), this.config.minZoom, this.config.maxZoom);
 
-          this._isProgrammaticMovement = true;
-          // Chamada limpa do Leaflet com animate: false para tracking físico sem transições CSS conflitantes
-          this.map.setView(
-            [this._smoothDrone.currentLat, this._smoothDrone.currentLon],
-            this._smoothDrone.currentZoom,
-            { animate: false }
-          );
-          this._isProgrammaticMovement = false;
-          if (typeof this.config.onZoomUpdate === 'function') {
-            this.config.onZoomUpdate(this._smoothDrone.currentZoom);
-          }
+      if (force || !this._smoothDrone.initialized) {
+        this._smoothDrone.currentLat = targetCenter[0];
+        this._smoothDrone.currentLon = targetCenter[1];
+        this._smoothDrone.currentZoom = finalZoom;
+        this._smoothDrone.initialized = true;
+        this._isProgrammaticMovement = true;
+        this.map.setView(targetCenter, finalZoom, { animate: false });
+        setTimeout(() => { this._isProgrammaticMovement = false; }, 40);
+      } else {
+        const s = this.speedMultiplier || 1;
+
+        // Escala o damping de aproximação proporcional à velocidade de reprodução (1x, 5x, 10x, 30x)
+        let dmpPos = clamp((this.config.damping || 0.08) * Math.pow(s, 0.8), 0.10, 0.98);
+        let dmpZoom = clamp((this.config.zoomDamping || 0.045) * Math.pow(s, 0.5), 0.045, 0.50);
+
+        if (isPortrait) {
+          // No celular em formato em pé (portrait), maior responsividade para manter a canoa centralizada
+          dmpPos = clamp(dmpPos * 1.5, 0.20, 1.0);
+        }
+
+        const latDiff = targetCenter[0] - this._smoothDrone.currentLat;
+        const lonDiff = targetCenter[1] - this._smoothDrone.currentLon;
+        const lagDistM = haversineDistM(this._smoothDrone.currentLat, this._smoothDrone.currentLon, targetCenter[0], targetCenter[1]);
+
+        // Velocidade de deslocamento do drone = o dobro da velocidade das canoas:
+        // A 30x ou se o atraso passar do limite de enquadramento do celular, o drone alcança a canoa imediatamente
+        const maxSafeLagM = isPortrait ? (s >= 10 ? 6 : 10) : (s >= 10 ? 12 : 20);
+        if (lagDistM > maxSafeLagM || s >= 30) {
+          dmpPos = 1.0;
+        }
+
+        this._smoothDrone.currentLat += latDiff * dmpPos;
+        this._smoothDrone.currentLon += lonDiff * dmpPos;
+        this._smoothDrone.currentZoom += (finalZoom - this._smoothDrone.currentZoom) * dmpZoom;
+
+        this._isProgrammaticMovement = true;
+        this.map.setView(
+          [this._smoothDrone.currentLat, this._smoothDrone.currentLon],
+          this._smoothDrone.currentZoom,
+          { animate: false }
+        );
+        this._isProgrammaticMovement = false;
+        if (typeof this.config.onZoomUpdate === 'function') {
+          this.config.onZoomUpdate(this._smoothDrone.currentZoom);
         }
       }
     }
+  }
 
-    _getAutoPhaseTarget(phase, entities, leader, pts, realNow) {
-      if (!leader) return null;
-      const lLat = leader.lat ?? leader.latitude ?? leader.currentPos?.lat;
-      const lLon = leader.lon ?? leader.lng ?? leader.longitude ?? leader.currentPos?.lon;
-      const lHeading = leader.heading ?? leader.currentHeading ?? leader._currentHeading ?? 0;
+  _getAutoPhaseTarget(phase, entities, leader, pts, realNow) {
+    if (!leader) return null;
+    const isPortrait = this._isPortraitMode();
+    const lLat = leader.lat ?? leader.latitude ?? leader.currentPos?.lat;
+    const lLon = leader.lon ?? leader.lng ?? leader.longitude ?? leader.currentPos?.lon;
+    const lHeading = leader.heading ?? leader.currentHeading ?? leader._currentHeading ?? 0;
+    const lookAheadM = isPortrait ? Math.min(10, (this.config.futureMeters || 16) * 0.5) : (this.config.futureMeters || 16);
 
-      if (phase === 'LEADER_LOOKAHEAD') {
-        return {
-          center: computeLookAhead(lLat, lLon, lHeading, this.config.futureMeters || 16) || [Number(lLat), Number(lLon)],
-          zoom: this.config.followZoom
-        };
-      }
+    if (phase === 'LEADER_LOOKAHEAD') {
+      return {
+        center: computeLookAhead(lLat, lLon, lHeading, lookAheadM) || [Number(lLat), Number(lLon)],
+        zoom: this.config.followZoom
+      };
+    }
 
       if (phase === 'PELOTAO') {
         if (pts.length > 1) {

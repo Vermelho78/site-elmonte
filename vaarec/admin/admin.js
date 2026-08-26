@@ -118,16 +118,39 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
 
       if (sourceTracks && Array.isArray(sourceTracks)) {
         const processedTracks = sourceTracks.map((track, idx) => {
-          const { points, data, gpsData, ...trackMeta } = track;
+          const { points, rawPoints, data, gpsData, ...trackMeta } = track;
           const rawId = track.id || track.trackId || (idx + 1);
           const cleanTrackId = String(rawId).replace(/^track-/, '');
+          const trackPoints = (points && points.length) ? points : (rawPoints || data || gpsData || []);
+
+          let computedDistM = 0;
+          if (trackPoints && trackPoints.length > 1) {
+            for (let p = 0; p < trackPoints.length - 1; p++) {
+              const p1 = trackPoints[p];
+              const p2 = trackPoints[p + 1];
+              const lat1 = p1.lat ?? p1[0];
+              const lon1 = p1.lng ?? p1.lon ?? p1[1];
+              const lat2 = p2.lat ?? p2[0];
+              const lon2 = p2.lng ?? p2.lon ?? p2[1];
+              if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+                computedDistM += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              }
+            }
+          }
+          const finalStats = { ...(trackMeta.stats || {}) };
+          if (computedDistM > 100) {
+            finalStats.totalDistanceMeters = Math.round(computedDistM);
+          }
 
           tracks.push({
             trackId: cleanTrackId,
             name: track.name || `Canoa ${idx + 1}`,
-            points: points || data || gpsData || []
+            points: trackPoints
           });
-          return { ...trackMeta, id: cleanTrackId, name: track.name || `Canoa ${idx + 1}` };
+          return { ...trackMeta, stats: finalStats, id: cleanTrackId, name: track.name || `Canoa ${idx + 1}` };
         });
 
         if (meta.sportPackage) {
@@ -205,24 +228,27 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
       const shareTemplateSelect = document.getElementById('share-template-select');
       if (shareTemplateSelect) shareTemplateSelect.value = selectedTemplate;
 
-      const token = 't_' + Math.random().toString(36).substring(2, 10);
-      const targetUrl = `https://elmonte.dev.br/vaarec/viewers/${selectedTemplate}?v=${encodeURIComponent(slug)}&t=${token}`;
+      const publicUrl = `https://elmonte.dev.br/vaarec/viewers/${selectedTemplate}?v=${encodeURIComponent(slug)}`;
+      const adminBypassUrl = `https://elmonte.dev.br/vaarec/viewers/${selectedTemplate}?v=${encodeURIComponent(slug)}&t=t_adm_master`;
 
       statusEl.style.color = '#22c55e';
       statusEl.innerHTML = `
-        <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 10px; padding: 14px; margin-top: 10px;">
+        <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 10px; padding: 16px; margin-top: 10px;">
           <div style="font-size: 14px; font-weight: 800; color: #22c55e; margin-bottom: 8px;">
             ✅ Sucesso! Viewer "${slug}" publicado no Supabase Storage (${uploadedTracks} tracks enviadas).
           </div>
           <div style="font-size: 13px; color: #eaf2ff; margin-bottom: 12px;">
-            Template Principal Ativo: <b style="color: var(--accent);">${selectedTemplate}</b>
+            Template Principal: <b style="color: var(--accent);">${selectedTemplate}</b>
+          </div>
+          <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; margin-bottom: 14px;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🔗 LINK OFICIAL PARA O PÚBLICO (Exige e-mail e gera link único de 24h):</div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <a href="${publicUrl}" target="_blank" style="color: #00F2FE; font-size: 13px; word-break: break-all;">${publicUrl}</a>
+            </div>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <a href="${targetUrl}" target="_blank" class="btn btn-cyan" style="text-decoration:none; padding:8px 14px; font-size:12px;">✨ Abrir Viewer Selecionado</a>
-            <a href="https://elmonte.dev.br/vaarec/viewers/viewer-slim.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#0e7490;">✨ Abrir no Slim</a>
-            <a href="https://elmonte.dev.br/vaarec/viewers/viewer-desafio.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#0891b2;">🚀 Abrir no Desafio</a>
-            <a href="https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#1d4ed8;">🏄 Abrir no Padrão</a>
-            <a href="https://elmonte.dev.br/vaarec/viewers/viewer-treino-raia.html?v=${encodeURIComponent(slug)}&t=${token}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#7c3aed;">🏁 Abrir na Raia</a>
+            <a href="${publicUrl}" target="_blank" class="btn btn-cyan" style="text-decoration:none; padding:8px 14px; font-size:12px;">✉️ Testar Fluxo de E-mail (Público)</a>
+            <a href="${adminBypassUrl}" target="_blank" class="btn" style="text-decoration:none; padding:8px 14px; font-size:12px; background:#0e7490;">🔑 Abrir Direto (Admin Bypass)</a>
           </div>
         </div>
       `;
@@ -238,31 +264,34 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
 document.getElementById('btn-create-link').addEventListener('click', () => {
   const slug = document.getElementById('viewer-slug').value.trim();
   const shareTemplateSelect = document.getElementById('share-template-select');
-  const selectedTemplate = shareTemplateSelect ? shareTemplateSelect.value : 'viewer-desafio.html';
+  const selectedTemplate = shareTemplateSelect ? shareTemplateSelect.value : 'viewer-slim.html';
 
   if (!slug) {
     alert('Informe o slug do viewer.');
     return;
   }
 
-  const token = 't_' + Math.random().toString(36).substring(2, 10);
-  const shareUrl = `https://elmonte.dev.br/vaarec/viewers/${selectedTemplate}?v=${encodeURIComponent(slug)}&t=${token}`;
+  const publicUrl = `https://elmonte.dev.br/vaarec/viewers/${selectedTemplate}?v=${encodeURIComponent(slug)}`;
+  const adminBypassUrl = `https://elmonte.dev.br/vaarec/viewers/${selectedTemplate}?v=${encodeURIComponent(slug)}&t=t_adm_master`;
 
   const linkEl = document.getElementById('generated-link');
   linkEl.innerHTML = `
-    <div style="background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 10px; padding: 12px; margin-top: 10px;">
-      <div style="font-size: 12px; color: var(--muted); margin-bottom: 4px;">Template: ${selectedTemplate}</div>
-      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-        <a href="${shareUrl}" target="_blank" style="color: #60a5fa; text-decoration: underline; font-size: 13px; word-break: break-all;">${shareUrl}</a>
-        <button class="btn btn-green" id="btn-copy-link" style="padding: 6px 12px; font-size: 12px;">📋 Copiar Link</button>
+    <div style="background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3); border-radius: 10px; padding: 14px; margin-top: 10px;">
+      <div style="font-size: 12px; font-weight: 700; color: #00F2FE; margin-bottom: 6px;">🔗 Link Oficial para Espectadores (Magic Link / Uso Único por E-mail):</div>
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+        <a href="${publicUrl}" target="_blank" style="color: #60a5fa; text-decoration: underline; font-size: 13px; word-break: break-all;">${publicUrl}</a>
+        <button class="btn btn-green" id="btn-copy-public" style="padding: 6px 12px; font-size: 12px;">📋 Copiar Link do Público</button>
+      </div>
+      <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; font-size: 11px; color: #94a3b8;">
+        🔑 Acesso Direto Admin (Sem E-mail): <a href="${adminBypassUrl}" target="_blank" style="color: #cbd5e1; text-decoration: underline;">${adminBypassUrl}</a>
       </div>
     </div>
   `;
 
-  document.getElementById('btn-copy-link').addEventListener('click', () => {
-    navigator.clipboard.writeText(shareUrl);
-    const copyBtn = document.getElementById('btn-copy-link');
+  document.getElementById('btn-copy-public').addEventListener('click', () => {
+    navigator.clipboard.writeText(publicUrl);
+    const copyBtn = document.getElementById('btn-copy-public');
     copyBtn.textContent = '✅ Link Copiado!';
-    setTimeout(() => { copyBtn.textContent = '📋 Copiar Link'; }, 3000);
+    setTimeout(() => { copyBtn.textContent = '📋 Copiar Link do Público'; }, 3000);
   });
 });

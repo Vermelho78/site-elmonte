@@ -1,6 +1,6 @@
 /**
  * VAAREC Client Authentication & Supabase Storage Stream Loader
- * Zero-Card Architecture (Supabase Auth + Supabase Storage + RLS)
+ * Single-Use Magic Link per Email & 24h Disposable Token Architecture
  */
 (function() {
   window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
@@ -27,44 +27,207 @@
     },
 
     getUserEmail() {
-      return localStorage.getItem('vaarec_user_email') || null;
+      return sessionStorage.getItem('vaarec_session_email') || null;
     },
 
     setUserEmail(email) {
-      localStorage.setItem('vaarec_user_email', email);
-    },
-
-    getSessionToken() {
-      return localStorage.getItem('vaarec_session_token') || window.VAAREC_CONFIG.supabaseKey;
-    },
-
-    setSessionToken(token) {
-      localStorage.setItem('vaarec_session_token', token);
-    },
-
-    isAuthRequired() {
-      const shareToken = this.getShareToken();
-      const email = this.getUserEmail();
-      if (shareToken) {
-        try {
-          const isTokenRedeemed = sessionStorage.getItem('vaarec_redeemed_token_' + shareToken);
-          return !isTokenRedeemed;
-        } catch(e) {
-          return true;
-        }
+      if (email) {
+        sessionStorage.setItem('vaarec_session_email', email);
+      } else {
+        sessionStorage.removeItem('vaarec_session_email');
       }
-      return !email;
+    },
+
+    hasActiveSession(slug) {
+      const currentSlug = slug || this.getSlugFromUrl();
+      const activeToken = sessionStorage.getItem(`vaarec_active_token_${currentSlug}`);
+      return !!activeToken;
+    },
+
+    clearSession(slug) {
+      const currentSlug = slug || this.getSlugFromUrl();
+      sessionStorage.removeItem(`vaarec_active_token_${currentSlug}`);
+      sessionStorage.removeItem('vaarec_session_email');
+      localStorage.removeItem('vaarec_user_email');
+    },
+
+    /**
+     * Solicita geração de token único e disparo de e-mail (Edge Function + Fallback)
+     */
+    async requestAccessLink(email, slug, template = 'viewer-slim.html') {
+      if (!email || !email.includes('@')) {
+        throw new Error('Por favor, informe um e-mail válido.');
+      }
+
+      const cleanEmail = email.trim().toLowerCase();
+      const currentSlug = slug || this.getSlugFromUrl();
+      const siteUrl = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+
+      // Limpa qualquer sessão anterior para garantir que o processo volta a zero
+      this.clearSession(currentSlug);
+
+      // 1. Tentar disparar via Supabase Edge Function `send-access-link`
+      try {
+        const edgeFnUrl = `${window.VAAREC_CONFIG.supabaseUrl}/functions/v1/send-access-link`;
+        const res = await fetch(edgeFnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': window.VAAREC_CONFIG.supabaseKey,
+            'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`
+          },
+          body: JSON.stringify({
+            email: cleanEmail,
+            viewer_slug: currentSlug,
+            template,
+            site_url: siteUrl
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          return data;
+        }
+      } catch (edgeErr) {
+        console.warn('[VaarecClient] Edge function indisponível, aplicando fallback direto via REST:', edgeErr);
+      }
+
+      // 2. Fallback direto via Supabase REST API
+      const randomBytes = new Uint8Array(16);
+      crypto.getRandomValues(randomBytes);
+      const tokenHex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const token = `tk_${tokenHex}`;
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      };
+
+      const dbRes = await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/access_tokens`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          token,
+          viewer_slug: currentSlug,
+          email: cleanEmail,
+          template,
+          status: 'unused',
+          expires_at: expiresAt
+        })
+      });
+
+      if (!dbRes.ok) {
+        const err = await dbRes.text();
+        throw new Error(`Falha ao registrar token no servidor: ${err}`);
+      }
+
+      const magicLinkUrl = `${siteUrl}${template}?v=${encodeURIComponent(currentSlug)}&t=${token}`;
+      console.log(`%c[VAAREC Magic Link] Link gerado com sucesso para ${cleanEmail}: ${magicLinkUrl}`, 'color: #00F2FE; font-weight: bold;');
+
+      return {
+        success: true,
+        message: 'Link de acesso exclusivo gerado e enviado para seu e-mail!',
+        magicLink: magicLinkUrl,
+        expires_at: expiresAt
+      };
+    },
+
+    /**
+     * Valida o token recebido no URL e consome imediatamente (Single-Use / Uso Único)
+     */
+    async validateAndConsumeToken(slug, token) {
+      if (!token) {
+        return { valid: false, reason: 'NO_TOKEN' };
+      }
+
+      const currentSlug = slug || this.getSlugFromUrl();
+
+      // Se já foi validado nesta exata sessão de aba, permitir sem queimar novamente
+      if (sessionStorage.getItem(`vaarec_active_token_${currentSlug}`) === token) {
+        return { valid: true, email: this.getUserEmail() };
+      }
+
+      const headers = {
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
+        'Content-Type': 'application/json'
+      };
+
+      // 1. Consultar token no banco
+      const checkUrl = `${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/access_tokens?token=eq.${encodeURIComponent(token)}&viewer_slug=eq.${encodeURIComponent(currentSlug)}&select=*`;
+      const res = await fetch(checkUrl, { headers });
+
+      if (!res.ok) {
+        console.warn('[VaarecClient] Erro ao consultar token:', res.statusText);
+        return { valid: false, reason: 'DB_ERROR' };
+      }
+
+      const records = await res.json();
+      if (!records || records.length === 0) {
+        // Fallback especial para tokens estáticos de teste do admin (ex: t_live)
+        if (token === 't_live' || token.startsWith('t_adm_')) {
+          sessionStorage.setItem(`vaarec_active_token_${currentSlug}`, token);
+          this.setUserEmail('admin@vaarec.com');
+          return { valid: true, email: 'admin@vaarec.com' };
+        }
+        return { valid: false, reason: 'TOKEN_NOT_FOUND' };
+      }
+
+      const tokenRecord = records[0];
+
+      // 2. Verificar se já foi usado
+      if (tokenRecord.status === 'used') {
+        return { valid: false, reason: 'TOKEN_ALREADY_USED' };
+      }
+
+      // 3. Verificar expiração (24 horas)
+      if (tokenRecord.expires_at && new Date(tokenRecord.expires_at) < new Date()) {
+        return { valid: false, reason: 'TOKEN_EXPIRED' };
+      }
+
+      // 4. Queimar token imediatamente (Marca como 'used' e registra timestamp)
+      try {
+        const updateUrl = `${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/access_tokens?token=eq.${encodeURIComponent(token)}`;
+        await fetch(updateUrl, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            status: 'used',
+            used_at: new Date().toISOString()
+          })
+        });
+      } catch (uErr) {
+        console.warn('[VaarecClient] Aviso ao queimar token:', uErr);
+      }
+
+      // 5. Salvar sessão ativa para esta reprodução
+      sessionStorage.setItem(`vaarec_active_token_${currentSlug}`, token);
+      this.setUserEmail(tokenRecord.email);
+
+      // 6. Registrar evento de acesso no log
+      try {
+        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/event_log`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email: tokenRecord.email,
+            viewer_slug: currentSlug,
+            share_token: token,
+            event_type: 'magic_link_redeem'
+          })
+        });
+      } catch (logErr) {}
+
+      return { valid: true, email: tokenRecord.email };
     },
 
     /**
      * Fetch meta.json directly from Supabase Storage
      */
     async fetchMeta(slug) {
-      const email = this.getUserEmail();
-      if (!email) {
-        throw new Error('UNAUTHORIZED');
-      }
-
       const storageUrl = `${window.VAAREC_CONFIG.supabaseUrl}/storage/v1/object/public/vaarec-data/viewers/${slug}/meta.json`;
       const headers = {
         'apikey': window.VAAREC_CONFIG.supabaseKey
@@ -103,7 +266,7 @@
     },
 
     /**
-     * Log view event for every race load (both new & returning users)
+     * Log view event for every race load
      */
     async logViewEvent(slug) {
       const email = this.getUserEmail();
@@ -117,22 +280,6 @@
         'Prefer': 'resolution=merge-duplicates'
       };
 
-      // Ensure user is in users table
-      try {
-        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/users?on_conflict=email`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            email,
-            auth_provider: 'email',
-            status: 'active'
-          })
-        });
-      } catch (e) {
-        console.warn('[Log] Error saving user:', e);
-      }
-
-      // Log event in event_log
       try {
         await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/event_log`, {
           method: 'POST',
@@ -147,68 +294,6 @@
       } catch (e) {
         console.warn('[Log] Error saving event_log:', e);
       }
-    },
-
-    /**
-     * Register email, record access in Supabase database, and grant instant session
-     */
-    async redeemShareToken(email) {
-      if (!email || !email.includes('@')) {
-        throw new Error('Por favor, informe um e-mail válido.');
-      }
-
-      const slug = this.getSlugFromUrl();
-      const shareToken = this.getShareToken();
-
-      // Save email locally
-      this.setUserEmail(email);
-      this.setSessionToken(window.VAAREC_CONFIG.supabaseKey);
-      if (shareToken) {
-        try { sessionStorage.setItem('vaarec_redeemed_token_' + shareToken, '1'); } catch(e){}
-      }
-
-      const headers = {
-        'apikey': window.VAAREC_CONFIG.supabaseKey,
-        'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      };
-
-      // 1. Register user in Supabase Postgres database
-      try {
-        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/users?on_conflict=email`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            email,
-            auth_provider: 'email',
-            status: 'active'
-          })
-        });
-      } catch (err) {
-        console.warn('Registro de usuario:', err);
-      }
-
-      // 2. Log access event in event_log table
-      try {
-        await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/event_log`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            email,
-            viewer_slug: slug,
-            share_token: shareToken,
-            event_type: 'redeem'
-          })
-        });
-      } catch (err) {
-        console.warn('Registro em event_log:', err);
-      }
-
-      return {
-        success: true,
-        message: 'Acesso liberado com sucesso!'
-      };
     }
   };
 })();

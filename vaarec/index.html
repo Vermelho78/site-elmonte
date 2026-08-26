@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VAAREC — Fase 5: Inteligência, Replay Multi-GPS & Competitivo (CC1 - CE4)</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- Mapbox GL JS CSS & JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+
+  <!-- Leaflet CSS & JS (Fallback) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Turf.js para Cálculos Geoespaciais -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+  <!-- Chart.js para Gráficos de Telemetria -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Estilos Customizados com Cache-Busting -->
+  <link rel="stylesheet" href="./style.css?v=5.3" />
+  <style>
+    /* Critical Component Fallbacks para impedir cache obsoleto do navegador */
+    .sidebar { height: calc(100vh - 104px) !important; bottom: 20px !important; }
+    .stat-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+    .stat-card { background: rgba(30, 41, 59, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 8px !important; padding: 12px !important; display: flex !important; flex-direction: column !important; gap: 4px !important; }
+    .stat-label { font-size: 10px !important; color: #64748b !important; font-weight: 500 !important; text-transform: uppercase !important; }
+    .stat-value { font-size: 15px !important; font-weight: 700 !important; color: #f8fafc !important; font-family: 'JetBrains Mono', monospace !important; }
+    .btn-option { background: rgba(30, 41, 59, 0.7) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: #94a3b8 !important; padding: 8px 12px !important; border-radius: 8px !important; font-size: 12px !important; font-weight: 600 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; appearance: none !important; -webkit-appearance: none !important; }
+    .btn-option.active { background: rgba(0, 242, 254, 0.15) !important; color: #00f2fe !important; border-color: rgba(0, 242, 254, 0.5) !important; box-shadow: 0 0 12px rgba(0, 242, 254, 0.2) !important; }
+    .input-dark { background: rgba(15, 23, 42, 0.82) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: #00f2fe !important; font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; padding: 8px 12px !important; border-radius: 8px !important; outline: none !important; }
+    .bbox-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; font-size: 12px !important; }
+  </style>
+</head>
+<body class="dark-theme">
+
+  <!-- Top Header Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand">
+        <i class="fa-solid fa-water brand-icon"></i>
+        <div class="brand-text">
+          <h1>VAAREC</h1>
+          <p class="subtitle">Análise Náutica & Esportiva • Florianópolis / Jurerê</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="coord-pill" id="ref-coords-pill" title="Coordenadas de Referência">
+        <i class="fa-solid fa-location-dot"></i>
+        <span>-27.426247, -48.481372</span>
+        <span class="location-name">Jurerê / Canasvieiras</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="lod-badge" id="lod-badge">
+        <i class="fa-solid fa-layer-group"></i>
+        <span id="lod-level-text">LOD 2: Circuito</span>
+      </div>
+      <input type="file" id="input-import-json" accept=".json" style="display:none;" />
+      <button class="btn btn-secondary" id="btn-import-json" title="Importar Contrato JSON">
+        <i class="fa-solid fa-upload"></i> Importar Contrato
+      </button>
+      <button class="btn btn-primary" id="btn-export-all" title="Exportar Pacote Completo (JSON + Viewers Padrão, Desafio e Raia com um único clique)" style="background:linear-gradient(135deg, #10B981, #059669); border-color:#10B981; color:#fff; font-weight:700; display:inline-flex; align-items:center; gap:6px; box-shadow:0 0 14px rgba(16,185,129,0.3);">
+        <i class="fa-solid fa-box-archive"></i> Exportar Tudo
+      </button>
+      <button class="btn btn-primary" id="btn-export-json" title="Exportar Contrato JSON e Viewer Regata">
+        <i class="fa-solid fa-download"></i> Exportar Contrato
+      </button>
+      <button class="btn btn-accent" id="btn-export-slim" title="Exportar viewer Slim (Minimalista, Fullscreen & Timeline Vertical)" style="background:linear-gradient(135deg,rgba(0,242,254,0.18),rgba(0,242,254,0.06));border-color:rgba(0,242,254,0.4);color:#00F2FE;">
+        <i class="fa-solid fa-expand"></i> Gerar Slim
+      </button>
+      <button class="btn btn-accent" id="btn-export-desafio" title="Exportar viewer de Desafio (duelo entre dois atletas)" style="background:linear-gradient(135deg,rgba(212,160,23,0.15),rgba(212,160,23,0.08));border-color:rgba(212,160,23,0.4);color:#D4A017;">
+        <i class="fa-solid fa-trophy"></i> Gerar Desafio
+      </button>
+      <button class="btn btn-accent" id="btn-export-raia" title="Exportar viewer de Treino em Raia (análise de séries)" style="background:linear-gradient(135deg,rgba(34,211,238,0.12),rgba(34,211,238,0.05));border-color:rgba(34,211,238,0.35);color:#22D3EE;">
+        <i class="fa-solid fa-chart-line"></i> Gerar Raia
+      </button>
+      <a href="/gpx-studio.html" class="btn btn-primary" title="Abrir VAAREC GPX Skills Studio (Decupagem, Trimming e Composição)" style="background:linear-gradient(135deg,rgba(0,242,254,0.2),rgba(139,92,246,0.2)); border-color:#00F2FE; color:#fff; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <i class="fa-solid fa-sliders"></i> GPX Studio
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="workspace">
+
+    <!-- Primary Interactive Map Canvas (CC1) -->
+    <div id="map" class="main-map"></div>
+
+    <!-- Floating Control Panel (Left Sidebar) -->
+    <aside class="sidebar glass-panel">
+
+      <!-- Tabs Navigation Wrapper with Arrows & Wheel Scroll -->
+      <div class="panel-tabs-wrapper">
+        <button class="tabs-nav-btn tabs-nav-prev" id="btn-tabs-prev" title="Rolar Abas para Esquerda">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        
+        <div class="panel-tabs" id="panel-tabs-scroll">
+          <button class="tab-btn active" data-tab="tab-ce2"><i class="fa-solid fa-file-waveform"></i> Ingestão & Telemetria</button>
+          <button class="tab-btn" data-tab="tab-cc1"><i class="fa-solid fa-map"></i> Mapa Base</button>
+          <button class="tab-btn" data-tab="tab-cc3"><i class="fa-solid fa-flag-checkered"></i> Geometria de Raia</button>
+          <button class="tab-btn" data-tab="tab-cc2"><i class="fa-solid fa-cloud-sun-rain"></i> Clima & Maré</button>
+          <button class="tab-btn" data-tab="tab-cc4"><i class="fa-solid fa-route"></i> Circuito & Boias</button>
+          <button class="tab-btn" data-tab="tab-ce3"><i class="fa-solid fa-crosshairs"></i> Detecção Eventos</button>
+          <button class="tab-btn" data-tab="tab-ce4"><i class="fa-solid fa-play"></i> Replay & Dashboard</button>
+        </div>
+
+        <button class="tabs-nav-btn tabs-nav-next" id="btn-tabs-next" title="Rolar Abas para Direita">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+
+      <!-- Tab Content: CE2 Ingestão & Telemetria -->
+      <div class="tab-content active" id="tab-ce2">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-file-waveform"></i> Ingestão &amp; Telemetria</h3>
+          <span class="info-tag pulse">Multi-Canoa</span>
+        </div>
+
+        <!-- 1. IDENTIFICAÇÃO DA PROVA (TEMPLATES) -->
+        <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--bg-panel-border); padding: 10px 12px; border-radius: var(--radius-md); margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+            <i class="fa-solid fa-trophy" style="color: var(--accent-cyan); font-size: 11px;"></i>
+            <strong style="font-size: 11px; color: #f8fafc; text-transform: uppercase; letter-spacing: 0.5px;">Identificação da Prova / Regata</strong>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div>
+              <label style="font-size: 9px; color: var(--text-secondary); display: block; margin-bottom: 2px;">Nome da Prova</label>
+              <input type="text" id="input-race-title" class="input-dark" placeholder="Ex: Desafio V1 Zimbros 2026" style="width: 100%; font-weight: 700; font-size: 12px; color: #00F2FE; padding: 5px 8px;" />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <div>
+                <label style="font-size: 9px; color: var(--text-secondary); display: block; margin-bottom: 2px;">Local / Raia</label>
+                <input type="text" id="input-race-location" class="input-dark" placeholder="Ex: Zimbros / SC" style="width: 100%; font-size: 10px; padding: 4px 6px;" />
+              </div>
+              <div>
+                <label style="font-size: 9px; color: var(--text-secondary); display: block; margin-bottom: 2px;">Categoria / Modalidade</label>
+                <input type="text" id="input-race-category" class="input-dark" placeholder="Ex: V1 Masculino Master" style="width: 100%; font-size: 10px; padding: 4px 6px;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. UPLOAD DE GPS / CONTRATO -->
+        <div class="control-group" style="background: linear-gradient(135deg, rgba(6,182,212,0.12) 0%, rgba(15,23,42,0.8) 100%); border: 1px solid var(--accent-cyan); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+          <label style="font-weight: 700; font-size: 12px; color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 16px;"></i> CARREGAR TRILHAS (GPX / JSON / TXT / FIT)
+          </label>
+          <p style="font-size: 10px; color: var(--text-secondary); margin-top: 3px; margin-bottom: 6px;">Trilhas já tratadas e sincronizadas pelo GPX Studio são mantidas em seu estado integral.</p>
+          <input type="file" id="input-upload-file" accept=".gpx,.json,.txt,.fit" multiple class="input-dark" style="margin-top: 2px; width: 100%; cursor: pointer;" />
+
+          <div style="display: flex; gap: 6px; justify-content: center; margin-top: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" id="btn-load-demo-zimbros" style="font-size: 10px; padding: 4px 8px; border-color: rgba(0, 242, 254, 0.4); color: #00F2FE;" title="Carregar 7 Canoas reais de V1 Zimbros">
+              <i class="fa-solid fa-flag-checkered"></i> Demo V1 Zimbros (7 Canoas)
+            </button>
+            <button class="btn btn-secondary" id="btn-load-studio-contract" style="font-size: 10px; padding: 4px 8px; border-color: rgba(139, 92, 246, 0.4); color: #c084fc;" title="Carregar Contrato GPX Studio com 5 Canoas">
+              <i class="fa-solid fa-layer-group"></i> Studio (5 Canoas)
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. SUB-ABAS POR CANOA -->
+        <div id="ce2-tracks-subtabs-container" style="display: none; margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary);"><i class="fa-solid fa-ship"></i> Embarcações Carregadas</span>
+            <span id="loaded-tracks-count" style="font-size: 10px; font-weight: 700; color: var(--accent-cyan); font-family: var(--font-mono);">0 canoas</span>
+          </div>
+          <div id="ce2-tracks-subtabs" style="display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; border-bottom: 1px solid var(--bg-panel-border);">
+            <!-- Sub-abas geradas dinamicamente via JS com cor + nome -->
+          </div>
+        </div>
+
+        <!-- 4. PAINEL DA CANOA ATIVA (CARD DE DETALHES) -->
+        <div id="ce2-track-detail-panel" style="margin-top: 10px; display: none; flex-direction: column; gap: 10px; background: rgba(15,23,42,0.7); border: 1px solid var(--bg-panel-border); padding: 12px; border-radius: var(--radius-sm);">
+
+          <!-- Cabecalho: nome + cor + remover -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="track-color-indicator" style="width: 12px; height: 12px; border-radius: 50%; background: #00f2fe; display: inline-block;"></span>
+              <strong id="track-detail-name" style="font-size: 12px; color: var(--text-primary);">--</strong>
+            </div>
+            <button class="btn btn-danger" id="btn-remove-active-track" style="font-size: 9px; padding: 2px 6px;" title="Remover Canoa">
+              <i class="fa-solid fa-trash"></i> Remover
+            </button>
+          </div>
+
+          <!-- Nome + Extensao -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label style="font-size: 9px; color: var(--text-secondary);">Nome da Canoa / Atleta</label>
+              <input type="text" id="input-track-custom-name" class="input-dark" style="font-size: 11px; padding: 4px;" />
+            </div>
+            <div>
+              <label style="font-size: 9px; color: var(--text-secondary);">Extensão da Trilha</label>
+              <div id="label-raw-total-meters" style="font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--accent-cyan); margin-top: 4px;">0 m</div>
+            </div>
+          </div>
+
+          <!-- RESUMO DA CANOA ATIVA -->
+          <div id="valid-points-summary" style="display: flex; flex-direction: column; gap: 4px; font-size: 10px; font-family: var(--font-mono); background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--color-start);"><i class="fa-solid fa-play"></i> Horário Início:</span>
+              <strong id="start-point-time" style="color: var(--text-primary);">--:--:--</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--color-end);"><i class="fa-solid fa-flag-checkered"></i> Horário Chegada:</span>
+              <strong id="finish-point-time" style="color: var(--text-primary);">--:--:--</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);"><i class="fa-solid fa-ruler-horizontal"></i> Distância Percorrida:</span>
+              <strong id="active-track-dist" style="color: var(--accent-cyan);">0.0 km</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. STATS -->
+        <div class="stat-grid" style="margin-top: 10px;">
+          <div class="stat-card">
+            <span class="stat-label">Distância Total</span>
+            <span class="stat-value highlight-accent" id="stat-gps-dist">0.0 km</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Vel. Média</span>
+            <span class="stat-value" id="stat-gps-speed">0.0 km/h</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Duração</span>
+            <span class="stat-value" id="stat-gps-time">0h 0m 0s</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">BPM / Cadência Med.</span>
+            <span class="stat-value" id="stat-gps-hr-cad">-- BPM / -- SPM</span>
+          </div>
+        </div>
+
+        <!-- 6. GRAFICO DE TELEMETRIA -->
+        <div class="chart-container">
+          <h4><i class="fa-solid fa-chart-line"></i> Gráfico de Telemetria (Velocidade &amp; Batimento)</h4>
+          <div class="chart-wrapper">
+            <canvas id="canvas-telemetry"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: CC1 Mapa & LOD -->
+      <div class="tab-content" id="tab-cc1">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-sliders"></i> Camada CC1 — Parâmetros do Mapa</h3>
+          <span class="info-tag">Raio 5km</span>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">Zoom do Mapa</span>
+            <span class="stat-value" id="stat-zoom">12.5</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Escala Calculada</span>
+            <span class="stat-value" id="stat-scale">1: 45,000</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Raio Bounding Box</span>
+            <span class="stat-value" id="stat-bbox-radius">5.0 km</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Motor Ativo</span>
+            <span class="stat-value highlight-accent" id="stat-engine">Mapbox GL</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Ajustar Raio Bounding Box (km)</label>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="range" id="slider-bbox" min="1" max="20" step="0.5" value="5.0" class="slider-dark" />
+            <span id="bbox-value" style="font-size:12px; font-weight:700; font-family:var(--font-mono); color:var(--accent-cyan);">5.0 km</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Estilo do Mapa (Mapbox Custom Tiles)</label>
+          <div class="btn-group-grid">
+            <button class="btn-option active" data-style="dark">
+              <i class="fa-solid fa-moon"></i> Escuro
+            </button>
+            <button class="btn-option" data-style="satellite">
+              <i class="fa-solid fa-satellite"></i> Satélite
+            </button>
+            <button class="btn-option" data-style="streets">
+              <i class="fa-solid fa-road"></i> Ruas
+            </button>
+            <button class="btn-option" data-style="outdoors">
+              <i class="fa-solid fa-mountain"></i> Relevo
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Ações do Recorte 20km</label>
+          <div class="btn-stack">
+            <button class="btn btn-secondary" id="btn-recenter">
+              <i class="fa-solid fa-crosshairs"></i> Recentralizar em Jurerê
+            </button>
+            <button class="btn btn-secondary" id="btn-toggle-circle">
+              <i class="fa-solid fa-circle-notch"></i> Alternar Círculo 20km
+            </button>
+          </div>
+        </div>
+
+        <div class="bbox-info">
+          <h4><i class="fa-solid fa-vector-square"></i> Bounding Box Geográfico (CC1)</h4>
+          <div class="bbox-grid">
+            <div><span>Norte:</span> <strong id="bbox-n">-27.2462</strong></div>
+            <div><span>Sul:</span> <strong id="bbox-s">-27.6062</strong></div>
+            <div><span>Leste:</span> <strong id="bbox-e">-48.2814</strong></div>
+            <div><span>Oeste:</span> <strong id="bbox-w">-48.6814</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: CC3 Geometria de Raia (Largada e Chegada) -->
+      <div class="tab-content" id="tab-cc3">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-flag-checkered"></i> Geometria de Raia — Largada & Chegada</h3>
+          <span class="info-tag">Referência Visual & Raia</span>
+        </div>
+
+        <div class="drawing-tools">
+          <p class="tool-instruction">
+            Defina as linhas de Largada e Chegada para o traçado do percurso e indicadores do Replay (não cortam as trilhas):
+          </p>
+          <div class="tool-buttons">
+            <button class="btn-tool btn-start-line" id="btn-mode-start">
+              <i class="fa-solid fa-play"></i> Desenhando Largada (A1 ➔ A2)
+            </button>
+            <button class="btn-tool btn-end-line" id="btn-mode-end">
+              <i class="fa-solid fa-flag-checkered"></i> Desenhando Chegada (B1 ➔ B2)
+            </button>
+          </div>
+        </div>
+
+        <div class="line-card start-line-card" id="card-start-line">
+          <div class="card-header">
+            <h4><i class="fa-solid fa-circle-play text-green"></i> Linha de Largada</h4>
+            <span class="status-badge" id="start-status">Não Definida</span>
+          </div>
+          <div class="line-metrics">
+            <div><span>Ponto A1:</span> <code id="start-p1">--</code></div>
+            <div><span>Ponto A2:</span> <code id="start-p2">--</code></div>
+            <div><span>Extensão:</span> <strong id="start-len">0.0 m</strong></div>
+            <div><span>Vetor / Bearing:</span> <strong id="start-bearing">0° (Norte)</strong></div>
+          </div>
+        </div>
+
+        <div class="line-card end-line-card" id="card-end-line">
+          <div class="card-header">
+            <h4><i class="fa-solid fa-flag-checkered text-red"></i> Linha de Chegada</h4>
+            <span class="status-badge" id="end-status">Não Definida</span>
+          </div>
+          <div class="line-metrics">
+            <div><span>Ponto B1:</span> <code id="end-p1">--</code></div>
+            <div><span>Ponto B2:</span> <code id="end-p2">--</code></div>
+            <div><span>Extensão:</span> <strong id="end-len">0.0 m</strong></div>
+            <div><span>Vetor / Bearing:</span> <strong id="end-bearing">0° (Norte)</strong></div>
+          </div>
+        </div>
+
+        <div class="preset-actions">
+          <button class="btn btn-accent" id="btn-load-preset">
+            <i class="fa-solid fa-bolt"></i> Carregar Percurso Exemplo Jurerê
+          </button>
+          <button class="btn btn-danger" id="btn-clear-lines">
+            <i class="fa-solid fa-trash"></i> Limpar Linhas
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content: CC2 Clima, Maré e Corrente -->
+      <div class="tab-content" id="tab-cc2">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-cloud-sun-rain"></i> Camada CC2 — Clima & Maré</h3>
+          <span class="info-tag" id="weather-source-tag">LIVE_API</span>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">Vento (Nó)</span>
+            <span class="stat-value highlight-accent" id="stat-wind-speed">12.0 Kts</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Direção Vento</span>
+            <span class="stat-value" id="stat-wind-dir">45° (NE)</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Altura Maré</span>
+            <span class="stat-value" id="stat-tide">0.8m (Enchente)</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Corrente Marítima</span>
+            <span class="stat-value" id="stat-current">1.5 Kts (S)</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <button class="btn btn-secondary btn-full" id="btn-fetch-weather">
+            <i class="fa-solid fa-arrows-rotate"></i> Atualizar Clima Live (Jurerê)
+          </button>
+        </div>
+
+        <div class="table-container">
+          <h4><i class="fa-solid fa-table"></i> Condições por Segmento (Km x Km)</h4>
+          <table class="weather-table">
+            <thead>
+              <tr>
+                <th>Km</th>
+                <th>Vento (Kts)</th>
+                <th>Dir. Vento</th>
+                <th>Maré (m)</th>
+                <th>Vetor Relativo</th>
+              </tr>
+            </thead>
+            <tbody id="weather-km-tbody">
+              <!-- Preenchido via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content: CC4 Percurso, Boias e Discretização -->
+      <div class="tab-content" id="tab-cc4">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-route"></i> Camada CC4 — Circuito & Boias</h3>
+          <span class="info-tag">Configuração da Prova</span>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">Percurso Total</span>
+            <span class="stat-value highlight-accent" id="stat-course-dist">0.0 km</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Tempo Máx. DNF</span>
+            <span class="stat-value" id="stat-course-time">0h 0min</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Boias no Circuito</span>
+            <span class="stat-value" id="stat-buoy-count">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Nº de Voltas</span>
+            <span class="stat-value" id="stat-lap-count">1</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="input-inline-grid">
+            <div>
+              <label>Nº de Voltas</label>
+              <input type="number" id="input-laps" min="1" max="10" value="1" class="input-dark" />
+            </div>
+            <div>
+              <label>Vel. Mínima (Knots)</label>
+              <input type="number" id="input-min-speed" min="1.0" max="15.0" step="0.5" value="4.0" class="input-dark" />
+            </div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <button class="btn btn-secondary btn-full" id="btn-add-buoy">
+            <i class="fa-solid fa-location-crosshairs"></i> Adicionar Boia (Clique no Mapa)
+          </button>
+        </div>
+
+        <div class="buoy-list-container">
+          <h4><i class="fa-solid fa-layer-group"></i> Boias do Circuito</h4>
+          <div id="buoy-list" class="buoy-list-stack"></div>
+        </div>
+      </div>
+
+      <!-- Tab Content: CE3 Cruzamento & Eventos Notáveis -->
+      <div class="tab-content" id="tab-ce3">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-crosshairs"></i> Camada CE3 — Eventos Notáveis</h3>
+          <span class="info-tag pulse">Inteligência Semântica</span>
+        </div>
+
+        <!-- CARREGAR EVENTOS DO GPX STUDIO (JSON) -->
+        <div style="margin-bottom: 12px; padding: 10px 12px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: var(--radius-md);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <label style="font-size: 11px; font-weight: 700; color: #F59E0B; margin: 0; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-bolt"></i> Carregar Eventos do GPX Studio
+            </label>
+            <span style="font-size: 9px; font-weight: 700; color: #F59E0B; background: rgba(245,158,11,0.15); padding: 1px 6px; border-radius: 3px;">JSON</span>
+          </div>
+          <p style="font-size: 10px; color: var(--text-secondary); margin: 0 0 8px 0;">
+            Importe o arquivo <code>eventos-vaarec-*.json</code> gerado no GPX Studio com sprints, ataques e boias detectadas.
+          </p>
+          <input type="file" id="input-import-events-json" accept=".json" style="display:none;" />
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-primary" id="btn-import-events-json" style="flex: 1; font-size: 11px; padding: 6px 12px; background: linear-gradient(135deg, #F59E0B, #D97706); border-color: #F59E0B; color: #000; font-weight: 700;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Carregar Arquivo de Eventos (JSON)
+            </button>
+            <button class="btn btn-secondary" id="btn-load-demo-events" style="font-size: 11px; padding: 6px 10px;" title="Carregar eventos de exemplo (eventos-vaarec-Jean-01.json)">
+              <i class="fa-solid fa-file-lines"></i> Demo Jean
+            </button>
+          </div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">Aderência ao Percurso</span>
+            <span class="stat-value highlight-accent" id="stat-adherence">95.4%</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Desvio Médio</span>
+            <span class="stat-value" id="stat-deviation">12.8 m</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Eventos Detectados</span>
+            <span class="stat-value" id="stat-event-count">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Confiança Média</span>
+            <span class="stat-value" id="stat-avg-confidence">94%</span>
+          </div>
+        </div>
+
+        <div class="events-feed-container" style="margin-bottom: 12px;">
+          <h4><i class="fa-solid fa-plus-circle"></i> Criar / Marcar Evento Manual no Mapa</h4>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
+            Clique no botão abaixo e em seguida clique no mapa para posicionar o evento manual.
+          </p>
+
+          <div class="control-group" style="margin-bottom: 8px;">
+            <button class="btn btn-secondary btn-full" id="btn-mode-add-event">
+              <i class="fa-solid fa-location-crosshairs"></i> <span id="lbl-mode-add-event">Marcar Localização do Evento no Mapa</span>
+            </button>
+          </div>
+
+          <div class="input-inline-grid" style="margin-bottom: 8px;">
+            <div>
+              <label style="font-size: 10px; color: var(--text-muted);">TIPO DE EVENTO</label>
+              <select id="select-event-type" class="input-dark" style="padding: 6px 8px;">
+                <option value="BUOY_COLLISION">🔵 Contorno / Incidente em Boia</option>
+                <option value="SPRINT">⚡ Sprint / Aceleração</option>
+                <option value="ABRUPT_TURN">🔄 Guinada / Curva Abrupta</option>
+                <option value="STOP">🚨 Parada / Incidente</option>
+                <option value="PENALTY">⚠️ Penalidade / Cartão</option>
+                <option value="CUSTOM">📌 Outro Evento Notável</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 10px; color: var(--text-muted);">COORDENADAS (LAT, LNG)</label>
+              <input type="text" id="input-event-coords" class="input-dark" placeholder="Clique no mapa..." readonly />
+            </div>
+          </div>
+
+          <div class="control-group" style="margin-bottom: 8px;">
+            <label style="font-size: 10px; color: var(--text-muted);">DESCRIÇÃO / OBSERVAÇÃO DO EVENTO</label>
+            <input type="text" id="input-event-desc" class="input-dark" placeholder="Ex: Incidente de ultrapassagem perto da boia 2" />
+          </div>
+
+          <button class="btn btn-accent btn-full" id="btn-save-custom-event">
+            <i class="fa-solid fa-floppy-disk"></i> Registrar Evento Notável
+          </button>
+        </div>
+
+        <div class="events-feed-container">
+          <h4><i class="fa-solid fa-bell"></i> Feed de Eventos Notáveis da Prova</h4>
+          <div id="events-feed-list" class="events-feed-stack"></div>
+        </div>
+      </div>
+
+      <!-- Tab Content: CE4 Apresentação & Replay 2D Multi-GPS Competitivo -->
+      <div class="tab-content" id="tab-ce4">
+        <div class="section-title">
+          <h3><i class="fa-solid fa-play"></i> Camada CE4 — Replay Multi-GPS</h3>
+          <span class="info-tag pulse">Simultâneo</span>
+        </div>
+
+        <!-- Banner de Líder da Prova & Gap -->
+        <div id="replay-leader-banner" class="leader-banner-container">
+          <div class="leader-pill">
+            <span class="crown">🥇 LÍDER:</span>
+            <strong>Calculando...</strong>
+            <span class="gap-pill">Gap: 0.0 m</span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Linha do Tempo Simultânea (Scrubber)</label>
+          <input type="range" id="input-replay-slider" min="0" max="100" value="0" class="input-slider" />
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:4px;">
+            <span>Tempo Decorrido: <strong id="replay-time-display" style="color:var(--accent-neon)">00:00:00</strong></span>
+            <span>Modo: <strong style="color:var(--color-start)">Simultâneo Multi-Canoa</strong></span>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="btn-group-grid">
+            <button class="btn btn-primary" id="btn-replay-play">
+              <i class="fa-solid fa-play"></i> Reproduzir
+            </button>
+            <button class="btn btn-secondary" id="btn-replay-reset">
+              <i class="fa-solid fa-rotate-left"></i> Reiniciar
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Velocidade de Reprodução</label>
+          <div class="btn-group-grid">
+            <button class="btn-option btn-speed" data-speed="1">1x</button>
+            <button class="btn-option btn-speed active" data-speed="2">2x</button>
+            <button class="btn-option btn-speed" data-speed="5">5x</button>
+            <button class="btn-option btn-speed" data-speed="10">10x</button>
+          </div>
+        </div>
+
+        <!-- Telemetria Instantânea das Canoas em Competição -->
+        <div class="control-group">
+          <label><i class="fa-solid fa-stopwatch"></i> Telemetria Instantânea das Canoas</label>
+          <div id="replay-multi-boat-cards" class="multi-boat-stack">
+            <!-- Cards de telemetria inseridos dinamicamente -->
+          </div>
+        </div>
+
+        <!-- Tabela Comparativa de Splits Discretizados km a km -->
+        <div class="splits-table-container">
+          <h4><i class="fa-solid fa-table-columns"></i> Splits Discretizados km a km (Comparativo)</h4>
+          <table class="weather-table" id="splits-km-table">
+            <thead>
+              <tr>
+                <th>km</th>
+                <th>Canoa 1: Natureza</th>
+                <th>Canoa 2: Salva'a</th>
+              </tr>
+            </thead>
+            <tbody id="splits-km-tbody">
+              <tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Aguardando dados de telemetria...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Bottom Right Panel: Contract Inspector -->
+    <div class="json-inspector-panel glass-panel collapsible" id="json-panel">
+      <div class="panel-header" id="json-header">
+        <div class="header-title">
+          <i class="fa-solid fa-code"></i>
+          <span>Contrato Completo VAAREC — <code>VAAREC Master State</code></span>
+        </div>
+        <div class="header-actions">
+          <button class="btn-icon" id="btn-copy-json" title="Copiar JSON"><i class="fa-solid fa-copy"></i></button>
+          <button class="btn-icon" id="btn-toggle-json" title="Minimizar/Expandir"><i class="fa-solid fa-chevron-down"></i></button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <pre><code id="json-output">// Aguardando inicialização do contrato...</code></pre>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Main JavaScript Application Module -->
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>
