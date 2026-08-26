@@ -1903,11 +1903,13 @@
     .slim-cam-item.active { background: rgba(0,242,254,0.2); color: var(--accent); }
     .slim-cam-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 0; }
 
-    /* Focused Canoe Floating Card (Right, below elapsed time) */
+    /* Focused Canoe Floating Card (Right, below elapsed time - Não esmaece quando ativo) */
     #slim-focused-canoe-card {
+      position: absolute;
       top: 60px;
       right: 16px;
       left: auto;
+      z-index: 1000;
       background: var(--bg-glass);
       border: 1px solid var(--border-glass);
       backdrop-filter: blur(16px);
@@ -1917,6 +1919,11 @@
       box-shadow: 0 12px 36px rgba(0,0,0,0.7), 0 0 20px rgba(0,242,254,0.1);
       pointer-events: auto;
       transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    body.idle #slim-focused-canoe-card {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      transform: none !important;
     }
     .focused-card-header {
       display: flex;
@@ -2106,8 +2113,8 @@
     </div>
   </div>
 
-  <!-- Focused Canoe Floating Card (Top-Left) (Req 8) -->
-  <div id="slim-focused-canoe-card" class="slim-overlay-control" style="display:none;">
+  <!-- Focused Canoe Floating Card (Top-Right) (Req 8) -->
+  <div id="slim-focused-canoe-card" style="display:none;">
     <div class="focused-card-header">
       <div class="focused-card-name" id="fc-canoe-name">--</div>
       <div class="focused-card-rank" id="fc-canoe-rank">1º LUGAR</div>
