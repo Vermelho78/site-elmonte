@@ -1961,6 +1961,120 @@
     .focused-stat-lbl { font-size: 0.65rem; color: var(--text-sec); text-transform: uppercase; font-weight: 600; }
     .focused-stat-val { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: var(--accent); }
 
+    /* Overview Leaderboard Card (Visão Geral - Classificação em Tempo Real) */
+    #slim-overview-leaderboard-card {
+      position: fixed;
+      top: 56px;
+      right: 16px;
+      width: 290px;
+      max-height: calc(100vh - 140px);
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      z-index: 1000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      transition: opacity 0.3s ease;
+      display: none;
+    }
+    body.idle #slim-overview-leaderboard-card {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      transform: none !important;
+    }
+    .overview-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .overview-card-title {
+      font-family: var(--font-title);
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+    }
+    .overview-card-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0,242,254,0.12);
+      border: 1px solid rgba(0,242,254,0.3);
+      color: var(--accent);
+    }
+    .overview-leaderboard-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+    }
+    .overview-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 6px;
+      font-size: 0.78rem;
+    }
+    .overview-row.leader {
+      background: rgba(245,158,11,0.08);
+      border-color: rgba(245,158,11,0.3);
+    }
+    .overview-row-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .overview-pos-badge {
+      font-family: var(--font-title);
+      font-size: 0.75rem;
+      font-weight: 800;
+      min-width: 20px;
+      text-align: center;
+      color: #fff;
+    }
+    .overview-name {
+      font-family: var(--font-title);
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 105px;
+    }
+    .overview-row-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+    }
+    .overview-gap {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .overview-spd {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-sec);
+    }
+
     /* Simplified Marker Tooltip (Req 6 - Name & Avg Speed only, no emoji, no hr) */
     .slim-marker-tip {
       background: rgba(8, 14, 24, 0.88);
@@ -2187,6 +2301,17 @@
         <span class="focused-stat-lbl">Gap Líder</span>
         <span class="focused-stat-val" id="fc-stat-gap">--</span>
       </div>
+    </div>
+  </div>
+
+  <!-- Overview Leaderboard Floating Card (Visão Geral - Classificação em Tempo Real) -->
+  <div id="slim-overview-leaderboard-card" style="display:none;">
+    <div class="overview-card-header">
+      <div class="overview-card-title">🌐 Classificação</div>
+      <div class="overview-card-badge">AO VIVO</div>
+    </div>
+    <div class="overview-leaderboard-list" id="overview-leaderboard-list">
+      <!-- Dynamic Rows -->
     </div>
   </div>
 
@@ -2886,14 +3011,51 @@ function selectCameraMode(mode, canoeIdx) {
   if (popover) popover.classList.remove('show');
 }
 
-// Focused Canoe Card (Req 8 - Right Side below Elapsed Time)
+// Focused Canoe Card (Req 8) & Overview Leaderboard Card (Req 1 & 2)
 function updateFocusedCanoeCard(sortedAthletes) {
-  const card = document.getElementById('slim-focused-canoe-card');
-  if (!card) return;
+  const focusedCard = document.getElementById('slim-focused-canoe-card');
+  const overviewCard = document.getElementById('slim-overview-leaderboard-card');
 
+  // 1. Visão Geral (Camera 'all') -> Apresentar Card com a Classificação Atual
+  if (activeCameraMode === 'all') {
+    if (focusedCard) focusedCard.style.display = 'none';
+    if (overviewCard) {
+      overviewCard.style.display = 'block';
+      const listContainer = document.getElementById('overview-leaderboard-list');
+      if (listContainer) {
+        const leader = sortedAthletes[0];
+        listContainer.innerHTML = sortedAthletes.map((ath, r) => {
+          const gapM = leader ? Math.round(leader.projectedProgressM - ath.projectedProgressM) : 0;
+          const gapText = r === 0 ? '🏆 Líder' : `+${gapM}m`;
+          const posBadge = r === 0 ? '🥇' : (r === 1 ? '🥈' : (r === 2 ? '🥉' : `${r + 1}º`));
+          const isLeader = r === 0 ? 'leader' : '';
+          return `
+            <div class="overview-row ${isLeader}">
+              <div class="overview-row-left">
+                <span class="overview-pos-badge">${posBadge}</span>
+                <span style="width:8px; height:8px; border-radius:50%; background:${ath.color}; flex-shrink:0;"></span>
+                <span class="overview-name" title="${ath.name}">${ath.name}</span>
+              </div>
+              <div class="overview-row-right">
+                <span class="overview-gap">${gapText}</span>
+                <span class="overview-spd">${(ath.avgSpeedKmh || 0).toFixed(1)} km/h · ${(ath.projectedProgressM / 1000).toFixed(2)}km</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+    return;
+  } else {
+    if (overviewCard) overviewCard.style.display = 'none';
+  }
+
+  // 2. Foco no Líder, Canoa Específica ou Auto Direct
   let targetAth = null;
   if (activeCameraMode === 'canoe' && activeCanoeFocusIdx != null && athletes[activeCanoeFocusIdx]) {
     targetAth = athletes[activeCanoeFocusIdx];
+  } else if (activeCameraMode === 'leader') {
+    targetAth = sortedAthletes[0]; // Apresentar card da canoa líder
   } else if (activeCameraMode === 'auto' && droneCamera && droneCamera._autoDirector) {
     const phase = droneCamera._autoDirector.phase;
     if ((phase === 'CANOE_CHASE' || phase === 'CANOE_FRONT' || phase === 'OVERTAKE_DUEL') && droneCamera._autoDirector.targetCanoeIdx != null) {
@@ -2901,20 +3063,20 @@ function updateFocusedCanoeCard(sortedAthletes) {
     }
   }
 
-  if (targetAth) {
-    card.style.display = 'block';
+  if (targetAth && focusedCard) {
+    focusedCard.style.display = 'block';
     const leader = sortedAthletes[0];
     const gapM = leader ? Math.round(leader.projectedProgressM - targetAth.projectedProgressM) : 0;
     const gapText = gapM <= 5 ? '🏆 Líder' : `+${gapM}m`;
 
     document.getElementById('fc-canoe-name').innerHTML = `<span style="width:10px; height:10px; border-radius:50%; background:${targetAth.color}; display:inline-block;"></span> ${targetAth.name}`;
     document.getElementById('fc-canoe-rank').textContent = `${targetAth.rank}º LUGAR`;
-    document.getElementById('fc-stat-cur-spd').textContent = `${targetAth.curPt.spdKmh.toFixed(1)} km/h`;
-    document.getElementById('fc-stat-avg-spd').textContent = `${targetAth.avgSpeedKmh.toFixed(1)} km/h`;
+    document.getElementById('fc-stat-cur-spd').textContent = `${(targetAth.curPt?.spdKmh || 0).toFixed(1)} km/h`;
+    document.getElementById('fc-stat-avg-spd').textContent = `${(targetAth.avgSpeedKmh || 0).toFixed(1)} km/h`;
     document.getElementById('fc-stat-dist').textContent = `${(targetAth.projectedProgressM / 1000).toFixed(2)} km`;
     document.getElementById('fc-stat-gap').textContent = gapText;
-  } else {
-    card.style.display = 'none';
+  } else if (focusedCard) {
+    focusedCard.style.display = 'none';
   }
 }
 
