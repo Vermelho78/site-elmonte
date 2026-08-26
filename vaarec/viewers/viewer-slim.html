@@ -2299,6 +2299,87 @@ function generateDemoSlimTracks() {
   };
 }
 
+// Distance & Bearing Helpers
+function calcDistM(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calcBearing(lat1, lon1, lat2, lon2) {
+  const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+  const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+            Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+// Representação SVG das Canoas (Modelo Desafio com Ama e Iakos)
+function makeCanoeIcon(color, stroke, id, name) {
+  const badgeText = name.length > 12 ? name.substring(0, 10) + '..' : name;
+  const svgHtml = `
+  <div style="position:relative; width:140px; height:70px; overflow:visible;">
+    <div style="position:absolute; left:70px; top:35px; transform:translate(-50%,-50%); width:8px; height:8px; border-radius:50%; background:${color}; border:2px solid #ffffff; box-shadow:0 0 8px ${color}; z-index:1100;"></div>
+    <svg class="canoe-svg" viewBox="-70 -35 140 70" width="140" height="70" overflow="visible" style="position:absolute; left:0; top:0; z-index:1000;">
+      <path d="M -26 0 C -16 -2.8, 16 -2.8, 26 0 C 16 2.8, -16 2.8, -26 0 Z" fill="${color}" stroke="${stroke}" stroke-width="2"/>
+      <path d="M 26 0 C 21 -2.2, 21 2.2, 26 0 Z" fill="#ffffff" opacity="0.95"/>
+      <line x1="-12" y1="0" x2="-12" y2="-8" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="12" y1="0" x2="12" y2="-8" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M -18 -8 C -9 -9.5, 9 -9.5, 18 -8 C 9 -6.8, -9 -6.8, -18 -8 Z" fill="${stroke}" stroke="#ffffff" stroke-width="1.5"/>
+    </svg>
+    <div style="position:absolute; left:82px; top:42px; font-family:'Rajdhani',sans-serif; font-size:11px; font-weight:800; color:${color}; text-shadow:1px 1px 3px #000; white-space:nowrap; pointer-events:none; z-index:1110">
+      ${badgeText} <span id="spd-marker-${id}">-- km/h</span>
+    </div>
+  </div>`;
+
+  return L.divIcon({
+    html: `<div style="position:relative;overflow:visible">${svgHtml}</div>`,
+    className: 'canoe-icon-wrap',
+    iconSize: [140, 70],
+    iconAnchor: [70, 35]
+  });
+}
+
+function rotateCanoe(el, h) {
+  if (!el || !map) return;
+  const svg = el.querySelector('.canoe-svg');
+  if (!svg) return;
+  const z = map.getZoom(), lat = map.getCenter().lat;
+  const mpp = (156543.03392 * Math.cos(lat * Math.PI / 180)) / Math.pow(2, z);
+  const scale = Math.max(0.18, 13.71 / mpp / 52);
+  svg.style.transformOrigin = '70px 35px';
+  svg.style.transform = `scale(${scale.toFixed(4)}) rotate(${(h - 90).toFixed(1)}deg)`;
+}
+
+function interp(pts, t) {
+  if (!pts.length) return null;
+  if (t <= pts[0].relT) return pts[0];
+  if (t >= pts[pts.length - 1].relT) return pts[pts.length - 1];
+  let lo = 0, hi = pts.length - 1;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (pts[m].relT <= t) lo = m; else hi = m;
+  }
+  const a = pts[lo], b = pts[hi];
+  const f = a.relT === b.relT ? 0 : (t - a.relT) / (b.relT - a.relT);
+
+  const hA = a.heading != null ? a.heading : 0;
+  const hB = b.heading != null ? b.heading : 0;
+  let dh = hB - hA;
+  if (dh > 180) dh -= 360;
+  if (dh < -180) dh += 360;
+  const heading = (hA + dh * f + 360) % 360;
+
+  return {
+    lat: a.lat + (b.lat - a.lat) * f,
+    lon: a.lon + (b.lon - a.lon) * f,
+    spdKmh: (a.spdKmh || 0) + ((b.spdKmh || 0) - (a.spdKmh || 0)) * f,
+    accDist: (a.accDist || 0) + ((b.accDist || 0) - (a.accDist || 0)) * f,
+    heading
+  };
+}
+
 function setupData(contract) {
   const rawTracks = contract.sportPackage?.tracks || contract.tracks || [];
   athletes = rawTracks.map((tr, idx) => {
@@ -2311,13 +2392,13 @@ function setupData(contract) {
 
     const color = tr.color || SLIM_COLORS[idx % SLIM_COLORS.length];
     return {
-      id: tr.id || 'track-' + idx,
+      id: idx,
       name: tr.name || `Canoa ${idx + 1}`,
       color,
       points: pts,
       marker: null,
       polyline: null,
-      curPt: pts[0] || { lat: 0, lon: 0, spdKmh: 0 },
+      curPt: pts[0] || { lat: 0, lon: 0, spdKmh: 0, heading: 0 },
       distanceTraveledM: 0,
       totalDistanceM: 0,
       avgSpeedKmh: 0,
@@ -2327,16 +2408,33 @@ function setupData(contract) {
 
   if (!athletes.length) return;
 
-  // Sincronizar tempo relativo (0 até totalDurationMs)
+  // Sincronizar tempo relativo (0 até totalDurationMs) e calcular heading
   athletes.forEach(ath => {
     const t0 = ath.points[0].t;
-    ath.points.forEach((p, i) => {
+    let totalAccM = 0;
+    ath.points[0].accDist = 0;
+    ath.points.forEach((p, j) => {
       p.relT = p.t - t0;
-      if (i > 0) {
-        const prev = ath.points[i - 1];
-        ath.totalDistanceM += calcDistM(prev.lat, prev.lon, p.lat, p.lon);
+      if (j > 0) {
+        totalAccM += calcDistM(ath.points[j - 1].lat, ath.points[j - 1].lon, p.lat, p.lon);
+        p.accDist = totalAccM;
+      }
+
+      let lookAhead = ath.points[Math.min(j + 3, ath.points.length - 1)];
+      let dist = calcDistM(p.lat, p.lon, lookAhead.lat, lookAhead.lon);
+      if (dist < 0.2 && j < ath.points.length - 1) {
+        lookAhead = ath.points[j + 1];
+        dist = calcDistM(p.lat, p.lon, lookAhead.lat, lookAhead.lon);
+      }
+      if (dist >= 0.2) {
+        p.heading = calcBearing(p.lat, p.lon, lookAhead.lat, lookAhead.lon);
+      } else if (j > 0) {
+        p.heading = ath.points[j - 1].heading;
+      } else {
+        p.heading = 0;
       }
     });
+    ath.totalDistanceM = totalAccM;
   });
 
   totalDurationMs = Math.max(...athletes.map(a => a.points[a.points.length - 1].relT));
@@ -2354,9 +2452,14 @@ function initMap() {
   activeMapType = 'satellite';
 
   map.on('zoomend moveend', updateMapLayerForZoom);
+  map.on('zoom', () => {
+    athletes.forEach(ath => {
+      if (ath.marker && ath.curPt) rotateCanoe(ath.marker.getElement(), ath.curPt.heading || 0);
+    });
+  });
 
-  // Criar marcadores e polylines
-  athletes.forEach(ath => {
+  // Criar marcadores SVG idênticos ao Desafio e polylines
+  athletes.forEach((ath, i) => {
     const latlngs = ath.points.map(p => [p.lat, p.lon]);
     ath.polyline = L.polyline(latlngs, {
       color: ath.color,
@@ -2364,22 +2467,16 @@ function initMap() {
       opacity: 0.85
     }).addTo(map);
 
-    const icon = L.divIcon({
-      className: 'slim-marker-wrap',
-      html: `<div style="width:18px; height:18px; border-radius:50%; background:${ath.color}; border:3px solid #fff; box-shadow:0 0 16px ${ath.color}; position:relative;"></div>`,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9]
-    });
+    const mkIcon = makeCanoeIcon(ath.color, '#ffffff', ath.id, ath.name);
+    ath.marker = L.marker([ath.points[0].lat, ath.points[0].lon], {
+      icon: mkIcon,
+      zIndexOffset: 1000 + i
+    }).addTo(map);
 
-    ath.marker = L.marker([ath.points[0].lat, ath.points[0].lon], { icon }).addTo(map);
-    
-    // Tooltip simplificado (Req 6: Nome + Vel Média, sem batimento, sem emoji)
-    ath.marker.bindTooltip(`
-      <div class="slim-marker-tip">
-        <span class="slim-tip-name" style="color:${ath.color}; font-weight:800;">${ath.name}</span>
-        <span class="slim-tip-spd" id="tip-spd-${ath.id}">0.0 km/h</span>
-      </div>
-    `, { permanent: true, direction: 'top', offset: [0, -10], className: 'slim-custom-leaflet-tip' });
+    if (ath.points[0]) {
+      ath.curPt = ath.points[0];
+      rotateCanoe(ath.marker.getElement(), ath.points[0].heading || 0);
+    }
   });
 
   // Fit bounds
@@ -2453,33 +2550,21 @@ function updateFrame(ms) {
   document.getElementById('slim-timeline-bead').style.bottom = `${pct}%`;
 
   athletes.forEach(ath => {
-    const pts = ath.points;
-    let p0 = pts[0], p1 = pts[pts.length - 1];
-    for (let i = 0; i < pts.length - 1; i++) {
-      if (pts[i].relT <= playTimeMs && pts[i + 1].relT >= playTimeMs) {
-        p0 = pts[i];
-        p1 = pts[i + 1];
-        break;
-      }
+    const p = interp(ath.points, playTimeMs);
+    if (!p) return;
+    ath.curPt = p;
+
+    if (ath.marker) {
+      ath.marker.setLatLng([p.lat, p.lon]);
+      rotateCanoe(ath.marker.getElement(), p.heading || 0);
     }
 
-    const span = (p1.relT - p0.relT) || 1;
-    const f = Math.max(0, Math.min(1, (playTimeMs - p0.relT) / span));
-    const curLat = p0.lat + (p1.lat - p0.lat) * f;
-    const curLon = p0.lon + (p1.lon - p0.lon) * f;
-    const curSpd = p0.spdKmh + (p1.spdKmh - p0.spdKmh) * f;
-
-    ath.curPt = { lat: curLat, lon: curLon, spdKmh: curSpd };
-    if (ath.marker) ath.marker.setLatLng([curLat, curLon]);
-
-    // Calcular velocidade média até o momento
-    ath.distanceTraveledM = ath.totalDistanceM * (playTimeMs / totalDurationMs);
+    ath.distanceTraveledM = p.accDist || (ath.totalDistanceM * (playTimeMs / totalDurationMs));
     const hoursElapsed = (playTimeMs / 1000) / 3600;
-    ath.avgSpeedKmh = hoursElapsed > 0.001 ? (ath.distanceTraveledM / 1000) / hoursElapsed : curSpd;
+    ath.avgSpeedKmh = hoursElapsed > 0.001 ? (ath.distanceTraveledM / 1000) / hoursElapsed : p.spdKmh;
 
-    // Atualizar tooltip (Req 6)
-    const tipEl = document.getElementById(`tip-spd-${ath.id}`);
-    if (tipEl) tipEl.textContent = `${ath.avgSpeedKmh.toFixed(1)} km/h`;
+    const spdEl = document.getElementById(`spd-marker-${ath.id}`);
+    if (spdEl) spdEl.textContent = `${ath.avgSpeedKmh.toFixed(1)} km/h`;
   });
 
   // Ordenar ranking atual por distância percorrida
