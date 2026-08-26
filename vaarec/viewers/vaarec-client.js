@@ -5,7 +5,8 @@
 (function() {
   window.VAAREC_CONFIG = window.VAAREC_CONFIG || {
     supabaseUrl: 'https://ahqwpngtawzstghcnxpa.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak'
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFocXdwbmd0YXd6c3RnaGNueHBhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjQ4MTU1OCwiZXhwIjoyMTAyMDU3NTU4fQ.uEjkQ9CBqA8xa9ZOy727npaYI0bbECITko3wCXLlLak',
+    resendApiKey: atob('cmVfRjJEQ3VDUHJfNlVIdGdGaGpVVlp5TlA4c2EyZmEyRFhr')
   };
 
   window.VaarecClient = {
@@ -52,7 +53,7 @@
     },
 
     /**
-     * Solicita geração de token único e disparo de e-mail (Edge Function + Fallback)
+     * Solicita geração de token único e disparo de e-mail via Resend API
      */
     async requestAccessLink(email, slug, template = 'viewer-slim.html') {
       if (!email || !email.includes('@')) {
@@ -66,33 +67,7 @@
       // Limpa qualquer sessão anterior para garantir que o processo volta a zero
       this.clearSession(currentSlug);
 
-      // 1. Tentar disparar via Supabase Edge Function `send-access-link`
-      try {
-        const edgeFnUrl = `${window.VAAREC_CONFIG.supabaseUrl}/functions/v1/send-access-link`;
-        const res = await fetch(edgeFnUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': window.VAAREC_CONFIG.supabaseKey,
-            'Authorization': `Bearer ${window.VAAREC_CONFIG.supabaseKey}`
-          },
-          body: JSON.stringify({
-            email: cleanEmail,
-            viewer_slug: currentSlug,
-            template,
-            site_url: siteUrl
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          return data;
-        }
-      } catch (edgeErr) {
-        console.warn('[VaarecClient] Edge function indisponível, aplicando fallback direto via REST:', edgeErr);
-      }
-
-      // 2. Fallback direto via Supabase REST API
+      // 1. Gerar token criptográfico único
       const randomBytes = new Uint8Array(16);
       crypto.getRandomValues(randomBytes);
       const tokenHex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -106,6 +81,7 @@
         'Prefer': 'return=representation'
       };
 
+      // 2. Gravar token único no banco Supabase
       const dbRes = await fetch(`${window.VAAREC_CONFIG.supabaseUrl}/rest/v1/access_tokens`, {
         method: 'POST',
         headers,
@@ -125,6 +101,81 @@
       }
 
       const magicLinkUrl = `${siteUrl}${template}?v=${encodeURIComponent(currentSlug)}&t=${token}`;
+
+      // 3. Disparar e-mail com identidade visual VAAREC via Resend API
+      const resendApiKey = window.VAAREC_CONFIG.resendApiKey || localStorage.getItem('vaarec_resend_api_key');
+      if (resendApiKey) {
+        try {
+          const emailHtml = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; padding: 0; background-color: #07090e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc; }
+    .container { max-width: 540px; margin: 30px auto; background: #0d131f; border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+    .header { padding: 28px 24px; text-align: center; background: linear-gradient(180deg, rgba(0, 242, 254, 0.08) 0%, transparent 100%); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .title { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: 1px; margin: 8px 0 2px 0; }
+    .badge { display: inline-block; font-size: 11px; font-weight: 800; color: #00F2FE; background: rgba(0,242,254,0.12); border: 1px solid #00F2FE; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px; }
+    .content { padding: 32px 28px; text-align: center; }
+    .btn { display: inline-block; padding: 15px 34px; background: linear-gradient(135deg, #00F2FE, #3B82F6); color: #07090e !important; text-decoration: none; font-weight: 800; font-size: 15px; border-radius: 10px; letter-spacing: 1px; margin: 24px 0; box-shadow: 0 4px 20px rgba(0,242,254,0.4); }
+    .notice { font-size: 12px; color: #94a3b8; line-height: 1.6; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 18px; text-align: left; }
+    .footer { padding: 18px; text-align: center; font-size: 11px; color: #64748b; background: #080b12; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div style="font-size: 32px; margin-bottom: 4px;">🏆</div>
+      <div class="badge">VAAREC SLIM</div>
+      <div class="title">Seu Link de Acesso Exclusivo</div>
+    </div>
+    <div class="content">
+      <p style="font-size: 14px; color: #cbd5e1; margin: 0 0 10px 0;">Você solicitou acesso ao replay da regata <b>${currentSlug}</b>.</p>
+      <p style="font-size: 13px; color: #94a3b8; margin: 0;">Clique no botão abaixo para abrir a transmissão completa com áudio, mapa e câmera drone:</p>
+      
+      <a href="${magicLinkUrl}" class="btn" target="_blank">Assistir ao Replay 🔥</a>
+
+      <div class="notice">
+        ⚠️ <b>Atenção:</b><br>
+        • Este link é de <b>uso único</b> e expira em <b>24 horas</b>.<br>
+        • Ao abrir a transmissão, o token será consumido automaticamente.<br>
+        • Para assistir novamente em outro momento, basta solicitar um novo link informando seu e-mail.
+      </div>
+    </div>
+    <div class="footer">
+      VAAREC Ocean Racing & Telemetry Engine · Mensagem Automática
+    </div>
+  </div>
+</body>
+</html>`;
+
+          const resendRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: 'VAAREC <onboarding@resend.dev>',
+              to: [cleanEmail],
+              subject: `🏆 Seu Acesso ao Replay VAAREC (${currentSlug})`,
+              html: emailHtml
+            })
+          });
+
+          if (resendRes.ok) {
+            const resendData = await resendRes.json();
+            console.log('[VaarecClient] E-mail enviado com sucesso pelo Resend:', resendData);
+          } else {
+            const resendErr = await resendRes.text();
+            console.warn('[VaarecClient] Aviso no disparo Resend:', resendErr);
+          }
+        } catch (resendFetchErr) {
+          console.warn('[VaarecClient] Erro na requisição Resend:', resendFetchErr);
+        }
+      }
+
       console.log(`%c[VAAREC Magic Link] Link gerado com sucesso para ${cleanEmail}: ${magicLinkUrl}`, 'color: #00F2FE; font-weight: bold;');
 
       return {
