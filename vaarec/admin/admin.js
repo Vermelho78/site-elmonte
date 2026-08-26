@@ -111,7 +111,7 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
       // Slice JSON in browser
       const meta = JSON.parse(JSON.stringify(fullJson));
       meta.template = selectedTemplate;
-      meta.context = selectedTemplate.includes('desafio') ? 'desafio' : (selectedTemplate.includes('raia') ? 'treino-raia' : 'padrao');
+      meta.context = selectedTemplate.includes('slim') ? 'slim' : (selectedTemplate.includes('desafio') ? 'desafio' : (selectedTemplate.includes('raia') ? 'treino-raia' : 'padrao'));
 
       const tracks = [];
       const sourceTracks = meta.sportPackage?.tracks || meta.tracks || [];
