@@ -974,10 +974,14 @@
     }
 
     _findLeaderIdx(entities) {
+      if (!entities || !entities.length) return 0;
+      const rank1Idx = entities.findIndex(e => e.rank === 1);
+      if (rank1Idx !== -1) return rank1Idx;
+
       let maxDist = -1;
       let leaderIdx = 0;
       entities.forEach((e, idx) => {
-        const dist = e.accDist ?? e.currentDist ?? e.currentProg ?? e.prog ?? 0;
+        const dist = e.projectedProgressM ?? e.accDist ?? e.currentDist ?? e.currentProg ?? e.prog ?? 0;
         if (dist > maxDist) {
           maxDist = dist;
           leaderIdx = idx;

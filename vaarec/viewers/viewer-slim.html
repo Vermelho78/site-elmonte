@@ -13,7 +13,6 @@
   <script src="./vaarec-client.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-
 /**
  * audio-engine.js — VAAREC Procedural Ocean Soundtrack & Race Audio Director
  * Motor de Áudio 100% Nativo (Web Audio API) para Replay de Canoagem Oceânica / Va'a.
@@ -598,7 +597,6 @@
   global.VaarecAudio = new VaarecAudioEngine();
 })(typeof window !== 'undefined' ? window : this);
 
-  
   </script>
   <script>
 /**
@@ -1577,10 +1575,14 @@
     }
 
     _findLeaderIdx(entities) {
+      if (!entities || !entities.length) return 0;
+      const rank1Idx = entities.findIndex(e => e.rank === 1);
+      if (rank1Idx !== -1) return rank1Idx;
+
       let maxDist = -1;
       let leaderIdx = 0;
       entities.forEach((e, idx) => {
-        const dist = e.accDist ?? e.currentDist ?? e.currentProg ?? e.prog ?? 0;
+        const dist = e.projectedProgressM ?? e.accDist ?? e.currentDist ?? e.currentProg ?? e.prog ?? 0;
         if (dist > maxDist) {
           maxDist = dist;
           leaderIdx = idx;
@@ -2447,6 +2449,16 @@ function formatTimeHMS(ms) {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+// Time Format +HH:MM:SS (Diferença para o Vencedor)
+function formatDeltaHMS(ms) {
+  if (ms == null || isNaN(ms) || ms <= 0) return '00:00:00';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `+${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
 // Init App
 async function initApp() {
   let contractData = window.CONTRACT || null;
@@ -2824,12 +2836,16 @@ function initMap() {
     droneCamera = new DroneCameraSkills({
       map: map,
       getEntities: () => athletes.map(a => ({
+        id: a.id,
         lat: a.curPt?.lat,
         lon: a.curPt?.lon,
         heading: a.curPt?.heading || 0,
         speed: a.curPt?.spdKmh || 0,
         name: a.name,
-        color: a.color
+        color: a.color,
+        rank: a.rank || 99,
+        projectedProgressM: a.projectedProgressM || 0,
+        accDist: a.projectedProgressM || a.distanceTraveledM || 0
       })),
       getContract: () => window.CONTRACT || {}
     });
@@ -3192,15 +3208,19 @@ function showFinalResult() {
   const winner = ranked[0];
   const winnerDistKm = ((winner?.totalDistanceM || 0) / 1000).toFixed(2);
   const winnerDurationMs = winner?.durationMs || totalDurationMs;
+  const winnerHours = (winnerDurationMs / 1000) / 3600;
+  const winnerAvgSpeed = winnerHours > 0 ? ((winner?.totalDistanceM || 0) / 1000) / winnerHours : 0;
 
   document.getElementById('res-winner-name').textContent = `🥇 ${winner?.name}`;
-  document.getElementById('res-winner-time').textContent = `Tempo Oficial: ${formatTimeHMS(winnerDurationMs)} · Distância: ${winnerDistKm} km · Vel. Média: ${winner?.avgSpeedKmh.toFixed(1)} km/h`;
+  document.getElementById('res-winner-time').textContent = `Tempo Oficial: ${formatTimeHMS(winnerDurationMs)} · Distância: ${winnerDistKm} km · Vel. Média: ${winnerAvgSpeed.toFixed(1)} km/h`;
 
   tbody.innerHTML = '';
   ranked.forEach((a, r) => {
     const aDurationMs = a.durationMs || totalDurationMs;
+    const aHours = (aDurationMs / 1000) / 3600;
+    const aAvgSpeedKmh = aHours > 0 ? ((a.totalDistanceM || 0) / 1000) / aHours : 0;
     const deltaMs = aDurationMs - winnerDurationMs;
-    const deltaStr = r === 0 ? '🏆 Vencedor' : `+${(deltaMs / 1000).toFixed(1)}s`;
+    const deltaStr = r === 0 ? '🏆 Vencedor' : formatDeltaHMS(deltaMs);
     const medals = ['🥇 1º', '🥈 2º', '🥉 3º'];
     const distKm = ((a.totalDistanceM || 0) / 1000).toFixed(2) + ' km';
 
@@ -3211,7 +3231,7 @@ function showFinalResult() {
       <td style="padding:8px 6px; font-weight:700; color:${a.color}; white-space:nowrap; text-align:left;">${a.name}</td>
       <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:#fff;">${formatTimeHMS(aDurationMs)}</td>
       <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:#38EF7D;">${distKm}</td>
-      <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:var(--gold); font-weight:700;">${a.avgSpeedKmh.toFixed(1)} km/h</td>
+      <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:var(--gold); font-weight:700;">${aAvgSpeedKmh.toFixed(1)} km/h</td>
       <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:${r === 0 ? '#10B981' : '#F59E0B'}; font-weight:700;">${deltaStr}</td>
     `;
     tbody.appendChild(tr);
