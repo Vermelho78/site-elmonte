@@ -448,6 +448,7 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
         const rows = viewers.map(v => {
           const date = new Date(v.created_at).toLocaleString('pt-BR');
           const accessCount = events.filter(e => e.viewer_slug === v.slug).length;
+          const slimUrl = `https://elmonte.dev.br/vaarec/viewers/viewer-slim.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
           const desafioUrl = `https://elmonte.dev.br/vaarec/viewers/viewer-desafio.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
           const padraoUrl = `https://elmonte.dev.br/vaarec/viewers/viewer.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
           const raiaUrl = `https://elmonte.dev.br/vaarec/viewers/viewer-treino-raia.html?v=${encodeURIComponent(v.slug)}&t=t_live`;
@@ -458,22 +459,64 @@ CREATE POLICY "Leitura admin de users" ON users FOR SELECT TO service_role USING
             <td><span class="pill pill-blue">${accessCount} acessos</span></td>
             <td style="color: var(--muted); font-size: 12px;">${date}</td>
             <td>
-              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <a href="${slimUrl}" target="_blank" style="color: #00F2FE; font-weight:700; font-size: 11px; background:rgba(0,242,254,0.12); border:1px solid rgba(0,242,254,0.35); border-radius:4px; padding:2px 6px; text-decoration:none;">✨ Slim</a>
                 <a href="${desafioUrl}" target="_blank" style="color: var(--accent); font-weight:700; font-size: 11px; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.3); border-radius:4px; padding:2px 6px; text-decoration:none;">🚀 Desafio</a>
                 <a href="${padraoUrl}" target="_blank" style="color: var(--blue); font-weight:700; font-size: 11px; background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); border-radius:4px; padding:2px 6px; text-decoration:none;">🏄 Padrão</a>
                 <a href="${raiaUrl}" target="_blank" style="color: #a78bfa; font-weight:700; font-size: 11px; background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.3); border-radius:4px; padding:2px 6px; text-decoration:none;">🏁 Raia</a>
+                <button onclick="deleteProva('${v.slug}')" title="Excluir Prova" style="color: #ef4444; font-weight:700; font-size: 11px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); border-radius:4px; padding:2px 7px; cursor:pointer; margin-left:4px;">🗑️ Excluir</button>
               </div>
             </td>
           </tr>`;
         }).join('');
 
         wrap.innerHTML = `<table>
-          <thead><tr><th>Slug</th><th>Título</th><th>Acessos</th><th>Publicado em</th><th>Visualizadores</th></tr></thead>
+          <thead><tr><th>Slug</th><th>Título</th><th>Acessos</th><th>Publicado em</th><th>Visualizadores & Ações</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
 
       } catch (err) {
         document.getElementById('provas-table-wrap').innerHTML = `<div class="empty-state" style="color: var(--red);">❌ ${err.message}</div>`;
+      }
+    }
+
+    async function deleteProva(slug) {
+      if (!confirm(`⚠️ Tem certeza que deseja excluir a prova "${slug}"?\n\nEsta ação removerá a prova do banco de dados e todos os arquivos de GPS do Storage.`)) {
+        return;
+      }
+      const { url, headers } = getConfig();
+      try {
+        // 1. Remover do banco de dados (viewers, share_tokens, event_log)
+        await fetch(`${url}/rest/v1/viewers?slug=eq.${encodeURIComponent(slug)}`, { method: 'DELETE', headers });
+        await fetch(`${url}/rest/v1/share_tokens?viewer_slug=eq.${encodeURIComponent(slug)}`, { method: 'DELETE', headers });
+        await fetch(`${url}/rest/v1/event_log?viewer_slug=eq.${encodeURIComponent(slug)}`, { method: 'DELETE', headers });
+
+        // 2. Remover arquivos do Supabase Storage
+        try {
+          const listRes = await fetch(`${url}/storage/v1/object/list/vaarec-data`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ prefix: `viewers/${slug}/`, limit: 100 })
+          });
+          if (listRes.ok) {
+            const items = await listRes.json();
+            if (items && items.length) {
+              const prefixes = items.map(item => `viewers/${slug}/${item.name}`);
+              await fetch(`${url}/storage/v1/object/vaarec-data`, {
+                method: 'DELETE',
+                headers,
+                body: JSON.stringify({ prefixes })
+              });
+            }
+          }
+        } catch (storageErr) {
+          console.warn('Aviso ao excluir arquivos do Storage:', storageErr);
+        }
+
+        alert(`✅ Prova "${slug}" excluída com sucesso.`);
+        loadProvas();
+      } catch (err) {
+        alert(`❌ Erro ao excluir prova: ${err.message}`);
       }
     }
 
