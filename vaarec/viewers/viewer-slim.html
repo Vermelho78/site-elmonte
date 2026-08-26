@@ -2132,27 +2132,31 @@
     </div>
   </div>
 
-  <!-- Results Modal -->
-  <div id="modal-result">
+  <!-- Results Modal (Modelo Desafio com 5s de Delay e Estatísticas Completas) -->
+  <div id="modal-result" style="display:none;">
     <div class="result-card">
-      <div style="font-size:44px; margin-bottom:8px;">🏆</div>
-      <h2 style="font-family:var(--font-title); font-size:24px; font-weight:800; color:#fff; margin-bottom:4px;">PROVA FINALIZADA!</h2>
-      <p id="result-winner-text" style="color:var(--accent); font-family:var(--font-title); font-size:1.1rem; font-weight:700; margin-bottom:16px;"></p>
+      <div style="font-size:44px; margin-bottom:6px;">🏆</div>
+      <h2 style="font-family:var(--font-title); font-size:24px; font-weight:800; color:var(--accent); letter-spacing:2px; margin-bottom:4px;">FIM DO DESAFIO!</h2>
+      <div id="res-winner-name" style="font-family:var(--font-title); font-size:1.6rem; font-weight:800; color:#fff; margin-bottom:2px;">--</div>
+      <p id="res-winner-time" style="color:var(--text-sec); font-family:var(--font-title); font-size:0.95rem; font-weight:600; margin-bottom:14px;"></p>
       
-      <table class="result-rank-table">
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th style="text-align:left;">Canoa</th>
-            <th>Tempo Total</th>
-            <th>Vel. Média</th>
-            <th>Distância</th>
-          </tr>
-        </thead>
-        <tbody id="result-rank-tbody"></tbody>
-      </table>
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; padding:8px 12px; max-height:280px; overflow-y:auto;">
+        <table class="result-rank-table" style="width:100%; border-collapse:collapse; text-align:left;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:var(--text-sec); font-size:11px; text-transform:uppercase;">
+              <th style="padding:6px 8px;">Pos</th>
+              <th style="padding:6px 8px;">Atleta / Canoa</th>
+              <th style="padding:6px 8px; text-align:right;">Tempo</th>
+              <th style="padding:6px 8px; text-align:right;">Distância</th>
+              <th style="padding:6px 8px; text-align:right;">Vel. Média</th>
+              <th style="padding:6px 8px; text-align:right;">Diferença</th>
+            </tr>
+          </thead>
+          <tbody id="result-rank-tbody"></tbody>
+        </table>
+      </div>
 
-      <button class="auth-btn" onclick="restartReplay()" style="margin-top:20px;">🔄 Assistir Novamente</button>
+      <button class="auth-btn" onclick="restartReplay()" style="margin-top:16px;">Assistir Novamente 🔄</button>
     </div>
   </div>
 
@@ -2315,6 +2319,16 @@ function calcBearing(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Cores Dinâmicas de Velocidade do Rastro (Modelo Desafio)
+function getSpeedColor(kmh) {
+  if (kmh < 3) return '#3B82F6';      // Azul (<3 km/h)
+  if (kmh < 6) return '#06B6D4';      // Ciano (3-6 km/h)
+  if (kmh < 8.5) return '#10B981';    // Verde (6-8.5 km/h)
+  if (kmh < 10.5) return '#F59E0B';   // Amarelo / Âmbar (8.5-10.5 km/h)
+  if (kmh < 12.5) return '#F97316';   // Laranja (10.5-12.5 km/h)
+  return '#EF4444';                   // Vermelho (>12.5 km/h)
+}
+
 // Representação SVG das Canoas (Modelo Desafio com Ama e Iakos)
 function makeCanoeIcon(color, stroke, id, name) {
   const badgeText = name.length > 12 ? name.substring(0, 10) + '..' : name;
@@ -2397,7 +2411,9 @@ function setupData(contract) {
       color,
       points: pts,
       marker: null,
-      polyline: null,
+      bgTrail: null,
+      speedSegs: [],
+      speedSegsGroup: null,
       curPt: pts[0] || { lat: 0, lon: 0, spdKmh: 0, heading: 0 },
       distanceTraveledM: 0,
       totalDistanceM: 0,
@@ -2408,7 +2424,7 @@ function setupData(contract) {
 
   if (!athletes.length) return;
 
-  // Sincronizar tempo relativo (0 até totalDurationMs) e calcular heading
+  // Sincronizar tempo relativo (0 até totalDurationMs) e calcular heading e accDist
   athletes.forEach(ath => {
     const t0 = ath.points[0].t;
     let totalAccM = 0;
@@ -2458,15 +2474,40 @@ function initMap() {
     });
   });
 
-  // Criar marcadores SVG idênticos ao Desafio e polylines
+  // Criar rastros térmicos de velocidade com janela de 1km e marcadores SVG
   athletes.forEach((ath, i) => {
-    const latlngs = ath.points.map(p => [p.lat, p.lon]);
-    ath.polyline = L.polyline(latlngs, {
+    // 1. Rastro de fundo pontilhado discreto
+    ath.bgTrail = L.polyline(ath.points.map(p => [p.lat, p.lon]), {
       color: ath.color,
-      weight: 3,
-      opacity: 0.85
+      weight: 2,
+      opacity: 0.22,
+      dashArray: '4 4'
     }).addTo(map);
 
+    // 2. Grupo de segmentos coloridos pela variação de velocidade com janela móvel de 1km
+    ath.speedSegsGroup = L.featureGroup().addTo(map);
+    ath.speedSegs = [];
+
+    for (let j = 0; j < ath.points.length - 1; j++) {
+      const p1 = ath.points[j];
+      const p2 = ath.points[j + 1];
+      const segSpd = ((p1.spdKmh || 0) + (p2.spdKmh || 0)) / 2;
+      const segCol = getSpeedColor(segSpd);
+
+      const polySeg = L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
+        color: segCol,
+        weight: 4,
+        opacity: 0,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(ath.speedSegsGroup);
+
+      polySeg._tEnd = p2.relT;
+      polySeg._distEnd = p2.accDist != null ? p2.accDist : 0;
+      ath.speedSegs.push(polySeg);
+    }
+
+    // 3. Marcador SVG Idêntico ao Desafio
     const mkIcon = makeCanoeIcon(ath.color, '#ffffff', ath.id, ath.name);
     ath.marker = L.marker([ath.points[0].lat, ath.points[0].lon], {
       icon: mkIcon,
@@ -2565,6 +2606,27 @@ function updateFrame(ms) {
 
     const spdEl = document.getElementById(`spd-marker-${ath.id}`);
     if (spdEl) spdEl.textContent = `${ath.avgSpeedKmh.toFixed(1)} km/h`;
+
+    // Atualizar rastro dinâmico com janela móvel de 1km (trechos a mais de 1km esmaecem)
+    if (ath.speedSegs) {
+      const curAccDist = ath.distanceTraveledM;
+      for (let s = 0; s < ath.speedSegs.length; s++) {
+        const seg = ath.speedSegs[s];
+        if (seg._tEnd > playTimeMs) {
+          seg.setStyle({ opacity: 0 });
+        } else {
+          const distBehindM = curAccDist - (seg._distEnd || 0);
+          if (distBehindM <= 800) {
+            seg.setStyle({ opacity: 0.9 });
+          } else if (distBehindM <= 1000) {
+            const fade = (1000 - distBehindM) / 200;
+            seg.setStyle({ opacity: Math.max(0, fade * 0.9) });
+          } else {
+            seg.setStyle({ opacity: 0 });
+          }
+        }
+      }
+    }
   });
 
   // Ordenar ranking atual por distância percorrida
@@ -2579,10 +2641,8 @@ function updateFrame(ms) {
     droneCamera.update(playTimeMs);
   }
 
-  // Verificar final de prova
-  if (playTimeMs >= totalDurationMs && !resultShown) {
-    showResults(sorted);
-  }
+  // Verificar final de prova com delay de 5 segundos
+  checkFinishCondition(sorted);
 }
 
 // Drone Camera Mode Controller (Req 5)
@@ -2713,7 +2773,28 @@ function playbackLoop(now) {
   requestAnimationFrame(playbackLoop);
 }
 
+let finishDelayTimer = null;
+
+function checkFinishCondition(sorted) {
+  if (playTimeMs >= totalDurationMs && !resultShown) {
+    if (!finishDelayTimer) {
+      if (typeof VaarecAudio !== 'undefined' && !VaarecAudio.finishFanfareTriggered) {
+        VaarecAudio.finishFanfareTriggered = true;
+        VaarecAudio.playFinishCelebration();
+      }
+      finishDelayTimer = setTimeout(() => {
+        showFinalResult(sorted);
+        finishDelayTimer = null;
+      }, 5000); // 5 segundos de delay antes de abrir o quadro
+    }
+  }
+}
+
 function seekToMs(targetMs) {
+  if (finishDelayTimer) {
+    clearTimeout(finishDelayTimer);
+    finishDelayTimer = null;
+  }
   playTimeMs = Math.max(0, Math.min(totalDurationMs, targetMs));
   updateFrame(playTimeMs);
 }
@@ -2743,35 +2824,50 @@ function toggleAudioMute() {
   }
 }
 
-// Final Results
-function showResults(sorted) {
+// Final Results (Modelo Desafio com Diferença de Tempo e Estatísticas)
+function showFinalResult(sorted) {
   resultShown = true;
-  if (typeof VaarecAudio !== 'undefined') {
-    VaarecAudio.playFanfare();
-  }
-  spawnConfetti();
+  const overlay = document.getElementById('modal-result');
+  const tbody = document.getElementById('result-rank-tbody');
+  if (!overlay || !tbody) return;
 
   const winner = sorted[0];
-  document.getElementById('result-winner-text').textContent = `Vencedor: ${winner?.name} (${(winner?.distanceTraveledM/1000).toFixed(2)} km percorridos)`;
+  const winnerDistKm = ((winner.totalDistanceM || 0) / 1000).toFixed(2);
+  const winnerDurationMs = winner.points[winner.points.length - 1].relT || totalDurationMs;
 
-  const tbody = document.getElementById('result-rank-tbody');
+  document.getElementById('res-winner-name').textContent = `🥇 ${winner.name}`;
+  document.getElementById('res-winner-time').textContent = `Tempo Oficial: ${formatTimeHMS(winnerDurationMs)} · Distância: ${winnerDistKm} km · Vel. Média: ${winner.avgSpeedKmh.toFixed(1)} km/h`;
+
   tbody.innerHTML = '';
-  sorted.forEach((ath, i) => {
+  sorted.forEach((a, r) => {
+    const aDurationMs = a.points[a.points.length - 1].relT || totalDurationMs;
+    const deltaMs = aDurationMs - winnerDurationMs;
+    const deltaStr = r === 0 ? '🏆 Vencedor' : `+${(deltaMs / 1000).toFixed(1)}s`;
+    const medals = ['🥇 1º', '🥈 2º', '🥉 3º'];
+    const distKm = ((a.totalDistanceM || 0) / 1000).toFixed(2) + ' km';
+
     const tr = document.createElement('tr');
+    tr.style.cssText = 'border-bottom: 1px solid rgba(255,255,255,0.06); font-size:13px;';
     tr.innerHTML = `
-      <td style="font-weight:800; color:${i === 0 ? 'var(--gold)' : 'var(--text)'};">${i + 1}º</td>
-      <td style="text-align:left; font-weight:700; color:${ath.color};">${ath.name}</td>
-      <td style="font-family:var(--font-mono);">${formatTimeHMS(totalDurationMs)}</td>
-      <td style="font-family:var(--font-mono); color:var(--accent);">${ath.avgSpeedKmh.toFixed(1)} km/h</td>
-      <td style="font-family:var(--font-mono);">${(ath.distanceTraveledM / 1000).toFixed(2)} km</td>
+      <td style="padding:8px 6px; font-weight:800; color:var(--accent); text-align:left;">${medals[r] || `${r + 1}º`}</td>
+      <td style="padding:8px 6px; font-weight:700; color:${a.color}; white-space:nowrap; text-align:left;">${a.name}</td>
+      <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:#fff;">${formatTimeHMS(aDurationMs)}</td>
+      <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:#38EF7D;">${distKm}</td>
+      <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:var(--gold); font-weight:700;">${a.avgSpeedKmh.toFixed(1)} km/h</td>
+      <td style="padding:8px 6px; text-align:right; font-family:var(--font-mono); color:${r === 0 ? '#10B981' : '#F59E0B'}; font-weight:700;">${deltaStr}</td>
     `;
     tbody.appendChild(tr);
   });
 
-  document.getElementById('modal-result').style.display = 'flex';
+  overlay.style.display = 'flex';
+  spawnConfetti();
 }
 
 function restartReplay() {
+  if (finishDelayTimer) {
+    clearTimeout(finishDelayTimer);
+    finishDelayTimer = null;
+  }
   document.getElementById('modal-result').style.display = 'none';
   resultShown = false;
   seekToMs(0);
