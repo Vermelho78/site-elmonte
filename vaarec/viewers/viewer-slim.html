@@ -1064,8 +1064,14 @@
           }
         }
 
-        stop() {
-          this.state.running = false;
+        setPlaybackSpeed(speed) {
+          this.speedMultiplier = Math.max(1, Number(speed) || 1);
+        }
+
+        _isPortraitMode() {
+          const w = typeof window !== 'undefined' ? window.innerWidth : 1000;
+          const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+          return w < h || w < 650;
         }
 
         // ==========================================
@@ -1413,20 +1419,10 @@
             }
           }
 
-        setPlaybackSpeed(speed) {
-          this.speedMultiplier = Math.max(1, Number(speed) || 1);
-        }
-
-        _isPortraitMode() {
-          const w = typeof window !== 'undefined' ? window.innerWidth : 1000;
-          const h = typeof window !== 'undefined' ? window.innerHeight : 800;
-          return w < h || w < 650;
-        }
-
-        // ==========================================
-        // GIMBAL DAMPING INTERPOLATOR (ZERO FLICKER / ZERO BLACK TILES)
-        // ==========================================
-        if (targetCenter && validPoint(targetCenter[0], targetCenter[1])) {
+          // ==========================================
+          // GIMBAL DAMPING INTERPOLATOR (ZERO FLICKER / ZERO BLACK TILES)
+          // ==========================================
+          if (targetCenter && validPoint(targetCenter[0], targetCenter[1])) {
           const isPortrait = this._isPortraitMode();
           const portraitZoomOffset = isPortrait ? -0.8 : 0;
           const finalZoom = clamp((targetZoom || this.config.followZoom) + portraitZoomOffset + (this.config.zoomOffset || 0), this.config.minZoom, this.config.maxZoom);
