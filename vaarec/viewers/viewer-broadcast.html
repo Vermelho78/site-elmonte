@@ -31,12 +31,13 @@ if (typeof window !== 'undefined' && !window.EMBEDDED_CANOE_MODEL_DATA_URI) {
 }
 </script>
 
-<!-- VAAREC Client (Opcional) -->
+<!-- VAAREC Client -->
+<script src="./vaarec-client.js"></script>
 <script>
 if (typeof VaarecClient === 'undefined') {
-  const s = document.createElement('script');
-  s.src = '/vaarec-client.js';
-  document.head.appendChild(s);
+  ['/vaarec/viewers/vaarec-client.js', '/vaarec-client.js', 'vaarec-client.js'].forEach(p => {
+    const s = document.createElement('script'); s.src = p; document.head.appendChild(s);
+  });
 }
 </script>
 
@@ -583,18 +584,43 @@ async function initContract() {
   }
 
   // 3. Suporte a window.CONTRACT embutido ou slug na nuvem
+  const slug = (typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null) || urlParams.get('v') || urlParams.get('slug');
   if (!CONTRACT && window.CONTRACT && typeof window.CONTRACT === 'object') {
     CONTRACT = window.CONTRACT;
   } else if (!CONTRACT) {
-    const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
     if (slug && typeof VaarecClient !== 'undefined') {
-      try { CONTRACT = await VaarecClient.fetchMeta(slug); } catch(e) {}
+      try {
+        CONTRACT = await VaarecClient.fetchMeta(slug);
+        VaarecClient.logViewEvent(slug);
+      } catch(e) {
+        console.warn('Erro ao carregar meta:', e);
+      }
     }
   }
 
   let rawTracks = CONTRACT?.tracks || CONTRACT?.sportPackage?.tracks || CONTRACT?.tracksData || CONTRACT?.data?.tracks || [];
 
-  if (!rawTracks.length) {
+  // Se os pontos não vierem embutidos no meta.json (arquivos separados track-N.json), buscar via VaarecClient
+  if (typeof VaarecClient !== 'undefined' && slug && rawTracks.length > 0) {
+    for (let i = 0; i < rawTracks.length; i++) {
+      const tr = rawTracks[i];
+      const pts = tr.points || tr.data || tr.gpsData || [];
+      if (!pts || pts.length === 0) {
+        const rawId = tr.id || tr.trackId || (i + 1);
+        try {
+          const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, rawId);
+          if (fetchedPoints && fetchedPoints.length > 0) {
+            tr.points = fetchedPoints;
+          }
+        } catch (errTrack) {
+          console.warn(`[Broadcast] Falha ao carregar track ${i + 1}:`, errTrack);
+        }
+      }
+    }
+  }
+
+  const hasValidPoints = rawTracks.some(tr => (tr.points && tr.points.length > 0) || (tr.data && tr.data.length > 0) || (tr.gpsData && tr.gpsData.length > 0));
+  if (!rawTracks.length || !hasValidPoints) {
     CONTRACT = buildDemoContract();
     rawTracks = CONTRACT.tracks;
   }

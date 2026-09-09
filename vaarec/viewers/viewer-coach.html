@@ -31,12 +31,13 @@ if (typeof window !== 'undefined' && !window.EMBEDDED_CANOE_MODEL_DATA_URI) {
 }
 </script>
 
-<!-- VAAREC Client (Opcional) -->
+<!-- VAAREC Client -->
+<script src="./vaarec-client.js"></script>
 <script>
 if (typeof VaarecClient === 'undefined') {
-  const s = document.createElement('script');
-  s.src = '/vaarec-client.js';
-  document.head.appendChild(s);
+  ['/vaarec/viewers/vaarec-client.js', '/vaarec-client.js', 'vaarec-client.js'].forEach(p => {
+    const s = document.createElement('script'); s.src = p; document.head.appendChild(s);
+  });
 }
 </script>
 
@@ -69,6 +70,17 @@ html, body {
   grid-template-columns: 1fr 380px;
   grid-template-rows: 56px 1fr 210px;
   height: 100vh; gap: 8px; padding: 8px;
+  transition: grid-template-columns .2s ease;
+}
+#app.side-collapsed {
+  grid-template-columns: 1fr 0px;
+}
+#app.side-collapsed #side-panel {
+  display: none !important;
+}
+#app.side-collapsed #topbar,
+#app.side-collapsed #chart-wrap {
+  grid-column: 1;
 }
 .glass {
   background: var(--glass);
@@ -249,6 +261,12 @@ table.splits td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.
     padding: 4px;
     gap: 4px;
   }
+  #app.side-collapsed {
+    grid-template-columns: 1fr 0px;
+  }
+  #app.side-collapsed #side-panel {
+    display: none !important;
+  }
   #topbar {
     padding: 0 10px;
   }
@@ -371,6 +389,10 @@ table.splits td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.
       <button class="btn" data-speed="4">4x</button>
       <button class="btn" data-speed="10">10x</button>
       <span id="timer">00:00.0</span>
+      <button class="btn" id="btn-toggle-side" onclick="toggleCoachPanel()" title="Recolher / Expandir Painel Lateral" style="display: inline-flex; align-items: center; gap: 5px;">
+        <i class="fa-solid fa-bars-staggered" id="icon-toggle-side"></i>
+        <span id="txt-toggle-side">Painel</span>
+      </button>
     </div>
   </div>
 
@@ -538,17 +560,43 @@ async function initContract() {
     }
   }
 
+  const slug = (typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null) || urlParams.get('v') || urlParams.get('slug');
   if (!CONTRACT && window.CONTRACT && typeof window.CONTRACT === 'object') {
     CONTRACT = window.CONTRACT;
   } else if (!CONTRACT) {
-    const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
     if (slug && typeof VaarecClient !== 'undefined') {
-      try { CONTRACT = await VaarecClient.fetchMeta(slug); } catch(e) {}
+      try {
+        CONTRACT = await VaarecClient.fetchMeta(slug);
+        VaarecClient.logViewEvent(slug);
+      } catch(e) {
+        console.warn('Erro ao carregar meta:', e);
+      }
     }
   }
 
   let rawTracks = CONTRACT?.tracks || CONTRACT?.sportPackage?.tracks || CONTRACT?.tracksData || CONTRACT?.data?.tracks || [];
-  if (!rawTracks.length) {
+
+  // Se os pontos não vierem embutidos no meta.json (arquivos separados track-N.json), buscar via VaarecClient
+  if (typeof VaarecClient !== 'undefined' && slug && rawTracks.length > 0) {
+    for (let i = 0; i < rawTracks.length; i++) {
+      const tr = rawTracks[i];
+      const pts = tr.points || tr.data || tr.gpsData || [];
+      if (!pts || pts.length === 0) {
+        const rawId = tr.id || tr.trackId || (i + 1);
+        try {
+          const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, rawId);
+          if (fetchedPoints && fetchedPoints.length > 0) {
+            tr.points = fetchedPoints;
+          }
+        } catch (errTrack) {
+          console.warn(`[Coach] Falha ao carregar track ${i + 1}:`, errTrack);
+        }
+      }
+    }
+  }
+
+  const hasValidPoints = rawTracks.some(tr => (tr.points && tr.points.length > 0) || (tr.data && tr.data.length > 0) || (tr.gpsData && tr.gpsData.length > 0));
+  if (!rawTracks.length || !hasValidPoints) {
     CONTRACT = buildDemoContract();
     rawTracks = CONTRACT.tracks;
   }
@@ -587,6 +635,24 @@ async function initContract() {
   initAthleteUI();
   initChartLegend();
   initEvents();
+}
+
+function toggleCoachPanel() {
+  const app = document.getElementById('app');
+  const icon = document.getElementById('icon-toggle-side');
+  const txt = document.getElementById('txt-toggle-side');
+  if (!app) return;
+  const isCollapsed = app.classList.toggle('side-collapsed');
+  if (isCollapsed) {
+    if (icon) icon.className = 'fa-solid fa-expand';
+    if (txt) txt.textContent = 'Ver Painel';
+  } else {
+    if (icon) icon.className = 'fa-solid fa-bars-staggered';
+    if (txt) txt.textContent = 'Painel';
+  }
+  if (map && typeof map.resize === 'function') {
+    setTimeout(() => map.resize(), 120);
+  }
 }
 
 function buildDemoContract() {

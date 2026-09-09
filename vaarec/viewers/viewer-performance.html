@@ -31,12 +31,13 @@ if (typeof window !== 'undefined' && !window.EMBEDDED_CANOE_MODEL_DATA_URI) {
 }
 </script>
 
-<!-- VAAREC Client (Opcional) -->
+<!-- VAAREC Client -->
+<script src="./vaarec-client.js"></script>
 <script>
 if (typeof VaarecClient === 'undefined') {
-  const s = document.createElement('script');
-  s.src = '/vaarec-client.js';
-  document.head.appendChild(s);
+  ['/vaarec/viewers/vaarec-client.js', '/vaarec-client.js', 'vaarec-client.js'].forEach(p => {
+    const s = document.createElement('script'); s.src = p; document.head.appendChild(s);
+  });
 }
 </script>
 
@@ -59,7 +60,8 @@ if (typeof VaarecClient === 'undefined') {
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
-  width: 100%; min-height: 100%; overflow-x: hidden;
+  width: 100%; min-height: 100%; overflow-x: hidden; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: radial-gradient(ellipse at 50% 0%, var(--bg-deep-2), var(--bg-deep));
   font-family: var(--font-body); color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -74,12 +76,12 @@ html, body {
 }
 
 #app {
-  max-width: 1320px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 18px;
+  max-width: 1320px; margin: 0 auto; padding: 24px; padding-bottom: 60px; display: flex; flex-direction: column; gap: 18px;
 }
 
 /* Topbar */
 #topbar {
-  display: flex; align-items: center; justify-content: space-between; padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; gap: 12px; flex-wrap: wrap;
 }
 #topbar .brand {
   font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: 2px;
@@ -96,7 +98,7 @@ html, body {
 .pill.active { background: var(--cyan-dim); border-color: var(--cyan); color: #eafffe; box-shadow: 0 0 12px var(--cyan-dim); }
 
 /* Grid de Cards */
-#grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+#grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; transition: all .2s ease; }
 .card { padding: 18px 22px; }
 .card .lbl { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
 .card .big { font-family: var(--font-mono); font-size: 34px; color: var(--cyan); text-shadow: 0 0 12px var(--cyan-dim); line-height: 1; font-weight: 700; }
@@ -120,12 +122,12 @@ td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .bar-cell { position: relative; width: 130px; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
 .bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--cyan), var(--amber)); border-radius: 4px; }
 
-#replay-card { padding: 16px; position: relative; min-height: 320px; display: flex; flex-direction: column; }
+#replay-card { padding: 16px; position: relative; min-height: 520px; display: flex; flex-direction: column; }
 #replay-card h3 {
   font-family: var(--font-display); font-size: 13px; letter-spacing: 2px;
   color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
 }
-#mini-map-container { width: 100%; height: 230px; border-radius: 8px; display: block; flex: 1; overflow: hidden; }
+#mini-map-container { width: 100%; height: 440px; min-height: 380px; border-radius: 8px; display: block; flex: 1; overflow: hidden; }
 #mini-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .btn {
   font-family: var(--font-display); font-weight: 600; letter-spacing: 1px;
@@ -234,7 +236,7 @@ td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
    ================================================================ */
 @media screen and (max-height: 520px), screen and (max-width: 920px) and (orientation: landscape) {
   #app {
-    padding: 6px 10px;
+    padding: 6px 10px 48px 10px;
     gap: 8px;
     max-width: 100vw;
   }
@@ -256,8 +258,15 @@ td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
     font-size: 11px;
     border-radius: 12px;
   }
+  #btn-toggle-stats {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
   #grid {
     gap: 6px;
+  }
+  #grid.collapsed {
+    display: none !important;
   }
   .card {
     padding: 6px 10px;
@@ -285,7 +294,7 @@ td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
   }
   #splits-card {
     padding: 8px 12px;
-    max-height: 220px;
+    max-height: 320px;
     overflow-y: auto;
   }
   #splits-card h3 {
@@ -304,14 +313,15 @@ td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
   }
   #replay-card {
     padding: 8px 12px;
-    min-height: 180px;
+    min-height: 360px;
   }
   #replay-card h3 {
     font-size: 11px;
     margin-bottom: 4px;
   }
   #mini-map-container {
-    height: 130px;
+    height: 290px;
+    min-height: 260px;
   }
   #mini-controls {
     margin-top: 4px;
@@ -351,8 +361,13 @@ td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
     <div class="brand">
       <span id="perf-title-txt">DASHBOARD DE PERFORMANCE VAAREC</span>
       <span>ANÁLISE BIOMÉTRICA & MÉTRICAS MECÂNICAS — MAPBOX 3D REPLAY</span>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <div id="athlete-select"></div>
+      <button id="btn-toggle-stats" class="btn" onclick="toggleStatsCards()" style="display: inline-flex; align-items: center; gap: 6px;" title="Recolher / Expandir Métricas">
+        <i class="fa-solid fa-compress" id="icon-toggle-stats"></i>
+        <span id="txt-toggle-stats">Recolher Métricas</span>
+      </button>
     </div>
-    <div id="athlete-select"></div>
   </div>
 
   <div id="grid">
@@ -530,17 +545,43 @@ async function initContract() {
     }
   }
 
+  const slug = (typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null) || urlParams.get('v') || urlParams.get('slug');
   if (!CONTRACT && window.CONTRACT && typeof window.CONTRACT === 'object') {
     CONTRACT = window.CONTRACT;
   } else if (!CONTRACT) {
-    const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
     if (slug && typeof VaarecClient !== 'undefined') {
-      try { CONTRACT = await VaarecClient.fetchMeta(slug); } catch(e) {}
+      try {
+        CONTRACT = await VaarecClient.fetchMeta(slug);
+        VaarecClient.logViewEvent(slug);
+      } catch(e) {
+        console.warn('Erro ao carregar meta:', e);
+      }
     }
   }
 
   let rawTracks = CONTRACT?.tracks || CONTRACT?.sportPackage?.tracks || CONTRACT?.tracksData || CONTRACT?.data?.tracks || [];
-  if (!rawTracks.length) {
+
+  // Se os pontos não vierem embutidos no meta.json (arquivos separados track-N.json), buscar via VaarecClient
+  if (typeof VaarecClient !== 'undefined' && slug && rawTracks.length > 0) {
+    for (let i = 0; i < rawTracks.length; i++) {
+      const tr = rawTracks[i];
+      const pts = tr.points || tr.data || tr.gpsData || [];
+      if (!pts || pts.length === 0) {
+        const rawId = tr.id || tr.trackId || (i + 1);
+        try {
+          const fetchedPoints = await VaarecClient.fetchTrackPoints(slug, rawId);
+          if (fetchedPoints && fetchedPoints.length > 0) {
+            tr.points = fetchedPoints;
+          }
+        } catch (errTrack) {
+          console.warn(`[Performance] Falha ao carregar track ${i + 1}:`, errTrack);
+        }
+      }
+    }
+  }
+
+  const hasValidPoints = rawTracks.some(tr => (tr.points && tr.points.length > 0) || (tr.data && tr.data.length > 0) || (tr.gpsData && tr.gpsData.length > 0));
+  if (!rawTracks.length || !hasValidPoints) {
     CONTRACT = buildDemoContract();
     rawTracks = CONTRACT.tracks;
   }
@@ -570,6 +611,28 @@ async function initContract() {
   updateKPIs();
   initMiniMap();
   initEvents();
+}
+
+function toggleStatsCards() {
+  const grid = document.getElementById('grid');
+  const icon = document.getElementById('icon-toggle-stats');
+  const txt = document.getElementById('txt-toggle-stats');
+  if (!grid) return;
+  const isHidden = grid.classList.contains('collapsed') || (grid.style.display === 'none');
+  if (isHidden) {
+    grid.classList.remove('collapsed');
+    grid.style.display = 'grid';
+    if (icon) icon.className = 'fa-solid fa-compress';
+    if (txt) txt.textContent = 'Recolher Métricas';
+  } else {
+    grid.classList.add('collapsed');
+    grid.style.display = 'none';
+    if (icon) icon.className = 'fa-solid fa-expand';
+    if (txt) txt.textContent = 'Ver Métricas';
+  }
+  if (miniMap && typeof miniMap.resize === 'function') {
+    setTimeout(() => miniMap.resize(), 120);
+  }
 }
 
 function buildDemoContract() {
