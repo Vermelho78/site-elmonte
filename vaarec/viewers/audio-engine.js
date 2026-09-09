@@ -1,6 +1,6 @@
 /**
  * audio-engine.js — VAAREC Procedural Ocean Soundtrack & Race Audio Director
- * Motor de Áudio 100% Nativo (Web Audio API) para Replay de Canoagem Oceânica / Va'a.
+ * Motor de Áudio 100% Nativo (Web Audio API) para Replay de Canoagem Polinésia / Va'a.
  * Zero arquivos MP3 pesados ou dependências externas — Síntese em tempo real com alta fidelidade!
  * Suporta aceleração de tempo sincronizada (1x, 5x, 10x, 30x).
  */

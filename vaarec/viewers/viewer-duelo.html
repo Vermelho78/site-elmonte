@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VAAREC • Duelo Head-to-Head 1v1</title>
+<meta name="description" content="Modo duelo 1v1 gamificado com cabo de guerra virtual, gap em tempo real e confronto direto de telemetria no VAAREC.">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Mapbox GL JS v3 -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+
+<!-- Three.js + GLTFLoader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="Model/canoe_model_base64.js"></script>
+<script>
+if (typeof window !== 'undefined' && !window.EMBEDDED_CANOE_MODEL_DATA_URI) {
+  ['/Model/canoe_model_base64.js', '../Model/canoe_model_base64.js', './Model/canoe_model_base64.js', 'canoe_model_base64.js'].forEach(p => {
+    const s = document.createElement('script'); s.src = p; document.head.appendChild(s);
+  });
+}
+</script>
+
+<!-- VAAREC Client (Opcional) -->
+<script>
+if (typeof VaarecClient === 'undefined') {
+  const s = document.createElement('script');
+  s.src = '/vaarec-client.js';
+  document.head.appendChild(s);
+}
+</script>
+
+<style>
+:root {
+  --bg-deep: #040A12;
+  --glass: rgba(10, 22, 34, 0.82);
+  --glass-border: rgba(120, 220, 255, 0.22);
+  --cyan: #00F2FE;
+  --cyan-dim: rgba(0, 242, 254, 0.35);
+  --amber: #ffb020;
+  --amber-dim: rgba(255, 176, 32, 0.35);
+  --danger: #ff4d6d;
+  --text: #d9eef6;
+  --muted: #6f8ea0;
+  --font-display: 'Rajdhani', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #020608; font-family: 'Inter', sans-serif; color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+#app { position: relative; width: 100vw; height: 100vh; }
+#map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* Divisor Central */
+#center-divider {
+  position: absolute; top: 0; bottom: 0; left: 50%; width: 4px; transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(0, 242, 254, 0.4), transparent);
+  z-index: 6; pointer-events: none;
+}
+
+/* Tug of War */
+#tug-bar {
+  position: absolute; top: 68px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 34px; z-index: 7; pointer-events: none;
+}
+#tug-track { position: relative; width: 100%; height: 100%; border-radius: 17px; overflow: hidden; }
+#tug-fill-a, #tug-fill-b { position: absolute; top: 0; bottom: 0; width: 50%; transition: width .25s ease; }
+#tug-fill-a { left: 0; background: linear-gradient(90deg, transparent, var(--fillA, #00F2FE)); }
+#tug-fill-b { right: 0; background: linear-gradient(-90deg, transparent, var(--fillB, #ffb020)); }
+#tug-marker {
+  position: absolute; top: -6px; width: 0; height: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid #ffffff;
+  left: 50%; transform: translateX(-50%); transition: left .25s ease;
+  filter: drop-shadow(0 0 8px #ffffff);
+}
+#tug-label {
+  position: absolute; top: 108px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 13px; color: var(--amber);
+  z-index: 7; white-space: nowrap; font-weight: 700; text-shadow: 0 0 10px var(--amber-dim);
+}
+
+/* Placas de Nomes */
+.name-plate {
+  position: absolute; top: 14px; padding: 10px 20px; z-index: 7;
+  font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 2px;
+}
+.name-plate.left { left: 14px; border-left: 4px solid var(--fillA, #00F2FE); }
+.name-plate.right { right: 14px; border-right: 4px solid var(--fillB, #ffb020); text-align: right; }
+.name-plate .sub { display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+
+/* HUDs Mini nos cantos */
+.hud-mini {
+  position: absolute; bottom: 18px; padding: 12px 18px; z-index: 7; display: flex; gap: 20px;
+}
+.hud-mini.left { left: 14px; }
+.hud-mini.right { right: 14px; }
+.hud-mini .m { text-align: center; }
+.hud-mini .m .lbl { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; display: block; }
+.hud-mini .m .val { font-family: var(--font-mono); font-size: 18px; color: var(--cyan); text-shadow: 0 0 8px var(--cyan-dim); font-weight: 700; }
+
+/* Topbar & Playback */
+#topbar {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 8; display: flex; align-items: center; gap: 10px; padding: 8px 18px;
+}
+.btn {
+  font-family: var(--font-display); font-weight: 600; letter-spacing: 1px;
+  background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--glass-border);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px;
+}
+.btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.btn.active { background: var(--cyan-dim); border-color: var(--cyan); color: #eafffe; }
+#timer { font-family: var(--font-mono); color: var(--amber); font-size: 17px; font-weight: 700; }
+
+/* Seletor de Duelo */
+#pick-wrap {
+  position: absolute; bottom: 84px; left: 50%; transform: translateX(-50%);
+  z-index: 8; display: flex; gap: 12px; padding: 8px 16px; align-items: center;
+}
+#pick-wrap span { font-family: var(--font-display); font-size: 13px; color: var(--muted); letter-spacing: 1px; }
+select.duel-sel {
+  background: rgba(4, 10, 18, 0.85); color: #ffffff; border: 1px solid var(--glass-border);
+  border-radius: 6px; padding: 5px 10px; font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  outline: none; cursor: pointer;
+}
+
+#scrub {
+  position: absolute; bottom: 64px; left: 14px; right: 14px;
+  -webkit-appearance: none; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.18); z-index: 10; cursor: pointer;
+}
+#scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--cyan); box-shadow: 0 0 8px var(--cyan); cursor: pointer;
+}
+
+.loading-veil {
+  position: absolute; inset: 0; background: var(--bg-deep); z-index: 100;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  font-family: var(--font-display); letter-spacing: 2px; color: var(--cyan); font-weight: 700;
+}
+
+/* ================================================================
+   LANDSCAPE ORIENTATION GUARD (EXCLUSIVELY LANDSCAPE TEMPLATE)
+   ================================================================ */
+.orientation-guard {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 10, 18, 0.97);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  z-index: 99999;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+}
+@media (orientation: portrait) and (max-width: 950px), (max-aspect-ratio: 1/1) and (max-width: 950px) {
+  .orientation-guard {
+    display: flex !important;
+  }
+}
+.orientation-guard-card {
+  background: rgba(10, 22, 34, 0.92);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 242, 254, 0.2);
+  border-radius: 20px;
+  padding: 32px 24px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.orientation-phone-icon {
+  margin-bottom: 4px;
+}
+.rotate-phone-anim {
+  animation: phoneRotateDuel 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes phoneRotateDuel {
+  0%, 20% { transform: rotate(0deg); }
+  50%, 80% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+.guard-badge {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.orientation-guard-card h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+}
+.orientation-guard-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.guard-pill {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  background: rgba(255, 176, 32, 0.1);
+  border: 1px solid rgba(255, 176, 32, 0.3);
+  padding: 6px 14px;
+  border-radius: 8px;
+}
+
+/* ================================================================
+   RESPONSIVE MOBILE LANDSCAPE (DUELO 1V1)
+   ================================================================ */
+@media screen and (max-height: 520px), screen and (max-width: 920px) and (orientation: landscape) {
+  #topbar {
+    top: 6px;
+    padding: 4px 10px;
+    gap: 6px;
+  }
+  .btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  #timer {
+    font-size: 13px;
+  }
+  .name-plate {
+    top: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  .name-plate .sub {
+    font-size: 9px;
+  }
+  #tug-bar {
+    top: 42px;
+    width: clamp(240px, 46vw, 440px);
+    height: 20px;
+  }
+  #tug-label {
+    top: 66px;
+    font-size: 10px;
+  }
+  #pick-wrap {
+    bottom: 50px;
+    padding: 4px 10px;
+    gap: 6px;
+  }
+  #pick-wrap span {
+    font-size: 10px;
+  }
+  select.duel-sel {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+  .hud-mini {
+    bottom: 8px;
+    padding: 5px 8px;
+    gap: 8px;
+  }
+  .hud-mini .m .lbl {
+    font-size: 8px;
+  }
+  .hud-mini .m .val {
+    font-size: 12px;
+  }
+  #scrub {
+    bottom: 40px;
+    left: 8px;
+    right: 8px;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- Landscape Orientation Guard (Exclusivo Deitado) -->
+<div id="vaarec-orientation-prompt" class="orientation-guard">
+  <div class="orientation-guard-card">
+    <div class="orientation-phone-icon">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#00F2FE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="rotate-phone-anim">
+        <rect x="4" y="2" width="16" height="20" rx="3" ry="3"></rect>
+        <line x1="12" y1="18" x2="12" y2="18.01"></line>
+      </svg>
+    </div>
+    <div class="guard-badge">VAAREC DUELO 1V1</div>
+    <h2>GIRE O DISPOSITIVO</h2>
+    <p>O Modo Duelo Head-to-Head foi projetado exclusivamente para visualização na horizontal (Landscape).</p>
+    <div class="guard-pill">MODO DEITADO RECOMENDADO 🔄</div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="map-container"></div>
+  <div id="center-divider"></div>
+
+  <!-- Cabo de Guerra Virtual -->
+  <div id="tug-bar" class="glass">
+    <div id="tug-track">
+      <div id="tug-fill-a"></div>
+      <div id="tug-fill-b"></div>
+      <div id="tug-marker"></div>
+    </div>
+  </div>
+  <div id="tug-label">EMPURRANDO VANTAGEM · EMPATE</div>
+
+  <!-- Placas de Atletas -->
+  <div class="name-plate left glass" id="plate-a">
+    <span id="name-a">Canoa A</span>
+    <span class="sub" id="sub-a">Pace: 04:15 · 14.2 km/h</span>
+  </div>
+
+  <div class="name-plate right glass" id="plate-b">
+    <span id="name-b">Canoa B</span>
+    <span class="sub" id="sub-b">Pace: 04:20 · 13.9 km/h</span>
+  </div>
+
+  <!-- HUDs Laterais -->
+  <div class="hud-mini left glass">
+    <div class="m"><span class="lbl">Velocidade</span><span class="val" id="spd-a">0.0 km/h</span></div>
+    <div class="m"><span class="lbl">Pace</span><span class="val" id="pace-a">00:00</span></div>
+    <div class="m"><span class="lbl">Restante</span><span class="val" id="rem-a">0.00 km</span></div>
+  </div>
+
+  <div class="hud-mini right glass">
+    <div class="m"><span class="lbl">Velocidade</span><span class="val" id="spd-b">0.0 km/h</span></div>
+    <div class="m"><span class="lbl">Pace</span><span class="val" id="pace-b">00:00</span></div>
+    <div class="m"><span class="lbl">Restante</span><span class="val" id="rem-b">0.00 km</span></div>
+  </div>
+
+  <!-- Controles -->
+  <div id="topbar" class="glass">
+    <button class="btn" id="btn-play"><i class="fa-solid fa-play"></i></button>
+    <button class="btn" data-speed="1">1x</button>
+    <button class="btn active" data-speed="2">2x</button>
+    <button class="btn" data-speed="5">5x</button>
+    <button class="btn" data-speed="10">10x</button>
+    <span id="timer">00:00.0</span>
+    <div class="boat-mode-toggle" style="display:inline-flex; gap:2px; margin-left:6px; background:rgba(255,255,255,0.06); padding:2px; border-radius:6px; border:1px solid var(--glass-border);">
+      <button class="btn btn-boat-mode active" data-mode="model" title="Exibir Modelo 3D da Canoa [M]" style="padding:4px 8px; font-size:11px;"><i class="fa-solid fa-ship"></i> 3D</button>
+      <button class="btn btn-boat-mode" data-mode="arrow" title="Exibir Seta Alinhada [M]" style="padding:4px 8px; font-size:11px;"><i class="fa-solid fa-location-arrow"></i> Seta</button>
+    </div>
+  </div>
+
+  <div id="pick-wrap" class="glass">
+    <span>DUELISTA 1:</span>
+    <select class="duel-sel" id="sel-duel-a"></select>
+    <span style="margin: 0 8px; color: var(--cyan);">VS</span>
+    <span>DUELISTA 2:</span>
+    <select class="duel-sel" id="sel-duel-b"></select>
+  </div>
+
+  <input type="range" id="scrub" min="0" max="1000" value="0">
+  <div class="loading-veil" id="loading-veil"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><br>CARREGANDO DUELO VAAREC…</div>
+</div>
+
+<script>
+const MAPBOX_TOKEN = "pk.eyJ1IjoidmVybWVsaG9tb250ZSIsImEiOiJjbTIwd2lpMTIwbXZjMnFwdGl6N3IyMTd5In0.wHyz3cKuR7KNtVTZ14LYzQ";
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+let map = null;
+let CONTRACT = null;
+let tracksData = [];
+let idxA = 0, idxB = 1;
+
+let simTimeSec = 0;
+let isPlaying = false;
+let playSpeed = 2;
+let minTimeSec = 0, maxTimeSec = 1200;
+
+let threeScene, threeCamera, threeRenderer;
+let boatObjects = [];
+const smoothCam = { lng: null, lat: null, heading: 0 };
+let userInteracting = false;
+
+function haversineDistanceMeters(p1, p2) {
+  const R = 6371000;
+  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((p1.lat * Math.PI) / 180) * Math.cos((p2.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculateHeading(p1, p2) {
+  if (!p1 || !p2) return 0;
+  const lat1 = (p1.lat * Math.PI) / 180;
+  const lat2 = (p2.lat * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  const rad = Math.atan2(y, x);
+  return ((rad * 180) / Math.PI + 360) % 360;
+}
+
+function sanitizeTrackPoints(pts) {
+  if (!Array.isArray(pts) || !pts.length) return [];
+
+  let rawTimes = [];
+  pts.forEach(p => {
+    let tVal = null;
+    if (p.tRel != null) tVal = Number(p.tRel);
+    else if (p.t != null) tVal = Number(p.t);
+    else if (p.timestamp != null) tVal = Number(p.timestamp);
+    else if (p.absT != null) tVal = Number(p.absT);
+    else if (p.time) tVal = new Date(p.time).getTime();
+    rawTimes.push(tVal);
+  });
+
+  const firstT = rawTimes[0] != null ? rawTimes[0] : 0;
+  const lastT = rawTimes[rawTimes.length - 1] != null ? rawTimes[rawTimes.length - 1] : rawTimes.length;
+  const rawSpan = Math.abs(lastT - firstT);
+
+  const isMillis = (rawSpan > 5000 && pts.length < rawSpan / 50) || firstT > 1e9;
+
+  const clean = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const lat = Number(p.lat ?? p.latitude);
+    const lng = Number(p.lon ?? p.lng ?? p.longitude);
+    const ele = Number(p.ele ?? p.alt ?? 0);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) continue;
+
+    let tSec = 0;
+    if (rawTimes[i] != null) {
+      tSec = isMillis ? (rawTimes[i] - firstT) / 1000 : (rawTimes[i] - firstT);
+    } else {
+      tSec = i;
+    }
+
+    let speedKmh = Number(p.spdKmh ?? p.speedKmh ?? p.speed_kmh ?? p.speed ?? 0);
+    clean.push({ lat, lng, ele, t: tSec, speedKmh });
+  }
+
+  clean.sort((a, b) => a.t - b.t);
+
+  let cumDist = 0;
+  for (let i = 0; i < clean.length; i++) {
+    if (i > 0) {
+      const stepM = haversineDistanceMeters(clean[i - 1], clean[i]);
+      cumDist += stepM;
+      const dt = clean[i].t - clean[i - 1].t;
+      if ((clean[i].speedKmh === 0 || isNaN(clean[i].speedKmh)) && dt > 0.1) {
+        clean[i].speedKmh = (stepM / dt) * 3.6;
+      }
+    }
+    clean[i].cumDistM = cumDist;
+    const next = clean[i + 1] || clean[i];
+    const prev = clean[i - 1] || clean[i];
+    clean[i].heading = calculateHeading(clean[i], next !== clean[i] ? next : prev);
+  }
+
+  return clean;
+}
+
+// =========================================================================
+// 1. CARREGAMENTO DO CONTRATO
+// =========================================================================
+async function initContract() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const directDataUrl = urlParams.get('data') || urlParams.get('json') || urlParams.get('contract') || urlParams.get('file');
+  if (directDataUrl) {
+    try {
+      const res = await fetch(directDataUrl);
+      if (res.ok) CONTRACT = await res.json();
+    } catch(e) {
+      console.warn('Erro ao carregar contrato via URL:', e);
+    }
+  }
+
+  if (!CONTRACT && window.CONTRACT && typeof window.CONTRACT === 'object') {
+    CONTRACT = window.CONTRACT;
+  } else if (!CONTRACT) {
+    const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
+    if (slug && typeof VaarecClient !== 'undefined') {
+      try { CONTRACT = await VaarecClient.fetchMeta(slug); } catch(e) {}
+    }
+  }
+
+  let rawTracks = CONTRACT?.tracks || CONTRACT?.sportPackage?.tracks || CONTRACT?.tracksData || CONTRACT?.data?.tracks || [];
+  if (!rawTracks.length) {
+    CONTRACT = buildDemoContract();
+    rawTracks = CONTRACT.tracks;
+  }
+
+  tracksData = rawTracks.map((tr, i) => {
+    const ptsRaw = tr.points || tr.data || tr.gpsData || [];
+    const pts = sanitizeTrackPoints(ptsRaw);
+
+    return {
+      id: tr.id || `track-${i+1}`,
+      name: tr.name || `Canoa ${i+1}`,
+      color: tr.color || (i === 0 ? '#00F2FE' : i === 1 ? '#ffb020' : '#ff4d6d'),
+      points: pts
+    };
+  }).filter(tr => tr.points.length > 0);
+
+  if (tracksData.length > 1) {
+    idxA = 0; idxB = 1;
+  }
+
+  if (tracksData.length && tracksData[0].points.length) {
+    minTimeSec = 0;
+    maxTimeSec = Math.max(...tracksData.map(t => t.points[t.points.length-1].t));
+    simTimeSec = minTimeSec;
+  }
+
+  document.getElementById('loading-veil').style.display = 'none';
+
+  initMap();
+  initSelectors();
+  initEvents();
+}
+
+function buildDemoContract() {
+  const ORIGIN = { lat: -27.1892, lng: -48.5143 };
+  const wps = [{ x: 0, z: 0 }, { x: 180, z: -900 }, { x: -350, z: -1800 }, { x: 60, z: -2550 }, { x: -40, z: -80 }];
+  let tot = 0; for (let i=1; i<wps.length; i++) tot += Math.hypot(wps[i].x - wps[i-1].x, wps[i].z - wps[i-1].z);
+
+  function getPt(frac) {
+    let acc = 0, target = frac * tot;
+    for (let i=1; i<wps.length; i++) {
+      const d = Math.hypot(wps[i].x - wps[i-1].x, wps[i].z - wps[i-1].z);
+      if (target <= acc + d || i === wps.length - 1) {
+        const f = (target - acc) / (d || 1);
+        return { x: wps[i-1].x + (wps[i].x - wps[i-1].x)*f, z: wps[i-1].z + (wps[i].z - wps[i-1].z)*f };
+      }
+      acc += d;
+    }
+    return wps[wps.length-1];
+  }
+
+  const defs = [
+    { name: 'Canoa 1 • Rodrigo (Líder)', color: '#00F2FE', spd: 14.4 },
+    { name: 'Canoa 2 • Marcos Costa', color: '#ffb020', spd: 14.1 }
+  ];
+
+  const tracks = defs.map((d, idx) => {
+    const pts = []; let cum = 0; const dur = 900; let prev = getPt(0);
+    for (let t=0; t<=dur; t+=2) {
+      const spdKmh = d.spd + Math.sin(t*0.02 + idx)*0.7;
+      const spdMs = spdKmh / 3.6;
+      const frac = Math.min(1, (cum + spdMs * 2) / tot);
+      const pos = getPt(frac);
+      pos.x += (idx === 0 ? -12 : 12) + Math.sin(t*0.015) * 4;
+      cum += Math.hypot(pos.x - prev.x, pos.z - prev.z);
+      const heading = (Math.atan2(pos.x - prev.x, -(pos.z - prev.z)) * 180 / Math.PI + 360) % 360;
+      pts.push({
+        lat: ORIGIN.lat - (pos.z / 111139),
+        lng: ORIGIN.lng + (pos.x / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))),
+        t, spdKmh: +spdKmh.toFixed(1), heading: +heading.toFixed(1), cumDistM: +cum.toFixed(1)
+      });
+      prev = pos;
+    }
+    return { id: `tr-${idx+1}`, name: d.name, color: d.color, points: pts };
+  });
+
+  return { name: 'Campeonato Catarinense 2026', totalDistanceKm: +(tot/1000).toFixed(2), tracks };
+}
+
+// =========================================================================
+// 2. MAPBOX GL JS & THREE.JS 3D SCENE
+// =========================================================================
+function initMap() {
+  const firstPt = tracksData[0]?.points[0] || { lng: -48.4805, lat: -27.4292, heading: 45 };
+  smoothCam.lng = firstPt.lng;
+  smoothCam.lat = firstPt.lat;
+  smoothCam.heading = firstPt.heading || 45;
+
+  map = new mapboxgl.Map({
+    container: 'map-container',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [firstPt.lng, firstPt.lat],
+    zoom: 17.6,
+    pitch: 74,
+    maxPitch: 85,
+    bearing: firstPt.heading || 45,
+    antialias: true,
+    interactive: true,
+    projection: 'mercator'
+  });
+
+  // Permitir ao usuário girar e dar zoom livremente na canoa 3D sem brigar com o camera-chase
+  map.on('dragstart', () => { userInteracting = true; });
+  map.on('rotatestart', () => { userInteracting = true; });
+  map.on('pitchstart', () => { userInteracting = true; });
+  map.on('wheel', () => { userInteracting = true; });
+  map.on('dblclick', () => { userInteracting = false; });
+
+  map.on('style.load', () => {
+    try {
+      if (!map.getSource('mapbox-dem')) {
+        map.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14
+        });
+      }
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+    } catch(e) {}
+
+    try {
+      if (typeof map.setFog === 'function') {
+        map.setFog({ range: [0.5, 10], color: '#07090e', 'horizon-blend': 0.3 });
+      }
+    } catch(e) {}
+
+    if (!map.getLayer('vaarec-duel-3d-layer')) {
+      map.addLayer(createThreeJSDuelLayer());
+    }
+    requestAnimationFrame(renderLoop);
+  });
+}
+
+// Calibração Oficial Definida no Laboratório 3D (model-test.html / model-SKILL.md)
+const CANOE_3D_CONFIG = {
+  modelPath: '/Model/canoe_3D.glb',
+  positionOffset: { x: 0.0, y: 0.0, z: 0.10 },
+  rotationOffsetDeg: { x: 0.0, y: 0.0, z: -90.0, order: 'ZYX' },
+  scale: { uniform: true, scaleU: 0.0913 },
+  elevationZAboveWater: 0.10
+};
+
+let gltfCanoeBaseMesh = null;
+let isModelLoading = false;
+
+function loadCalibratedCanoeModel(onLoadedCallback) {
+  if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') return;
+  if (gltfCanoeBaseMesh) {
+    if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+    return;
+  }
+  isModelLoading = true;
+  const loader = new THREE.GLTFLoader();
+  
+  if (window.EMBEDDED_CANOE_MODEL_DATA_URI) {
+    loader.load(
+      window.EMBEDDED_CANOE_MODEL_DATA_URI,
+      (gltf) => {
+        gltfCanoeBaseMesh = gltf.scene || gltf.scenes[0];
+        gltfCanoeBaseMesh.traverse((child) => {
+          if (child.isMesh && child.geometry && !child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+        });
+        isModelLoading = false;
+        console.log('✅ [3D] Modelo canoe_3D.glb carregado via Data URI Base64');
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+      },
+      undefined,
+      (err) => {
+        console.warn('[3D] Falha ao carregar Data URI, tentando CDN e caminhos relativos...', err);
+        tryLoad(0);
+      }
+    );
+    return;
+  }
+
+  const modelPaths = [
+    'https://ahqwpngtawzstghcnxpa.supabase.co/storage/v1/object/public/vaarec-data/models/canoe_3D.glb',
+    'Model/canoe_3D.glb',
+    './Model/canoe_3D.glb',
+    '/vaarec/viewers/Model/canoe_3D.glb',
+    '/Model/canoe_3D.glb',
+    '../Model/canoe_3D.glb',
+    'canoe_3D.glb'
+  ];
+
+  function tryLoad(idx = 0) {
+    if (idx >= modelPaths.length) {
+      isModelLoading = false;
+      console.warn('[3D] Modelo canoe_3D.glb não encontrado nos caminhos. Usando geometria procedural Va\'a.');
+      return;
+    }
+    loader.load(
+      modelPaths[idx],
+      (gltf) => {
+        gltfCanoeBaseMesh = gltf.scene || gltf.scenes[0];
+        gltfCanoeBaseMesh.traverse((child) => {
+          if (child.isMesh && child.geometry && !child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+        });
+        isModelLoading = false;
+        console.log(`✅ [3D] Modelo canoe_3D.glb calibrado carregado via: ${modelPaths[idx]}`);
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+      },
+      undefined,
+      () => tryLoad(idx + 1)
+    );
+  }
+  tryLoad(0);
+}
+
+function applyCanoeCalibrationToMesh(meshClone, colorHex = '#00F2FE', opacity = 1.0) {
+  const isTransparent = opacity < 0.99;
+  meshClone.traverse((child) => {
+    if (child.isMesh) {
+      if (child.geometry && !child.geometry.attributes.normal) {
+        child.geometry.computeVertexNormals();
+      }
+      child.material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        roughness: 0.35,
+        metalness: 0.15,
+        side: THREE.DoubleSide,
+        transparent: isTransparent,
+        opacity: opacity,
+        depthWrite: !isTransparent
+      });
+      child.frustumCulled = false;
+      child.castShadow = !isTransparent;
+      child.receiveShadow = !isTransparent;
+    }
+  });
+
+  // 1. Posição / Offset
+  meshClone.position.set(
+    CANOE_3D_CONFIG.positionOffset.x,
+    CANOE_3D_CONFIG.positionOffset.y,
+    CANOE_3D_CONFIG.positionOffset.z
+  );
+
+  // 2. Rotação Euler calibrada (Rot Z: -90° para alinhar proa com +Y)
+  meshClone.rotation.order = CANOE_3D_CONFIG.rotationOffsetDeg.order || 'ZYX';
+  meshClone.rotation.set(
+    (CANOE_3D_CONFIG.rotationOffsetDeg.x * Math.PI) / 180,
+    (CANOE_3D_CONFIG.rotationOffsetDeg.y * Math.PI) / 180,
+    (CANOE_3D_CONFIG.rotationOffsetDeg.z * Math.PI) / 180
+  );
+
+  // 3. Escala proporcional calibrada (12m de comprimento real)
+  const s = CANOE_3D_CONFIG.scale.scaleU || 0.0913;
+  meshClone.scale.set(s, s, s);
+  meshClone.updateMatrixWorld(true);
+
+  return meshClone;
+}
+
+function createVaACanoeMesh(colorHex = '#00F2FE', opacity = 1.0) {
+  const group = new THREE.Group();
+  const isTransparent = opacity < 0.99;
+
+  // 1. Casco Principal Va'a
+  const hullGeo = new THREE.ConeGeometry(0.65, 12.0, 10);
+  hullGeo.scale(0.65, 1.0, 0.85);
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.3,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    transparent: isTransparent,
+    opacity: opacity * 0.9,
+    depthTest: true,
+    depthWrite: !isTransparent,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const hull = new THREE.Mesh(hullGeo, hullMat);
+  hull.rotation.x = -Math.PI / 2;
+  hull.position.set(0, 0, 0.4);
+  group.add(hull);
+
+  // Proa colorida (+Y)
+  const bowGeo = new THREE.ConeGeometry(0.70, 3.2, 10);
+  bowGeo.scale(0.65, 1.0, 0.85);
+  const bowMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: isTransparent ? 0.3 : 0.6,
+    roughness: 0.25,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    transparent: isTransparent,
+    opacity: opacity,
+    depthTest: true,
+    depthWrite: !isTransparent,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const bow = new THREE.Mesh(bowGeo, bowMat);
+  bow.rotation.x = -Math.PI / 2;
+  bow.position.set(0, 4.6, 0.4);
+  group.add(bow);
+
+  // 2. Flutuador Ama (a bombordo / -X = -2.2m)
+  const amaGeo = new THREE.ConeGeometry(0.40, 6.5, 8);
+  amaGeo.scale(0.75, 1.0, 0.75);
+  const amaMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: isTransparent ? 0.25 : 0.5,
+    roughness: 0.3,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    transparent: isTransparent,
+    opacity: opacity,
+    depthTest: true,
+    depthWrite: !isTransparent,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const ama = new THREE.Mesh(amaGeo, amaMat);
+  ama.rotation.x = -Math.PI / 2;
+  ama.position.set(-2.2, 0, 0.3);
+  group.add(ama);
+
+  // 3. Iakos
+  const iakoGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6);
+  const iakoMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.5,
+    metalness: 0.2,
+    transparent: isTransparent,
+    opacity: opacity * 0.9,
+    depthWrite: !isTransparent
+  });
+  
+  const iako1 = new THREE.Mesh(iakoGeo, iakoMat);
+  iako1.rotation.z = Math.PI / 2;
+  iako1.position.set(-1.1, 2.0, 0.6);
+  group.add(iako1);
+
+  const iako2 = new THREE.Mesh(iakoGeo, iakoMat);
+  iako2.rotation.z = Math.PI / 2;
+  iako2.position.set(-1.1, -2.0, 0.6);
+  group.add(iako2);
+
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
+function createAlignedArrowMesh(colorHex = '#00F2FE', opacity = 1.0) {
+  const group = new THREE.Group();
+  const isTransparent = opacity < 0.99;
+
+  // 1. Seta Direcional Tática Náutica (Chevron Esportivo de Alta Legibilidade e Alto Contraste)
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 9.5);           // Ponta da proa
+  shape.lineTo(4.2, -6.0);        // Asa externa estibordo
+  shape.lineTo(1.6, -3.5);        // Reentrância estibordo
+  shape.lineTo(0, -1.5);          // Vértice central cauda/popa
+  shape.lineTo(-1.6, -3.5);       // Reentrância bombordo
+  shape.lineTo(-4.2, -6.0);       // Asa externa bombordo
+  shape.closePath();
+
+  const extrudeSettings = {
+    steps: 1,
+    depth: 0.85,                  // Altura/espessura nítida de 85cm acima d'água
+    bevelEnabled: true,
+    bevelThickness: 0.25,
+    bevelSize: 0.20,
+    bevelOffset: 0,
+    bevelSegments: 3
+  };
+  const arrowGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  arrowGeo.translate(0, 0, 0.35);
+
+  const mainMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: isTransparent ? 0.35 : 0.85,      // Brilho tático vibrante
+    roughness: 0.20,
+    metalness: 0.30,
+    side: THREE.DoubleSide,
+    transparent: isTransparent,
+    opacity: opacity,
+    depthTest: true,
+    depthWrite: !isTransparent,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const arrowMesh = new THREE.Mesh(arrowGeo, mainMat);
+  group.add(arrowMesh);
+
+  // 2. Crista longitudinal luminosa para indicação de rumo ultra-nítida
+  const spineGeo = new THREE.CylinderGeometry(0.22, 0.22, 12.0, 8);
+  const spineMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: isTransparent,
+    opacity: opacity * 0.9,
+    depthTest: true,
+    depthWrite: !isTransparent
+  });
+  const spine = new THREE.Mesh(spineGeo, spineMat);
+  spine.position.set(0, 1.2, 1.25);
+  group.add(spine);
+
+  // 3. Ponta cônica de proa de alto contraste
+  const tipGeo = new THREE.ConeGeometry(0.55, 2.2, 8);
+  const tipMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: isTransparent,
+    opacity: opacity * 0.9,
+    depthTest: true,
+    depthWrite: !isTransparent
+  });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.rotation.x = -Math.PI / 2;
+  tip.position.set(0, 9.6, 0.95);
+  group.add(tip);
+
+  // Desativar frustum culling em todas as partes da seta
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
+let boatRenderMode = (typeof localStorage !== 'undefined' && localStorage.getItem('vaarec_boat_render_mode')) || 'model';
+
+function setBoatRenderMode(mode) {
+  boatRenderMode = mode === 'arrow' ? 'arrow' : 'model';
+  try { localStorage.setItem('vaarec_boat_render_mode', boatRenderMode); } catch(e) {}
+
+  if (boatRenderMode === 'model' && !gltfCanoeBaseMesh && !isModelLoading) {
+    loadCalibratedCanoeModel(() => {
+      rebuildDuelBoatMeshes();
+    });
+  }
+
+  boatObjects.forEach(b => {
+    if (b.modelMesh) b.modelMesh.visible = (boatRenderMode === 'model');
+    if (b.arrowMesh) b.arrowMesh.visible = (boatRenderMode === 'arrow');
+  });
+
+  document.querySelectorAll('.btn-boat-mode').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === boatRenderMode);
+  });
+
+  if (map) map.triggerRepaint();
+}
+
+function createThreeJSDuelLayer() {
+  return {
+    id: 'vaarec-duel-3d-layer',
+    type: 'custom',
+    renderingMode: '3d',
+    onAdd: function (mapInstance, gl) {
+      threeCamera = new THREE.Camera();
+
+      threeRenderer = new THREE.WebGLRenderer({
+        canvas: mapInstance.getCanvas(),
+        context: gl,
+        antialias: true
+      });
+      threeRenderer.autoClear = false;
+      threeRenderer.setPixelRatio(1);
+
+      rebuildDuelBoatMeshes();
+
+      // Carregar modelo 3D GLB calibrado de forma assíncrona ou instantânea via Base64/CDN
+      loadCalibratedCanoeModel(() => {
+        rebuildDuelBoatMeshes();
+      });
+    },
+    render: function (gl, matrix) {
+      if (!threeRenderer || !threeCamera) return;
+
+      try {
+        if (typeof threeRenderer.resetState === 'function') {
+          threeRenderer.resetState();
+        } else if (threeRenderer.state && typeof threeRenderer.state.reset === 'function') {
+          threeRenderer.state.reset();
+        }
+
+        boatObjects.forEach(bObj => {
+          const track = tracksData[bObj.trackIdx];
+          if (!track || !track.points || !track.points.length) return;
+
+          const pt = interpolatePointAtTime(track.points, simTimeSec);
+          if (!pt) return;
+
+          const coord = mapboxgl.MercatorCoordinate.fromLngLat([pt.lng, pt.lat], 0.0);
+          const M = coord.meterInMercatorCoordinateUnits();
+          const terrainElevation = (map.getTerrain() && typeof map.queryTerrainElevation === 'function')
+            ? (map.queryTerrainElevation([pt.lng, pt.lat]) || 0)
+            : 0;
+          const zElevation = coord.z + ((terrainElevation + 0.15) * M);
+          const headingRad = ((pt.heading || 0) * Math.PI) / 180;
+
+          // Orientação precisa na cartografia Mercator do Mapbox:
+          // Inverter Y (scale(M, -M, M)) alinha o +Y da canoa com o Norte verdadeiro (-Y Mercator).
+          // Rotação por -headingRad faz o rumo girar no sentido horário náutico (0°=N, 90°=E, 180°=S, 270°=W).
+          const rotation = new THREE.Matrix4().makeRotationZ(-headingRad);
+          const mercatorTransform = new THREE.Matrix4()
+            .makeTranslation(coord.x, coord.y, zElevation)
+            .scale(new THREE.Vector3(M, -M, M))
+            .multiply(rotation);
+
+          threeCamera.projectionMatrix = new THREE.Matrix4()
+            .fromArray(matrix)
+            .multiply(mercatorTransform);
+
+          bObj.modelMesh.visible = (boatRenderMode === 'model');
+          bObj.arrowMesh.visible = (boatRenderMode === 'arrow');
+
+          threeRenderer.render(bObj.scene, threeCamera);
+        });
+
+      } catch (e) {
+        console.error('[Duel 3D Render Error]', e);
+      }
+      map.triggerRepaint();
+    }
+  };
+}
+
+function rebuildDuelBoatMeshes() {
+  boatObjects = [];
+
+  tracksData.forEach((tr, idx) => {
+    if (!tr) return;
+
+    const isDuelBoat = (idx === idxA || idx === idxB);
+    const opacity = isDuelBoat ? 1.0 : 0.35;
+    const defaultColor = (idx === idxA) ? '#00F2FE' : ((idx === idxB) ? '#ffb020' : '#88a0b5');
+    const color = tr.color || defaultColor;
+
+    const boatScene = new THREE.Scene();
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, isDuelBoat ? 1.2 : 0.7);
+    boatScene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xffffff, isDuelBoat ? 1.5 : 0.9);
+    sunLight.position.set(30, -50, 40);
+    boatScene.add(sunLight);
+
+    const hemiLight = new THREE.HemisphereLight(0xdff0ff, 0x06111e, isDuelBoat ? 0.7 : 0.35);
+    boatScene.add(hemiLight);
+
+    const boatGroup = new THREE.Group();
+    boatGroup.matrixAutoUpdate = true;
+
+    let modelChild = null;
+    if (gltfCanoeBaseMesh) {
+      modelChild = applyCanoeCalibrationToMesh(gltfCanoeBaseMesh.clone(true), color, opacity);
+    } else {
+      modelChild = createVaACanoeMesh(color, opacity);
+    }
+    boatGroup.add(modelChild);
+
+    const arrowChild = createAlignedArrowMesh(color, opacity);
+    boatGroup.add(arrowChild);
+
+    modelChild.visible = (boatRenderMode === 'model');
+    arrowChild.visible = (boatRenderMode === 'arrow');
+
+    boatScene.add(boatGroup);
+    boatGroup.updateMatrixWorld(true);
+
+    boatObjects.push({
+      trackIdx: idx,
+      isDuel: isDuelBoat,
+      scene: boatScene,
+      group: boatGroup,
+      modelMesh: modelChild,
+      arrowMesh: arrowChild
+    });
+  });
+
+  if (map) map.triggerRepaint();
+}
+
+function updateDuelBoats3D() {
+  // Posições agora são computadas diretamente no render com precisão 64-bit por embarcação
+}
+
+function interpolatePointAtTime(points, targetTime) {
+  if (!points || !points.length) return null;
+  if (targetTime <= points[0].t) return points[0];
+  if (targetTime >= points[points.length-1].t) return points[points.length-1];
+
+  let lo = 0, hi = points.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].t <= targetTime) lo = mid; else hi = mid;
+  }
+  const a = points[lo], b = points[hi];
+  const f = (targetTime - a.t) / (b.t - a.t || 1);
+
+  let dh = (b.heading - a.heading + 540) % 360 - 180;
+  return {
+    lat: a.lat + (b.lat - a.lat)*f,
+    lng: a.lng + (b.lng - a.lng)*f,
+    speedKmh: a.speedKmh + (b.speedKmh - a.speedKmh)*f,
+    heading: (a.heading + dh*f + 360)%360,
+    cumDistM: (a.cumDistM || 0) + (((b.cumDistM || 0) - (a.cumDistM || 0))*f)
+  };
+}
+
+// =========================================================================
+// 3. ANIMATION LOOP & TUG OF WAR
+// =========================================================================
+let lastPerfTimestamp = null;
+
+function renderLoop(perfTimestamp) {
+  if (lastPerfTimestamp === null) lastPerfTimestamp = perfTimestamp;
+  const deltaSec = Math.max(0.001, Math.min(0.1, (perfTimestamp - lastPerfTimestamp) / 1000));
+  lastPerfTimestamp = perfTimestamp;
+
+  if (isPlaying) {
+    simTimeSec += deltaSec * playSpeed;
+    if (simTimeSec > maxTimeSec) simTimeSec = minTimeSec;
+  }
+
+  const progressRatio = (maxTimeSec > minTimeSec) ? (simTimeSec - minTimeSec) / (maxTimeSec - minTimeSec) : 0;
+  document.getElementById('scrub').value = progressRatio * 1000;
+  document.getElementById('timer').textContent = formatTime(simTimeSec - minTimeSec);
+
+  const trA = tracksData[idxA];
+  const trB = tracksData[idxB];
+
+  if (trA && trB) {
+    const ptA = interpolatePointAtTime(trA.points, simTimeSec);
+    const ptB = interpolatePointAtTime(trB.points, simTimeSec);
+
+    if (ptA && ptB) {
+      updateTugOfWar(ptA, ptB, trA, trB);
+
+      const midLng = (ptA.lng + ptB.lng) / 2;
+      const midLat = (ptA.lat + ptB.lat) / 2;
+      const avgHeading = ptA.heading;
+
+      if (smoothCam.lng === null) {
+        smoothCam.lng = midLng; smoothCam.lat = midLat; smoothCam.heading = avgHeading;
+      }
+
+      const factor = Math.min(1, deltaSec * 8.0 * Math.max(1, playSpeed));
+      smoothCam.lng += (midLng - smoothCam.lng) * factor;
+      smoothCam.lat += (midLat - smoothCam.lat) * factor;
+
+      let dBearing = (avgHeading - smoothCam.heading + 540) % 360 - 180;
+      smoothCam.heading = (smoothCam.heading + dBearing * factor + 360) % 360;
+
+      if (map) {
+        if (userInteracting) {
+          map.jumpTo({ center: [smoothCam.lng, smoothCam.lat] });
+        } else {
+          map.jumpTo({
+            center: [smoothCam.lng, smoothCam.lat],
+            bearing: smoothCam.heading,
+            pitch: 76,
+            zoom: 17.8
+          });
+        }
+      }
+    }
+  }
+
+  requestAnimationFrame(renderLoop);
+}
+
+function updateTugOfWar(ptA, ptB, trA, trB) {
+  const distA = ptA.cumDistM || 0;
+  const distB = ptB.cumDistM || 0;
+  const diffM = distA - distB;
+
+  document.documentElement.style.setProperty('--fillA', trA.color);
+  document.documentElement.style.setProperty('--fillB', trB.color);
+
+  const maxGap = 50;
+  const clamped = Math.max(-maxGap, Math.min(maxGap, diffM));
+  const normA = (clamped + maxGap) / (maxGap * 2);
+  const pctA = (normA * 100).toFixed(1);
+
+  document.getElementById('tug-fill-a').style.width = `${pctA}%`;
+  document.getElementById('tug-fill-b').style.width = `${(100 - pctA).toFixed(1)}%`;
+  document.getElementById('tug-marker').style.left = `${pctA}%`;
+
+  const absDiff = Math.abs(Math.round(diffM));
+  let tugText = 'EMPATADOS LADO A LADO';
+  if (diffM > 1) {
+    tugText = `▲ ${trA.name.toUpperCase()} LIDERANDO COM +${absDiff}m DE VANTAGEM`;
+  } else if (diffM < -1) {
+    tugText = `▲ ${trB.name.toUpperCase()} LIDERANDO COM +${absDiff}m DE VANTAGEM`;
+  }
+  document.getElementById('tug-label').textContent = tugText;
+
+  document.getElementById('name-a').textContent = trA.name;
+  document.getElementById('name-b').textContent = trB.name;
+  document.getElementById('sub-a').textContent = `Pace: ${calcPace(ptA.speedKmh)} · ${ptA.speedKmh.toFixed(1)} km/h`;
+  document.getElementById('sub-b').textContent = `Pace: ${calcPace(ptB.speedKmh)} · ${ptB.speedKmh.toFixed(1)} km/h`;
+
+  document.getElementById('spd-a').textContent = `${ptA.speedKmh.toFixed(1)} km/h`;
+  document.getElementById('spd-b').textContent = `${ptB.speedKmh.toFixed(1)} km/h`;
+  document.getElementById('pace-a').textContent = calcPace(ptA.speedKmh);
+  document.getElementById('pace-b').textContent = calcPace(ptB.speedKmh);
+
+  const totKm = CONTRACT.totalDistanceKm || (tracksData[0]?.points[tracksData[0].points.length - 1]?.cumDistM / 1000) || 6.2;
+  document.getElementById('rem-a').textContent = `${Math.max(0, totKm - distA/1000).toFixed(2)} km`;
+  document.getElementById('rem-b').textContent = `${Math.max(0, totKm - distB/1000).toFixed(2)} km`;
+}
+
+function calcPace(spdKmh) {
+  if (spdKmh < 1.5) return '--:--';
+  return formatTime(3600 / spdKmh);
+}
+
+function formatTime(sec) {
+  if (isNaN(sec) || sec < 0) return '00:00.0';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.floor((sec % 1) * 10);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`;
+}
+
+function initSelectors() {
+  const selA = document.getElementById('sel-duel-a');
+  const selB = document.getElementById('sel-duel-b');
+
+  selA.innerHTML = '';
+  selB.innerHTML = '';
+
+  tracksData.forEach((tr, i) => {
+    selA.innerHTML += `<option value="${i}" ${i === idxA ? 'selected' : ''}>${tr.name}</option>`;
+    selB.innerHTML += `<option value="${i}" ${i === idxB ? 'selected' : ''}>${tr.name}</option>`;
+  });
+
+  selA.addEventListener('change', (e) => {
+    idxA = Number(e.target.value);
+    rebuildDuelBoatMeshes();
+  });
+
+  selB.addEventListener('change', (e) => {
+    idxB = Number(e.target.value);
+    rebuildDuelBoatMeshes();
+  });
+}
+
+function initEvents() {
+  document.getElementById('btn-play').addEventListener('click', () => {
+    isPlaying = !isPlaying;
+    const icon = document.querySelector('#btn-play i');
+    if (icon) icon.className = isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+  });
+
+  document.querySelectorAll('[data-speed]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      playSpeed = Number(e.currentTarget.dataset.speed);
+    });
+  });
+
+  document.getElementById('scrub').addEventListener('input', (e) => {
+    const frac = Number(e.target.value) / 1000;
+    simTimeSec = minTimeSec + frac * (maxTimeSec - minTimeSec);
+  });
+
+  document.querySelectorAll('.btn-boat-mode').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      setBoatRenderMode(e.currentTarget.getAttribute('data-mode'));
+    });
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if (e.key === 'm' || e.key === 'M') {
+      setBoatRenderMode(boatRenderMode === 'model' ? 'arrow' : 'model');
+    }
+  });
+
+  setBoatRenderMode(boatRenderMode);
+}
+
+window.addEventListener('DOMContentLoaded', initContract);
+</script>
+</body>
+</html>

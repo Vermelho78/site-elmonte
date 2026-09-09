@@ -27,7 +27,60 @@
       return params.get('t') || null;
     },
 
+    /**
+     * Recupera a sessão ativa do Supabase Auth (SSO Cross-Domain via Cookie ou LocalStorage)
+     */
+    getSupabaseSession() {
+      // 1. Tentar ler dos cookies (ex: sb-ahqwpngtawzstghcnxpa-auth-token)
+      try {
+        const cookies = document.cookie ? document.cookie.split('; ') : [];
+        for (const c of cookies) {
+          const [name, ...valParts] = c.split('=');
+          if (name && (name.startsWith('sb-') && name.endsWith('-auth-token') || name === 'vaarec_auth_session')) {
+            const raw = decodeURIComponent(valParts.join('='));
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.access_token || parsed[0])) {
+              return parsed.access_token ? parsed : parsed[0];
+            }
+          }
+        }
+      } catch (e) {}
+
+      // 2. Tentar ler do localStorage do Supabase
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') && key.endsWith('-auth-token') || key === 'vaarec_auth_session')) {
+            const val = localStorage.getItem(key);
+            const parsed = JSON.parse(val);
+            if (parsed && (parsed.access_token || parsed[0])) {
+              return parsed.access_token ? parsed : parsed[0];
+            }
+          }
+        }
+      } catch (e) {}
+
+      return null;
+    },
+
+    /**
+     * Headers de autenticação dinâmicos (usa JWT do usuário se logado, ou service key)
+     */
+    getAuthHeaders() {
+      const session = this.getSupabaseSession();
+      const token = session?.access_token || window.VAAREC_CONFIG.supabaseKey;
+      return {
+        'apikey': window.VAAREC_CONFIG.supabaseKey,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+    },
+
     getUserEmail() {
+      const session = this.getSupabaseSession();
+      if (session?.user?.email) {
+        return session.user.email;
+      }
       return sessionStorage.getItem('vaarec_session_email') || null;
     },
 
@@ -42,7 +95,16 @@
     hasActiveSession(slug) {
       const currentSlug = slug || this.getSlugFromUrl();
       const activeToken = sessionStorage.getItem(`vaarec_active_token_${currentSlug}`);
-      return !!activeToken;
+      if (activeToken) return true;
+
+      // Se há sessão global do Supabase Auth (SSO), sessão está ativa
+      const ssoSession = this.getSupabaseSession();
+      if (ssoSession && ssoSession.user) {
+        this.setUserEmail(ssoSession.user.email);
+        return true;
+      }
+
+      return false;
     },
 
     clearSession(slug) {
@@ -186,11 +248,20 @@
      * Valida o token recebido no URL e consome imediatamente (Single-Use / Uso Único)
      */
     async validateAndConsumeToken(slug, token) {
+      const currentSlug = slug || this.getSlugFromUrl();
+
+      // 0. Se o usuário já possui sessão autenticada globalmente via Supabase SSO
+      const ssoSession = this.getSupabaseSession();
+      if (ssoSession && ssoSession.user) {
+        const ssoEmail = ssoSession.user.email;
+        this.setUserEmail(ssoEmail);
+        sessionStorage.setItem(`vaarec_active_token_${currentSlug}`, `sso_${ssoSession.user.id || 'auth'}`);
+        return { valid: true, email: ssoEmail, isSso: true };
+      }
+
       if (!token) {
         return { valid: false, reason: 'NO_TOKEN' };
       }
-
-      const currentSlug = slug || this.getSlugFromUrl();
 
       // Se já foi validado nesta exata sessão de aba, permitir sem queimar novamente
       if (sessionStorage.getItem(`vaarec_active_token_${currentSlug}`) === token) {

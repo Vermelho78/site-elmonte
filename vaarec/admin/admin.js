@@ -49,14 +49,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let detectedTemplate = 'viewer-slim.html';
-        if (json.context === 'slim' || json.template === 'viewer-slim.html') {
+        const ctx = (json.context || '').toLowerCase();
+        const tmpl = (json.template || '').toLowerCase();
+
+        if (ctx === 'broadcast' || tmpl.includes('broadcast')) {
+          detectedTemplate = 'viewer-broadcast.html';
+        } else if (ctx === 'coach' || tmpl.includes('coach')) {
+          detectedTemplate = 'viewer-coach.html';
+        } else if (ctx === 'cockpit' || tmpl.includes('cockpit')) {
+          detectedTemplate = 'viewer-cockpit.html';
+        } else if (ctx === 'duelo' || tmpl.includes('duelo')) {
+          detectedTemplate = 'viewer-duelo.html';
+        } else if (ctx === 'performance' || tmpl.includes('performance')) {
+          detectedTemplate = 'viewer-performance.html';
+        } else if (ctx === 'slim' || tmpl.includes('slim')) {
           detectedTemplate = 'viewer-slim.html';
-        } else if (json.context === 'desafio' || json.template === 'viewer-desafio.html') {
-          detectedTemplate = 'viewer-desafio.html';
-        } else if (json.context === 'treino-raia' || json.template === 'viewer-treino-raia.html') {
-          detectedTemplate = 'viewer-treino-raia.html';
-        } else if (json.context === 'padrao' || json.template === 'viewer.html') {
-          detectedTemplate = 'viewer.html';
         }
 
         if (templateSelect) templateSelect.value = detectedTemplate;
@@ -76,7 +83,7 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
   const templateSelect = document.getElementById('template-select');
   const statusEl = document.getElementById('publish-status');
 
-  const selectedTemplate = templateSelect ? templateSelect.value : 'viewer-desafio.html';
+  const selectedTemplate = templateSelect ? templateSelect.value : 'viewer-slim.html';
 
   if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
     alert('Por favor, insira uma URL válida do projeto Supabase (ex: https://seu-projeto.supabase.co).');
@@ -111,7 +118,8 @@ document.getElementById('btn-publish').addEventListener('click', async () => {
       // Slice JSON in browser
       const meta = JSON.parse(JSON.stringify(fullJson));
       meta.template = selectedTemplate;
-      meta.context = selectedTemplate.includes('slim') ? 'slim' : (selectedTemplate.includes('desafio') ? 'desafio' : (selectedTemplate.includes('raia') ? 'treino-raia' : 'padrao'));
+      meta.context = selectedTemplate.replace(/^viewer-/, '').replace(/\.html$/, '');
+      if (meta.context === 'viewer') meta.context = 'padrao';
 
       const tracks = [];
       const sourceTracks = meta.sportPackage?.tracks || meta.tracks || [];

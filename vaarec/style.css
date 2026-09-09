@@ -1,0 +1,766 @@
+/* ============================================================================
+   VAAREC — CSS Completo (Dark Glassmorphism + Sliding Tabs + All Components)
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-dark: #090d16;
+  --bg-panel: rgba(15, 23, 42, 0.82);
+  --bg-panel-border: rgba(255, 255, 255, 0.1);
+  --bg-card: rgba(30, 41, 59, 0.6);
+  --bg-card-hover: rgba(30, 41, 59, 0.9);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent-cyan: #06b6d4;
+  --accent-neon: #00f2fe;
+  --accent-blue: #3b82f6;
+
+  --color-start: #10b981;
+  --color-start-glow: rgba(16, 185, 129, 0.35);
+  --color-end: #ef4444;
+  --color-end-glow: rgba(239, 68, 68, 0.35);
+
+  --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+/* ---- Reset ---------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, html {
+  width: 100%; height: 100%; overflow: hidden;
+  font-family: var(--font-main);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================================
+   TOP HEADER BAR
+   ============================================================================ */
+
+.app-header {
+  position: absolute; top: 0; left: 0; right: 0; height: 64px;
+  background: rgba(9, 13, 22, 0.92);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--bg-panel-border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; z-index: 1000; gap: 12px;
+}
+
+.header-left { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.header-left .brand { display: flex; align-items: center; gap: 14px; }
+
+.brand-icon {
+  font-size: 24px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.5));
+}
+
+.brand-text h1 {
+  font-family: var(--font-display); font-size: 18px; font-weight: 700;
+  letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px;
+}
+
+.badge-phase {
+  font-size: 10px; font-weight: 600; font-family: var(--font-main);
+  text-transform: uppercase; background: rgba(6, 182, 212, 0.15);
+  color: var(--accent-neon); padding: 2px 8px; border-radius: 20px;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.subtitle { font-size: 11px; color: var(--text-secondary); }
+
+.header-center { display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; }
+.header-center .coord-pill {
+  display: flex; align-items: center; gap: 10px; background: var(--bg-card);
+  border: 1px solid var(--bg-panel-border); padding: 6px 14px;
+  border-radius: 30px; font-family: var(--font-mono); font-size: 12px;
+  color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.coord-pill .location-name {
+  font-family: var(--font-main); color: var(--text-secondary); font-weight: 500;
+  border-left: 1px solid var(--bg-panel-border); padding-left: 10px;
+}
+
+.header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.lod-badge {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+  color: var(--text-primary); background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4); padding: 6px 12px; border-radius: 8px;
+  white-space: nowrap;
+}
+
+.header-right .btn {
+  font-size: 12px; padding: 7px 14px; white-space: nowrap; flex-shrink: 0;
+  border-radius: var(--radius-sm); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+
+/* ============================================================================
+   WORKSPACE & MAP
+   ============================================================================ */
+
+.workspace {
+  position: absolute; top: 64px; bottom: 0; left: 0; right: 0;
+}
+
+.main-map { width: 100%; height: 100%; }
+
+/* ============================================================================
+   SIDEBAR (Glassmorphism — Layout de Coluna Fixa)
+   ============================================================================ */
+
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--bg-panel-border);
+  box-shadow: var(--shadow-lg); border-radius: var(--radius-lg);
+}
+
+.sidebar {
+  position: absolute; top: 20px; left: 20px; bottom: 20px;
+  width: 450px;
+  height: calc(100vh - 104px); /* Ocupa toda a altura útil do mapa */
+  display: flex; flex-direction: column;
+  z-index: 900;
+  overflow: hidden; /* clipa contêiner externo — scroll interno na tab-content */
+}
+
+/* ============================================================================
+   TAB NAV — SLIDING WITH ARROWS, WHEEL SCROLL & DRAG
+   ============================================================================ */
+
+/* Wrapper geral da barra de abas (contém setas e o strip rolável) */
+.panel-tabs-wrapper {
+  display: flex; align-items: center;
+  background: rgba(12, 18, 36, 0.98);
+  border-bottom: 1px solid var(--bg-panel-border);
+  padding: 0 2px;
+  flex-shrink: 0; /* nunca comprime — altura fixa */
+  min-height: 48px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* Botões de seta (< >) */
+.tabs-nav-btn {
+  flex-shrink: 0;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--bg-panel-border);
+  color: var(--accent-neon);
+  width: 28px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; cursor: pointer; border-radius: 6px; z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.tabs-nav-btn:hover {
+  background: var(--accent-cyan); color: #000;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+}
+
+/* Strip de abas rolável */
+.panel-tabs {
+  display: flex; flex-wrap: nowrap; align-items: center;
+  flex: 1 1 0; /* ocupa o espaço restante entre as setas */
+  min-width: 0;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: thin; scroll-behavior: smooth;
+  cursor: grab; user-select: none;
+  padding: 6px 4px 2px 4px;
+  gap: 2px;
+}
+
+.panel-tabs:active { cursor: grabbing; }
+
+.panel-tabs::-webkit-scrollbar { height: 3px; }
+.panel-tabs::-webkit-scrollbar-thumb { background: var(--accent-cyan); border-radius: 2px; }
+
+/* Cada botão de aba */
+.tab-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: none; border: none;
+  color: var(--text-secondary);
+  padding: 6px 12px; font-family: var(--font-main); font-size: 11px; font-weight: 600;
+  cursor: pointer; border-radius: 6px 6px 0 0; transition: all 0.2s ease;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+
+.tab-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.07); }
+
+.tab-btn.active {
+  color: var(--accent-neon); background: rgba(0, 242, 254, 0.1);
+  border-bottom: 2px solid var(--accent-cyan);
+  box-shadow: 0 2px 8px rgba(0, 242, 254, 0.15);
+}
+
+/* ============================================================================
+   TAB CONTENT PANELS
+   ============================================================================ */
+
+.tab-content {
+  display: none;
+  padding: 20px;
+  overflow-y: auto; overflow-x: hidden;
+  width: 100%; box-sizing: border-box;
+  /* Ocupa o restante da sidebar com scroll interno */
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.tab-content.active { display: flex; flex-direction: column; gap: 16px; }
+
+/* ============================================================================
+   SECTION TITLES
+   ============================================================================ */
+
+.section-title {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.section-title h3 { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+
+.info-tag {
+  font-size: 11px; font-weight: 600; background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary); padding: 3px 8px; border-radius: 6px;
+}
+
+.info-tag.pulse {
+  background: rgba(16, 185, 129, 0.15); color: var(--color-start);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* ============================================================================
+   STAT GRID (4 cards em 2x2)
+   ============================================================================ */
+
+.stat-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--bg-panel-border);
+  border-radius: var(--radius-sm); padding: 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  transition: border-color 0.2s;
+}
+
+.stat-card:hover { border-color: rgba(0, 242, 254, 0.3); }
+
+.stat-label { font-size: 10px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+.stat-value { font-size: 15px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+.stat-value.highlight-accent { color: var(--accent-neon); }
+
+/* ============================================================================
+   CONTROL GROUPS, BUTTONS, INPUTS
+   ============================================================================ */
+
+.control-group {
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.control-group label {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+/* Button grids */
+.btn-group-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn-group-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.btn-stack { display: flex; flex-direction: column; gap: 8px; }
+
+/* Option buttons (style switcher / speed switcher) */
+.btn-option {
+  background: var(--bg-card); border: 1px solid var(--bg-panel-border);
+  color: var(--text-secondary); padding: 8px 12px; border-radius: var(--radius-sm);
+  font-family: var(--font-main); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+.btn-option:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.2); }
+.btn-option.active {
+  background: rgba(0, 242, 254, 0.12); color: var(--accent-neon);
+  border-color: rgba(0, 242, 254, 0.4);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
+}
+
+/* Action buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--font-main); font-size: 13px; font-weight: 600;
+  padding: 9px 16px; border-radius: var(--radius-sm); border: none;
+  cursor: pointer; transition: all 0.2s ease;
+}
+
+.btn-full { width: 100%; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  color: #fff; box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5); }
+
+.btn-secondary {
+  background: rgba(30, 41, 59, 0.8); color: var(--text-primary);
+  border: 1px solid var(--bg-panel-border);
+}
+.btn-secondary:hover { background: rgba(51, 65, 85, 0.8); border-color: rgba(255,255,255,0.2); }
+
+.btn-accent {
+  background: rgba(16, 185, 129, 0.12); color: var(--color-start);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.btn-accent:hover { background: rgba(16, 185, 129, 0.22); box-shadow: 0 0 12px var(--color-start-glow); }
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.12); color: var(--color-end);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+.btn-danger:hover { background: rgba(239, 68, 68, 0.22); box-shadow: 0 0 12px var(--color-end-glow); }
+
+.btn-icon {
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 14px; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+}
+.btn-icon:hover { color: var(--text-primary); background: rgba(255,255,255,0.1); }
+
+/* Inputs */
+.input-dark {
+  background: rgba(15, 23, 42, 0.8); border: 1px solid var(--bg-panel-border);
+  color: var(--accent-neon); font-family: var(--font-mono); font-size: 12px;
+  padding: 8px 12px; border-radius: var(--radius-sm); width: 100%;
+  transition: border-color 0.2s;
+}
+.input-dark:focus { outline: none; border-color: var(--accent-cyan); }
+
+.input-slider { width: 100%; accent-color: var(--accent-neon); cursor: pointer; }
+
+.input-inline-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ============================================================================
+   CC1 — BBOX INFO
+   ============================================================================ */
+
+.bbox-info {
+  background: var(--bg-card); border: 1px solid var(--bg-panel-border);
+  border-radius: var(--radius-md); padding: 14px;
+}
+
+.bbox-info h4 {
+  font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.bbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.bbox-grid span { color: var(--text-secondary); }
+.bbox-grid strong { color: var(--accent-neon); font-family: var(--font-mono); }
+
+/* ============================================================================
+   CC3 — DRAWING TOOLS & LINE CARDS
+   ============================================================================ */
+
+.drawing-tools { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+
+.tool-instruction { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+
+.tool-buttons { display: flex; flex-direction: column; gap: 8px; }
+
+.btn-tool {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  border-radius: var(--radius-sm); border: none; cursor: pointer;
+  font-family: var(--font-main); font-size: 13px; font-weight: 600; transition: all 0.2s ease;
+}
+
+.btn-start-line { background: rgba(16, 185, 129, 0.15); color: var(--color-start); border: 1px solid rgba(16, 185, 129, 0.4); }
+.btn-start-line:hover { background: rgba(16, 185, 129, 0.25); box-shadow: 0 0 12px var(--color-start-glow); }
+
+.btn-end-line { background: rgba(239, 68, 68, 0.15); color: var(--color-end); border: 1px solid rgba(239, 68, 68, 0.4); }
+.btn-end-line:hover { background: rgba(239, 68, 68, 0.25); box-shadow: 0 0 12px var(--color-end-glow); }
+
+.line-card {
+  background: var(--bg-card); border-radius: var(--radius-md); padding: 14px;
+  border: 1px solid var(--bg-panel-border);
+}
+
+.start-line-card { border-left: 3px solid var(--color-start); }
+.end-line-card { border-left: 3px solid var(--color-end); }
+
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.card-header h4 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+
+.status-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px;
+  background: rgba(100, 116, 139, 0.2); color: var(--text-muted);
+}
+
+.line-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.line-metrics code { font-family: var(--font-mono); color: var(--accent-neon); font-size: 11px; }
+.line-metrics strong { color: var(--text-primary); font-family: var(--font-mono); }
+
+.preset-actions { display: flex; gap: 10px; }
+.preset-actions .btn { flex: 1; }
+
+/* ============================================================================
+   CC2 — WEATHER TABLE
+   ============================================================================ */
+
+.weather-table-container { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+.weather-table-container h4 { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+.weather-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.weather-table th {
+  padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--bg-panel-border);
+}
+.weather-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; }
+.weather-table tr:last-child td { border-bottom: none; }
+.weather-table td strong { color: var(--text-primary); }
+.weather-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* ============================================================================
+   CC4 — COURSE & BUOYS
+   ============================================================================ */
+
+.buoy-list-container { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+.buoy-list-container h4 { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+.buoy-list-stack { display: flex; flex-direction: column; gap: 8px; }
+
+.buoy-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(15, 23, 42, 0.6); border: 1px solid var(--bg-panel-border);
+  border-radius: 8px; padding: 8px 12px; font-size: 12px;
+}
+.buoy-item:hover { border-color: rgba(0, 242, 254, 0.3); }
+.buoy-badge {
+  font-size: 10px; font-weight: 700; background: rgba(0, 242, 254, 0.15);
+  color: var(--accent-neon); padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(0, 242, 254, 0.3);
+}
+
+/* ============================================================================
+   CE1 — FLEET & CREW
+   ============================================================================ */
+
+.crew-container { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+.crew-roster-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+.crew-card {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(15, 23, 42, 0.6); border: 1px solid var(--bg-panel-border);
+  border-radius: 8px; padding: 8px 12px; font-size: 12px;
+}
+.crew-card:hover { border-color: rgba(0, 242, 254, 0.3); }
+.crew-role { font-size: 10px; color: var(--text-muted); }
+.crew-weight { font-family: var(--font-mono); color: var(--accent-neon); font-size: 11px; }
+
+/* ============================================================================
+   CE2 — TELEMETRY CHART
+   ============================================================================ */
+
+.chart-container { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+.chart-container h4 { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.chart-wrapper { position: relative; height: 160px; }
+.chart-wrapper canvas { width: 100% !important; height: 100% !important; }
+
+/* ============================================================================
+   CE3 — EVENTS FEED
+   ============================================================================ */
+
+.events-feed-container { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+.events-feed-container h4 { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.events-feed-stack { display: flex; flex-direction: column; gap: 8px; }
+
+.event-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: rgba(15, 23, 42, 0.6); border: 1px solid var(--bg-panel-border);
+  border-radius: 8px; padding: 10px 12px; font-size: 12px;
+}
+.event-item:hover { border-color: rgba(0, 242, 254, 0.25); }
+.event-icon { font-size: 16px; flex-shrink: 0; }
+.event-body { flex: 1; }
+.event-type { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.06em; }
+.event-desc { color: var(--text-primary); margin-top: 2px; line-height: 1.4; }
+.event-time { font-family: var(--font-mono); font-size: 10px; color: var(--accent-cyan); margin-top: 3px; }
+
+/* ============================================================================
+   CE4 — REPLAY MULTI-GPS COMPETITIVO
+   ============================================================================ */
+
+/* Leader banner */
+.leader-banner-container { /* inherits from control-group gap */ }
+
+.leader-pill {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.18), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(234, 179, 8, 0.4); padding: 10px 14px;
+  border-radius: var(--radius-md); display: flex; align-items: center;
+  justify-content: space-between; font-size: 12px;
+}
+.leader-pill .crown { color: #facc15; font-weight: 700; }
+
+.gap-pill {
+  font-family: var(--font-mono); font-size: 11px;
+  background: rgba(0,0,0,0.4); color: var(--accent-neon); padding: 2px 8px; border-radius: 10px;
+}
+
+/* Telemetria instantânea das canoas */
+.multi-boat-stack { display: flex; flex-direction: column; gap: 10px; }
+
+.replay-boat-card {
+  background: var(--bg-card); border: 1px solid var(--bg-panel-border);
+  border-radius: var(--radius-md); padding: 10px 12px;
+}
+
+.boat-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; font-size: 13px;
+}
+
+.rank-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+
+.boat-metrics-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  font-size: 11px; color: var(--text-secondary);
+}
+.boat-metrics-grid strong { color: var(--text-primary); font-family: var(--font-mono); }
+
+/* Splits table */
+.splits-table-container { background: var(--bg-card); border: 1px solid var(--bg-panel-border); border-radius: var(--radius-md); padding: 14px; }
+.splits-table-container h4 { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+/* Speed buttons specifically */
+.btn-speed {
+  background: var(--bg-card); border: 1px solid var(--bg-panel-border);
+  color: var(--text-secondary); padding: 7px 10px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s ease; text-align: center;
+}
+.btn-speed:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.2); }
+.btn-speed.active {
+  background: rgba(0, 242, 254, 0.12); color: var(--accent-neon);
+  border-color: rgba(0, 242, 254, 0.4);
+}
+
+/* Boat marker on map */
+.multi-boat-marker .boat-label {
+  font-size: 10px; font-weight: 700; background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  color: #fff; padding: 2px 6px; border-radius: 4px;
+  border: 1px solid rgba(0, 242, 254, 0.5); margin-top: 2px; white-space: nowrap;
+  opacity: 0.85; pointer-events: none;
+}
+
+/* ============================================================================
+   BOTTOM-RIGHT JSON INSPECTOR PANEL
+   ============================================================================ */
+
+.json-inspector-panel {
+  position: absolute; bottom: 20px; right: 20px; width: 480px;
+  max-height: 280px; z-index: 900;
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.json-inspector-panel.collapsed { max-height: 48px; }
+
+.panel-header {
+  padding: 12px 16px; background: rgba(12, 18, 36, 0.9);
+  border-bottom: 1px solid var(--bg-panel-border);
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; flex-shrink: 0;
+}
+
+.header-title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  display: flex; align-items: center; gap: 8px;
+}
+.header-title code { font-family: var(--font-mono); color: var(--accent-neon); }
+.header-actions { display: flex; gap: 6px; }
+
+.panel-body { padding: 14px; overflow-y: auto; background: rgba(9, 13, 22, 0.92); }
+.panel-body pre {
+  font-family: var(--font-mono); font-size: 11px; color: #a5f3fc;
+  line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+}
+
+/* ============================================================================
+   UTILITIES
+   ============================================================================ */
+
+.text-green { color: var(--color-start) !important; }
+.text-red { color: var(--color-end) !important; }
+.text-cyan { color: var(--accent-neon) !important; }
+.font-mono { font-family: var(--font-mono) !important; }
+
+/* Global scrollbars */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-cyan); }
+
+/* ============================================================================
+   EXPANDABLE EXPORT DROPDOWN (MENU EXPANSÍVEL DE EXPORTAÇÃO & GERAÇÃO)
+   ============================================================================ */
+
+.dropdown-export-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-export-toggle {
+  background: linear-gradient(135deg, #00F2FE 0%, #3B82F6 100%) !important;
+  color: #07090e !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(0, 242, 254, 0.6) !important;
+  box-shadow: 0 0 16px rgba(0, 242, 254, 0.35) !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-export-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(0, 242, 254, 0.55) !important;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-export-wrapper.active .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: rgba(11, 17, 30, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 242, 254, 0.15);
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2000;
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+
+.dropdown-export-wrapper.active .dropdown-export-menu {
+  display: flex;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+.dropdown-item {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.dropdown-item:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(2px);
+}
+
+.dropdown-item.item-highlight {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.dropdown-item.item-highlight:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.item-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.item-desc {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

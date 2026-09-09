@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VAAREC • Painel Tático do Treinador</title>
+<meta name="description" content="Painel de análise pós-prova e telemetria avançada para treinadores com gráficos sincronizados, splits por boia e dinâmica de vento no VAAREC.">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Mapbox GL JS v3 -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+
+<!-- Three.js + GLTFLoader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="Model/canoe_model_base64.js"></script>
+<script>
+if (typeof window !== 'undefined' && !window.EMBEDDED_CANOE_MODEL_DATA_URI) {
+  ['/Model/canoe_model_base64.js', '../Model/canoe_model_base64.js', './Model/canoe_model_base64.js', 'canoe_model_base64.js'].forEach(p => {
+    const s = document.createElement('script'); s.src = p; document.head.appendChild(s);
+  });
+}
+</script>
+
+<!-- VAAREC Client (Opcional) -->
+<script>
+if (typeof VaarecClient === 'undefined') {
+  const s = document.createElement('script');
+  s.src = '/vaarec-client.js';
+  document.head.appendChild(s);
+}
+</script>
+
+<style>
+:root {
+  --bg-deep: #040A12;
+  --bg-deep-2: #081522;
+  --glass: rgba(10, 22, 34, 0.82);
+  --glass-border: rgba(120, 220, 255, 0.22);
+  --cyan: #00F2FE;
+  --cyan-dim: rgba(0, 242, 254, 0.35);
+  --amber: #ffb020;
+  --amber-dim: rgba(255, 176, 32, 0.35);
+  --danger: #ff4d6d;
+  --text: #d9eef6;
+  --muted: #6f8ea0;
+  --font-display: 'Rajdhani', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 10%, var(--bg-deep-2), var(--bg-deep));
+  font-family: var(--font-body); color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+#app {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: 56px 1fr 210px;
+  height: 100vh; gap: 8px; padding: 8px;
+}
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* Topbar */
+#topbar {
+  grid-column: 1 / 3; display: flex; align-items: center; justify-content: space-between; padding: 0 18px;
+}
+#topbar .brand {
+  font-family: var(--font-display); font-weight: 700; font-size: 17px;
+  letter-spacing: 2px; color: var(--cyan); text-shadow: 0 0 10px var(--cyan-dim);
+}
+#topbar .brand span { display: block; font-size: 11px; color: var(--muted); letter-spacing: 1px; font-weight: 400; }
+.btn {
+  font-family: var(--font-display); font-weight: 600; letter-spacing: 1px;
+  background: rgba(255,255,255,0.06); color: var(--text);
+  border: 1px solid var(--glass-border); border-radius: 6px;
+  padding: 6px 12px; cursor: pointer; font-size: 12px;
+  transition: all .15s ease;
+}
+.btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.btn.active { background: var(--cyan-dim); border-color: var(--cyan); color: #eafffe; }
+#playback { display: flex; gap: 6px; align-items: center; }
+#timer { font-family: var(--font-mono); color: var(--amber); font-size: 20px; margin: 0 12px; font-weight: 700; }
+
+/* 3D Scene / Map Wrap */
+#scene-wrap { position: relative; overflow: hidden; }
+#map-container { width: 100%; height: 100%; border-radius: 10px; }
+#cam-toggle { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; z-index: 10; }
+
+/* Indicador de vento posicionado na parte inferior direita */
+#wind-badge {
+  position: absolute; bottom: 20px; right: 14px; padding: 8px 14px; z-index: 10;
+  font-family: var(--font-mono); font-size: 12px; text-align: center;
+}
+#wind-badge .arrow { font-size: 18px; color: var(--amber); display: block; transform: rotate(45deg); }
+
+/* Side Panel */
+#side-panel { grid-row: 2 / 4; padding: 14px; overflow-y: auto; }
+#side-panel h3 {
+  font-family: var(--font-display); font-size: 13px; letter-spacing: 2px;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 10px;
+}
+.athlete-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px;
+  cursor: pointer; margin-bottom: 5px; transition: all .15s;
+}
+.athlete-row:hover { background: rgba(255,255,255,0.08); }
+.athlete-row.selected { background: var(--cyan-dim); box-shadow: 0 0 10px var(--cyan-dim) inset; border: 1px solid var(--cyan); }
+.dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 6px currentColor; flex-shrink: 0; }
+.athlete-row .n { font-family: var(--font-display); font-weight: 600; font-size: 14px; flex: 1; }
+.athlete-row .v { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+table.splits { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: var(--font-mono); font-size: 12px; }
+table.splits th { text-align: left; color: var(--muted); font-weight: 400; padding: 6px 4px; border-bottom: 1px solid var(--glass-border); text-transform: uppercase; font-size: 10.5px; }
+table.splits td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
+#angle-widget { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--glass-border); }
+.angle-row { display: flex; justify-content: space-between; padding: 5px 0; font-family: var(--font-mono); font-size: 12px; }
+.angle-row .val { color: var(--cyan); font-weight: 700; }
+
+/* Chart Wrap */
+#chart-wrap { grid-column: 1 / 2; padding: 10px 16px; position: relative; }
+#chart-canvas { width: 100%; height: 100%; }
+#chart-legend { position: absolute; top: 8px; right: 16px; display: flex; gap: 12px; font-family: var(--font-mono); font-size: 11px; }
+#chart-legend span { display: flex; align-items: center; gap: 5px; }
+#chart-legend .sw { width: 8px; height: 8px; border-radius: 50%; }
+
+#scrub {
+  position: absolute; bottom: 8px; left: 14px; right: 14px;
+  -webkit-appearance: none; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.18); z-index: 10; cursor: pointer;
+}
+#scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--cyan); box-shadow: 0 0 8px var(--cyan); cursor: pointer;
+}
+
+.loading-veil {
+  position: absolute; inset: 0; background: var(--bg-deep); z-index: 100;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  font-family: var(--font-display); letter-spacing: 2px; color: var(--cyan); font-weight: 700;
+}
+
+/* ================================================================
+   LANDSCAPE ORIENTATION GUARD (EXCLUSIVELY LANDSCAPE TEMPLATE)
+   ================================================================ */
+.orientation-guard {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 10, 18, 0.97);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  z-index: 99999;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-family: var(--font-body);
+}
+@media (orientation: portrait) and (max-width: 950px), (max-aspect-ratio: 1/1) and (max-width: 950px) {
+  .orientation-guard {
+    display: flex !important;
+  }
+}
+.orientation-guard-card {
+  background: rgba(10, 22, 34, 0.92);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 242, 254, 0.2);
+  border-radius: 20px;
+  padding: 32px 24px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.orientation-phone-icon {
+  margin-bottom: 4px;
+}
+.rotate-phone-anim {
+  animation: phoneRotateCoach 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes phoneRotateCoach {
+  0%, 20% { transform: rotate(0deg); }
+  50%, 80% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+.guard-badge {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.orientation-guard-card h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+}
+.orientation-guard-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.guard-pill {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  background: rgba(255, 176, 32, 0.1);
+  border: 1px solid rgba(255, 176, 32, 0.3);
+  padding: 6px 14px;
+  border-radius: 8px;
+}
+
+/* ================================================================
+   RESPONSIVE MOBILE LANDSCAPE GRID (COACH VIEW)
+   ================================================================ */
+@media screen and (max-height: 520px), screen and (max-width: 920px) and (orientation: landscape) {
+  #app {
+    grid-template-columns: 1fr 230px;
+    grid-template-rows: 42px 1fr 85px;
+    padding: 4px;
+    gap: 4px;
+  }
+  #topbar {
+    padding: 0 10px;
+  }
+  #topbar .brand {
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  #topbar .brand span {
+    display: none;
+  }
+  #playback {
+    gap: 3px;
+  }
+  #playback .btn {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+  #playback .btn[data-speed="0.5"],
+  #playback .btn[data-speed="10"] {
+    display: none;
+  }
+  #timer {
+    font-size: 14px;
+    margin: 0 6px;
+  }
+  #cam-toggle {
+    top: 6px;
+    left: 6px;
+    gap: 4px;
+  }
+  #cam-toggle .btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  #wind-badge {
+    bottom: 16px;
+    right: 8px;
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  #wind-badge .arrow {
+    font-size: 14px;
+  }
+  #side-panel {
+    padding: 8px;
+  }
+  #side-panel h3 {
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .athlete-row {
+    padding: 4px 6px;
+    margin-bottom: 3px;
+  }
+  .athlete-row .n {
+    font-size: 12px;
+  }
+  .athlete-row .v {
+    font-size: 10px;
+  }
+  table.splits {
+    font-size: 10px;
+  }
+  table.splits th, table.splits td {
+    padding: 3px 2px;
+  }
+  #angle-widget {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .angle-row {
+    font-size: 10px;
+    padding: 2px 0;
+  }
+  #chart-wrap {
+    padding: 4px 8px;
+  }
+  #chart-legend {
+    top: 4px;
+    right: 8px;
+    font-size: 9px;
+    gap: 6px;
+  }
+  #scrub {
+    bottom: 4px;
+    left: 8px;
+    right: 8px;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- Landscape Orientation Guard (Exclusivo Deitado) -->
+<div id="vaarec-orientation-prompt" class="orientation-guard">
+  <div class="orientation-guard-card">
+    <div class="orientation-phone-icon">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#00F2FE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="rotate-phone-anim">
+        <rect x="4" y="2" width="16" height="20" rx="3" ry="3"></rect>
+        <line x1="12" y1="18" x2="12" y2="18.01"></line>
+      </svg>
+    </div>
+    <div class="guard-badge">VAAREC COACH PANEL</div>
+    <h2>GIRE O DISPOSITIVO</h2>
+    <p>O Painel Tático do Treinador foi projetado exclusivamente para análise na horizontal (Landscape).</p>
+    <div class="guard-pill">MODO DEITADO RECOMENDADO 🔄</div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="topbar" class="glass">
+    <div class="brand">
+      <span id="coach-title-txt">PAINEL TÁTICO DO TREINADOR</span>
+      <span>ANÁLISE SINCRONIZADA DE PROVA — MAPBOX 3D + TELEMETRIA VAAREC</span>
+    </div>
+    <div id="playback">
+      <button class="btn" id="btn-play"><i class="fa-solid fa-play"></i></button>
+      <button class="btn" data-speed="0.5">0.5x</button>
+      <button class="btn active" data-speed="1">1x</button>
+      <button class="btn" data-speed="4">4x</button>
+      <button class="btn" data-speed="10">10x</button>
+      <span id="timer">00:00.0</span>
+    </div>
+  </div>
+
+  <div id="scene-wrap" class="glass">
+    <div id="map-container"></div>
+
+    <div id="cam-toggle">
+      <button class="btn cam-btn active" data-cam="overview">VISÃO GERAL</button>
+      <button class="btn cam-btn" data-cam="follow">SEGUIR ATLETA</button>
+      <span style="display:inline-block; width:1px; height:18px; background:var(--glass-border); margin:0 4px; vertical-align:middle;"></span>
+      <button class="btn btn-boat-mode active" data-mode="model" title="Exibir Modelo 3D da Canoa [M]"><i class="fa-solid fa-ship"></i> 3D</button>
+      <button class="btn btn-boat-mode" data-mode="arrow" title="Exibir Seta Alinhada [M]"><i class="fa-solid fa-location-arrow"></i> SETA</button>
+    </div>
+
+    <!-- Indicador de Vento Reposicionado -->
+    <div id="wind-badge" class="glass">
+      <span class="arrow" id="wind-arrow">↗</span>
+      VENTO NE · 12 kts
+    </div>
+    <input type="range" id="scrub" min="0" max="1000" value="0">
+  </div>
+
+  <div id="side-panel" class="glass">
+    <h3>Atletas & Embarcações</h3>
+    <div id="athlete-list"></div>
+
+    <div id="angle-widget">
+      <h3>Ângulo de Ataque (Selecionado)</h3>
+      <div class="angle-row"><span>Rumo de Proa</span><span class="val" id="ang-hd">0°</span></div>
+      <div class="angle-row"><span>Ângulo ao Vento</span><span class="val" id="ang-wind">0° (Reaching)</span></div>
+      <div class="angle-row"><span>À Ondulação</span><span class="val" id="ang-wave">0°</span></div>
+      <div class="angle-row"><span>VMG Efetivo</span><span class="val" id="ang-vmg">0.0 km/h</span></div>
+    </div>
+
+    <h3 style="margin-top: 14px;">Splits por Boia</h3>
+    <table class="splits" id="splits-table">
+      <thead>
+        <tr><th>Segmento</th><th>Tempo</th><th>Pace Médio</th></tr>
+      </thead>
+      <tbody id="splits-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="chart-wrap" class="glass">
+    <div id="chart-legend"></div>
+    <canvas id="chart-canvas"></canvas>
+  </div>
+
+  <div class="loading-veil" id="loading-veil"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><br>CARREGANDO ANÁLISE DO TREINADOR…</div>
+</div>
+
+<script>
+const MAPBOX_TOKEN = "pk.eyJ1IjoidmVybWVsaG9tb250ZSIsImEiOiJjbTIwd2lpMTIwbXZjMnFwdGl6N3IyMTd5In0.wHyz3cKuR7KNtVTZ14LYzQ";
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+let map = null;
+let CONTRACT = null;
+let tracksData = [];
+let buoysData = [];
+let selectedTrackIdx = 0;
+
+let simTimeSec = 0;
+let isPlaying = false;
+let playSpeed = 1;
+let minTimeSec = 0, maxTimeSec = 1200;
+let camMode = 'overview'; // overview, follow
+
+let threeScene, threeCamera, threeRenderer;
+let boat3DObjects = [];
+const smoothCam = { lng: null, lat: null, heading: 0 };
+let userInteracting = false;
+
+function haversineDistanceMeters(p1, p2) {
+  const R = 6371000;
+  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((p1.lat * Math.PI) / 180) * Math.cos((p2.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculateHeading(p1, p2) {
+  if (!p1 || !p2) return 0;
+  const lat1 = (p1.lat * Math.PI) / 180;
+  const lat2 = (p2.lat * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  const rad = Math.atan2(y, x);
+  return ((rad * 180) / Math.PI + 360) % 360;
+}
+
+function sanitizeTrackPoints(pts) {
+  if (!Array.isArray(pts) || !pts.length) return [];
+
+  let rawTimes = [];
+  pts.forEach(p => {
+    let tVal = null;
+    if (p.tRel != null) tVal = Number(p.tRel);
+    else if (p.t != null) tVal = Number(p.t);
+    else if (p.timestamp != null) tVal = Number(p.timestamp);
+    else if (p.absT != null) tVal = Number(p.absT);
+    else if (p.time) tVal = new Date(p.time).getTime();
+    rawTimes.push(tVal);
+  });
+
+  const firstT = rawTimes[0] != null ? rawTimes[0] : 0;
+  const lastT = rawTimes[rawTimes.length - 1] != null ? rawTimes[rawTimes.length - 1] : rawTimes.length;
+  const rawSpan = Math.abs(lastT - firstT);
+
+  const isMillis = (rawSpan > 5000 && pts.length < rawSpan / 50) || firstT > 1e9;
+
+  const clean = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const lat = Number(p.lat ?? p.latitude);
+    const lng = Number(p.lon ?? p.lng ?? p.longitude);
+    const ele = Number(p.ele ?? p.alt ?? 0);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) continue;
+
+    let tSec = 0;
+    if (rawTimes[i] != null) {
+      tSec = isMillis ? (rawTimes[i] - firstT) / 1000 : (rawTimes[i] - firstT);
+    } else {
+      tSec = i;
+    }
+
+    let speedKmh = Number(p.spdKmh ?? p.speedKmh ?? p.speed_kmh ?? p.speed ?? 0);
+    clean.push({ lat, lng, ele, t: tSec, speedKmh });
+  }
+
+  clean.sort((a, b) => a.t - b.t);
+
+  let cumDist = 0;
+  for (let i = 0; i < clean.length; i++) {
+    if (i > 0) {
+      const stepM = haversineDistanceMeters(clean[i - 1], clean[i]);
+      cumDist += stepM;
+      const dt = clean[i].t - clean[i - 1].t;
+      if ((clean[i].speedKmh === 0 || isNaN(clean[i].speedKmh)) && dt > 0.1) {
+        clean[i].speedKmh = (stepM / dt) * 3.6;
+      }
+    }
+    clean[i].cumDistM = cumDist;
+    const next = clean[i + 1] || clean[i];
+    const prev = clean[i - 1] || clean[i];
+    clean[i].heading = calculateHeading(clean[i], next !== clean[i] ? next : prev);
+  }
+
+  return clean;
+}
+
+// =========================================================================
+// 1. CARREGAMENTO DO CONTRATO
+// =========================================================================
+async function initContract() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const directDataUrl = urlParams.get('data') || urlParams.get('json') || urlParams.get('contract') || urlParams.get('file');
+  if (directDataUrl) {
+    try {
+      const res = await fetch(directDataUrl);
+      if (res.ok) CONTRACT = await res.json();
+    } catch(e) {
+      console.warn('Erro ao carregar contrato via URL:', e);
+    }
+  }
+
+  if (!CONTRACT && window.CONTRACT && typeof window.CONTRACT === 'object') {
+    CONTRACT = window.CONTRACT;
+  } else if (!CONTRACT) {
+    const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
+    if (slug && typeof VaarecClient !== 'undefined') {
+      try { CONTRACT = await VaarecClient.fetchMeta(slug); } catch(e) {}
+    }
+  }
+
+  let rawTracks = CONTRACT?.tracks || CONTRACT?.sportPackage?.tracks || CONTRACT?.tracksData || CONTRACT?.data?.tracks || [];
+  if (!rawTracks.length) {
+    CONTRACT = buildDemoContract();
+    rawTracks = CONTRACT.tracks;
+  }
+
+  tracksData = rawTracks.map((tr, i) => {
+    const ptsRaw = tr.points || tr.data || tr.gpsData || [];
+    const pts = sanitizeTrackPoints(ptsRaw);
+
+    return {
+      id: tr.id || `tr-${i+1}`,
+      name: tr.name || `Canoa ${i+1}`,
+      color: tr.color || ['#00F2FE', '#ffb020', '#ff4d6d', '#7cff8a'][i % 4],
+      points: pts
+    };
+  }).filter(tr => tr.points.length > 0);
+
+  const rawBuoys = CONTRACT.buoys || CONTRACT.sportPackage?.buoys || CONTRACT.waypoints || [];
+  buoysData = rawBuoys.map((b, i) => ({
+    id: b.id || `buoy-${i+1}`,
+    name: b.name || `Boia ${i+1}`,
+    lat: Number(b.lat ?? b.latitude ?? 0),
+    lng: Number(b.lon ?? b.lng ?? b.longitude ?? 0),
+    order: Number(b.sequenceOrder ?? b.order ?? i+1)
+  }));
+
+  if (tracksData.length && tracksData[0].points.length) {
+    minTimeSec = 0;
+    maxTimeSec = Math.max(...tracksData.map(t => t.points[t.points.length-1].t));
+    simTimeSec = minTimeSec;
+  }
+
+  document.getElementById('coach-title-txt').textContent = (CONTRACT.name || 'PAINEL TÁTICO DO TREINADOR').toUpperCase();
+  document.getElementById('loading-veil').style.display = 'none';
+
+  initMap();
+  initAthleteUI();
+  initChartLegend();
+  initEvents();
+}
+
+function buildDemoContract() {
+  const ORIGIN = { lat: -27.1892, lng: -48.5143 };
+  const wps = [{ x: 0, z: 0 }, { x: 180, z: -900 }, { x: -350, z: -1800 }, { x: 60, z: -2550 }, { x: -40, z: -80 }];
+  let tot = 0; for (let i=1; i<wps.length; i++) tot += Math.hypot(wps[i].x - wps[i-1].x, wps[i].z - wps[i-1].z);
+
+  function getPt(frac) {
+    let acc = 0, target = frac * tot;
+    for (let i=1; i<wps.length; i++) {
+      const d = Math.hypot(wps[i].x - wps[i-1].x, wps[i].z - wps[i-1].z);
+      if (target <= acc + d || i === wps.length - 1) {
+        const f = (target - acc) / (d || 1);
+        return { x: wps[i-1].x + (wps[i].x - wps[i-1].x)*f, z: wps[i-1].z + (wps[i].z - wps[i-1].z)*f };
+      }
+      acc += d;
+    }
+    return wps[wps.length-1];
+  }
+
+  const defs = [
+    { name: 'Canoa 1 • Rodrigo (Líder)', color: '#00F2FE', spd: 14.5 },
+    { name: 'Canoa 2 • Marcos Costa', color: '#ffb020', spd: 14.1 },
+    { name: 'Canoa 3 • Equipe Floripa', color: '#ff4d6d', spd: 13.8 }
+  ];
+
+  const tracks = defs.map((d, idx) => {
+    const pts = []; let cum = 0; const dur = 900; let prev = getPt(0);
+    for (let t=0; t<=dur; t+=2) {
+      const spdKmh = d.spd + Math.sin(t*0.02 + idx)*0.8;
+      const spdMs = spdKmh / 3.6;
+      const frac = Math.min(1, (cum + spdMs * 2) / tot);
+      const pos = getPt(frac);
+      cum += Math.hypot(pos.x - prev.x, pos.z - prev.z);
+      const heading = (Math.atan2(pos.x - prev.x, -(pos.z - prev.z)) * 180 / Math.PI + 360) % 360;
+      pts.push({
+        lat: ORIGIN.lat - (pos.z / 111139),
+        lng: ORIGIN.lng + (pos.x / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))),
+        t, spdKmh: +spdKmh.toFixed(1), heading: +heading.toFixed(1), cumDistM: +cum.toFixed(1)
+      });
+      prev = pos;
+    }
+    return { id: `tr-${idx+1}`, name: d.name, color: d.color, points: pts };
+  });
+
+  const buoys = [
+    { name: 'Boia 1', lat: ORIGIN.lat - (-900 / 111139), lng: ORIGIN.lng + (180 / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))), sequenceOrder: 1 },
+    { name: 'Boia 2 (Viragem)', lat: ORIGIN.lat - (-1800 / 111139), lng: ORIGIN.lng + (-350 / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))), sequenceOrder: 2 },
+    { name: 'Boia 3', lat: ORIGIN.lat - (-2550 / 111139), lng: ORIGIN.lng + (60 / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))), sequenceOrder: 3 }
+  ];
+
+  return { name: 'Campeonato Catarinense 2026', totalDistanceKm: +(tot/1000).toFixed(2), tracks, buoys };
+}
+
+// =========================================================================
+// 2. MAPBOX GL JS & THREE.JS 3D CUSTOM LAYER
+// =========================================================================
+function initMap() {
+  const firstPt = tracksData[0]?.points[0] || { lng: -48.4805, lat: -27.4292, heading: 45 };
+  smoothCam.lng = firstPt.lng;
+  smoothCam.lat = firstPt.lat;
+  smoothCam.heading = firstPt.heading || 45;
+
+  map = new mapboxgl.Map({
+    container: 'map-container',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [firstPt.lng, firstPt.lat],
+    zoom: 16.2,
+    pitch: 65,
+    maxPitch: 85,
+    bearing: firstPt.heading || 45,
+    antialias: true,
+    interactive: true,
+    projection: 'mercator'
+  });
+
+  // Permitir ao usuário girar e dar zoom livremente na canoa 3D sem brigar com o camera-chase
+  map.on('dragstart', () => { userInteracting = true; });
+  map.on('rotatestart', () => { userInteracting = true; });
+  map.on('pitchstart', () => { userInteracting = true; });
+  map.on('wheel', () => { userInteracting = true; });
+  map.on('dblclick', () => { userInteracting = false; });
+
+  map.on('style.load', () => {
+    try {
+      if (!map.getSource('mapbox-dem')) {
+        map.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14
+        });
+      }
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+    } catch(e) {}
+
+    try {
+      if (typeof map.setFog === 'function') {
+        map.setFog({ range: [0.5, 10], color: '#07090e', 'horizon-blend': 0.3 });
+      }
+    } catch(e) {}
+
+    if (!map.getLayer('vaarec-coach-3d-layer')) {
+      map.addLayer(createThreeJSCustomLayer());
+    }
+
+    buoysData.forEach(b => {
+      const el = document.createElement('div');
+      el.style.width = '14px'; el.style.height = '14px';
+      el.style.borderRadius = '50%'; el.style.background = '#ffb020';
+      el.style.border = '2px solid #fff';
+      el.style.boxShadow = '0 0 10px #ffb020';
+      new mapboxgl.Marker({ element: el }).setLngLat([b.lng, b.lat]).addTo(map);
+    });
+
+    requestAnimationFrame(renderLoop);
+  });
+}
+
+// Calibração Oficial Definida no Laboratório 3D (model-test.html / model-SKILL.md)
+const CANOE_3D_CONFIG = {
+  modelPath: '/Model/canoe_3D.glb',
+  positionOffset: { x: 0.0, y: 0.0, z: 0.10 },
+  rotationOffsetDeg: { x: 0.0, y: 0.0, z: -90.0, order: 'ZYX' },
+  scale: { uniform: true, scaleU: 0.0913 },
+  elevationZAboveWater: 0.10
+};
+
+let gltfCanoeBaseMesh = null;
+let isModelLoading = false;
+
+function loadCalibratedCanoeModel(onLoadedCallback) {
+  if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') return;
+  if (gltfCanoeBaseMesh) {
+    if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+    return;
+  }
+  isModelLoading = true;
+  const loader = new THREE.GLTFLoader();
+  
+  if (window.EMBEDDED_CANOE_MODEL_DATA_URI) {
+    loader.load(
+      window.EMBEDDED_CANOE_MODEL_DATA_URI,
+      (gltf) => {
+        gltfCanoeBaseMesh = gltf.scene || gltf.scenes[0];
+        gltfCanoeBaseMesh.traverse((child) => {
+          if (child.isMesh && child.geometry && !child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+        });
+        isModelLoading = false;
+        console.log('✅ [3D] Modelo canoe_3D.glb carregado via Data URI Base64');
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+      },
+      undefined,
+      (err) => {
+        console.warn('[3D] Falha ao carregar Data URI, tentando CDN e caminhos relativos...', err);
+        tryLoad(0);
+      }
+    );
+    return;
+  }
+
+  const modelPaths = [
+    'https://ahqwpngtawzstghcnxpa.supabase.co/storage/v1/object/public/vaarec-data/models/canoe_3D.glb',
+    'Model/canoe_3D.glb',
+    './Model/canoe_3D.glb',
+    '/vaarec/viewers/Model/canoe_3D.glb',
+    '/Model/canoe_3D.glb',
+    '../Model/canoe_3D.glb',
+    'canoe_3D.glb',
+    '../public/Model/canoe_3D.glb'
+  ];
+
+  function tryLoad(idx = 0) {
+    if (idx >= modelPaths.length) {
+      isModelLoading = false;
+      console.warn("[3D] Modelo canoe_3D.glb não encontrado nos caminhos relativos. Usando geometria procedural Va\'a.");
+      return;
+    }
+    loader.load(
+      modelPaths[idx],
+      (gltf) => {
+        gltfCanoeBaseMesh = gltf.scene || gltf.scenes[0];
+        gltfCanoeBaseMesh.traverse((child) => {
+          if (child.isMesh && child.geometry && !child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+        });
+        isModelLoading = false;
+        console.log('✅ [3D] Modelo canoe_3D.glb calibrado carregado via: ' + modelPaths[idx]);
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+      },
+      undefined,
+      () => tryLoad(idx + 1)
+    );
+  }
+  tryLoad(0);
+}
+
+function applyCanoeCalibrationToMesh(meshClone, colorHex = '#00F2FE') {
+  meshClone.traverse((child) => {
+    if (child.isMesh) {
+      if (child.geometry && !child.geometry.attributes.normal) {
+        child.geometry.computeVertexNormals();
+      }
+      child.material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        roughness: 0.35,
+        metalness: 0.15,
+        side: THREE.DoubleSide
+      });
+      child.frustumCulled = false;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      child.frustumCulled = false;
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  // 1. Posição / Offset
+  meshClone.position.set(
+    CANOE_3D_CONFIG.positionOffset.x,
+    CANOE_3D_CONFIG.positionOffset.y,
+    CANOE_3D_CONFIG.positionOffset.z
+  );
+
+  // 2. Rotação Euler calibrada (Rot Z: -90° para alinhar proa com +Y)
+  meshClone.rotation.order = CANOE_3D_CONFIG.rotationOffsetDeg.order || 'ZYX';
+  meshClone.rotation.set(
+    (CANOE_3D_CONFIG.rotationOffsetDeg.x * Math.PI) / 180,
+    (CANOE_3D_CONFIG.rotationOffsetDeg.y * Math.PI) / 180,
+    (CANOE_3D_CONFIG.rotationOffsetDeg.z * Math.PI) / 180
+  );
+
+  // 3. Escala proporcional calibrada (12m de comprimento real)
+  const s = CANOE_3D_CONFIG.scale.scaleU || 0.0913;
+  meshClone.scale.set(s, s, s);
+  meshClone.updateMatrixWorld(true);
+
+  return meshClone;
+}
+
+function createVaACanoeMesh(colorHex = '#00F2FE') {
+  const group = new THREE.Group();
+
+  // 1. Casco Principal Va'a
+  const hullGeo = new THREE.ConeGeometry(0.65, 12.0, 10);
+  hullGeo.scale(0.65, 1.0, 0.85);
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.3,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const hull = new THREE.Mesh(hullGeo, hullMat);
+  hull.rotation.x = -Math.PI / 2;
+  hull.position.set(0, 0, 0.4);
+  group.add(hull);
+
+  // Proa colorida (+Y)
+  const bowGeo = new THREE.ConeGeometry(0.70, 3.2, 10);
+  bowGeo.scale(0.65, 1.0, 0.85);
+  const bowMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: 0.6,
+    roughness: 0.25,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const bow = new THREE.Mesh(bowGeo, bowMat);
+  bow.rotation.x = -Math.PI / 2;
+  bow.position.set(0, 4.6, 0.4);
+  group.add(bow);
+
+  // 2. Flutuador Ama (a bombordo / -X = -2.2m)
+  const amaGeo = new THREE.ConeGeometry(0.40, 6.5, 8);
+  amaGeo.scale(0.75, 1.0, 0.75);
+  const amaMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: 0.5,
+    roughness: 0.3,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const ama = new THREE.Mesh(amaGeo, amaMat);
+  ama.rotation.x = -Math.PI / 2;
+  ama.position.set(-2.2, 0, 0.3);
+  group.add(ama);
+
+  // 3. Iakos
+  const iakoGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6);
+  const iakoMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.5, metalness: 0.2 });
+  
+  const iako1 = new THREE.Mesh(iakoGeo, iakoMat);
+  iako1.rotation.z = Math.PI / 2;
+  iako1.position.set(-1.1, 2.0, 0.6);
+  group.add(iako1);
+
+  const iako2 = new THREE.Mesh(iakoGeo, iakoMat);
+  iako2.rotation.z = Math.PI / 2;
+  iako2.position.set(-1.1, -2.0, 0.6);
+  group.add(iako2);
+
+  // Desativar frustum culling para evitar descarte pelo Mapbox Mercator
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
+function createAlignedArrowMesh(colorHex = '#00F2FE') {
+  const group = new THREE.Group();
+
+  // 1. Seta Direcional Tática Náutica (Chevron Esportivo de Alta Legibilidade e Alto Contraste)
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 9.5);           // Ponta da proa
+  shape.lineTo(4.2, -6.0);        // Asa externa estibordo
+  shape.lineTo(1.6, -3.5);        // Reentrância estibordo
+  shape.lineTo(0, -1.5);          // Vértice central cauda/popa
+  shape.lineTo(-1.6, -3.5);       // Reentrância bombordo
+  shape.lineTo(-4.2, -6.0);       // Asa externa bombordo
+  shape.closePath();
+
+  const extrudeSettings = {
+    steps: 1,
+    depth: 0.85,                  // Altura/espessura nítida de 85cm acima d'água
+    bevelEnabled: true,
+    bevelThickness: 0.25,
+    bevelSize: 0.20,
+    bevelOffset: 0,
+    bevelSegments: 3
+  };
+  const arrowGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  arrowGeo.translate(0, 0, 0.35);
+
+  const mainMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: 0.85,      // Brilho tático vibrante
+    roughness: 0.20,
+    metalness: 0.30,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  const arrowMesh = new THREE.Mesh(arrowGeo, mainMat);
+  group.add(arrowMesh);
+
+  // 2. Crista longitudinal luminosa para indicação de rumo ultra-nítida
+  const spineGeo = new THREE.CylinderGeometry(0.22, 0.22, 12.0, 8);
+  const spineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: true });
+  const spine = new THREE.Mesh(spineGeo, spineMat);
+  spine.position.set(0, 1.2, 1.25);
+  group.add(spine);
+
+  // 3. Ponta cônica de proa de alto contraste
+  const tipGeo = new THREE.ConeGeometry(0.55, 2.2, 8);
+  const tipMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: true });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.rotation.x = -Math.PI / 2;
+  tip.position.set(0, 9.6, 0.95);
+  group.add(tip);
+
+  // Desativar frustum culling em todas as partes da seta
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
+let boatRenderMode = (typeof localStorage !== 'undefined' && localStorage.getItem('vaarec_boat_render_mode')) || 'model';
+
+function setBoatRenderMode(mode) {
+  boatRenderMode = mode === 'arrow' ? 'arrow' : 'model';
+  try { localStorage.setItem('vaarec_boat_render_mode', boatRenderMode); } catch(e) {}
+
+  if (boatRenderMode === 'model' && !gltfCanoeBaseMesh && !isModelLoading) {
+    loadCalibratedCanoeModel((baseMesh) => {
+      boat3DObjects.forEach((bObj) => {
+        const tr = tracksData[bObj.trackIdx];
+        if (bObj.modelMesh) {
+          bObj.group.remove(bObj.modelMesh);
+        }
+        bObj.modelMesh = applyCanoeCalibrationToMesh(baseMesh.clone(true), tr?.color || '#00F2FE');
+        bObj.modelMesh.visible = (boatRenderMode === 'model');
+        bObj.group.add(bObj.modelMesh);
+        bObj.group.updateMatrixWorld(true);
+      });
+      if (map) map.triggerRepaint();
+    });
+  }
+
+  boat3DObjects.forEach(b => {
+    if (b.modelMesh) b.modelMesh.visible = (boatRenderMode === 'model');
+    if (b.arrowMesh) b.arrowMesh.visible = (boatRenderMode === 'arrow');
+  });
+
+  document.querySelectorAll('.btn-boat-mode').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === boatRenderMode);
+  });
+
+  if (map) map.triggerRepaint();
+}
+
+function createThreeJSCustomLayer() {
+  return {
+    id: 'vaarec-coach-3d-layer',
+    type: 'custom',
+    renderingMode: '3d',
+    onAdd: function (mapInstance, gl) {
+      threeCamera = new THREE.Camera();
+
+      threeRenderer = new THREE.WebGLRenderer({
+        canvas: mapInstance.getCanvas(),
+        context: gl,
+        antialias: true
+      });
+      threeRenderer.autoClear = false;
+      threeRenderer.setPixelRatio(1);
+
+      boat3DObjects = [];
+      tracksData.forEach((tr, i) => {
+        const boatScene = new THREE.Scene();
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        boatScene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        sunLight.position.set(30, -50, 40);
+        boatScene.add(sunLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xdff0ff, 0x06111e, 0.7);
+        boatScene.add(hemiLight);
+
+        const boatGroup = new THREE.Group();
+        boatGroup.matrixAutoUpdate = true;
+        
+        let modelChild = null;
+        if (gltfCanoeBaseMesh) {
+          modelChild = applyCanoeCalibrationToMesh(gltfCanoeBaseMesh.clone(true), tr.color);
+        } else {
+          modelChild = createVaACanoeMesh(tr.color);
+        }
+        boatGroup.add(modelChild);
+
+        const arrowChild = createAlignedArrowMesh(tr.color || '#00F2FE');
+        boatGroup.add(arrowChild);
+
+        modelChild.visible = (boatRenderMode === 'model');
+        arrowChild.visible = (boatRenderMode === 'arrow');
+        
+        boatScene.add(boatGroup);
+        boatGroup.updateMatrixWorld(true);
+        boat3DObjects.push({ trackIdx: i, scene: boatScene, group: boatGroup, modelMesh: modelChild, arrowMesh: arrowChild });
+      });
+
+      // Carregar modelo 3D GLB calibrado de forma assíncrona ou instantânea via Base64
+      loadCalibratedCanoeModel((baseMesh) => {
+        boat3DObjects.forEach((bObj) => {
+          const tr = tracksData[bObj.trackIdx];
+          if (bObj.modelMesh) {
+            bObj.group.remove(bObj.modelMesh);
+          }
+          bObj.modelMesh = applyCanoeCalibrationToMesh(baseMesh.clone(true), tr?.color || '#00F2FE');
+          bObj.modelMesh.visible = (boatRenderMode === 'model');
+          bObj.group.add(bObj.modelMesh);
+          bObj.group.updateMatrixWorld(true);
+        });
+        if (map) map.triggerRepaint();
+      });
+    },
+    render: function (gl, matrix) {
+      if (!threeRenderer || !threeCamera) return;
+
+      try {
+        if (typeof threeRenderer.resetState === 'function') {
+          threeRenderer.resetState();
+        } else if (threeRenderer.state && typeof threeRenderer.state.reset === 'function') {
+          threeRenderer.state.reset();
+        }
+
+        boat3DObjects.forEach(bObj => {
+          const track = tracksData[bObj.trackIdx];
+          if (!track || !track.points || !track.points.length) return;
+
+          const pt = interpolatePointAtTime(track.points, simTimeSec);
+          if (!pt) return;
+
+          const coord = mapboxgl.MercatorCoordinate.fromLngLat([pt.lng, pt.lat], 0.0);
+          const M = coord.meterInMercatorCoordinateUnits();
+          const terrainElevation = (map.getTerrain() && typeof map.queryTerrainElevation === 'function')
+            ? (map.queryTerrainElevation([pt.lng, pt.lat]) || 0)
+            : 0;
+          const zElevation = coord.z + ((terrainElevation + 0.15) * M);
+          const headingRad = ((pt.heading || 0) * Math.PI) / 180;
+
+          // Orientação precisa na cartografia Mercator do Mapbox:
+          // Inverter Y (scale(M, -M, M)) alinha o +Y da canoa com o Norte verdadeiro (-Y Mercator).
+          // Rotação por -headingRad faz o rumo girar no sentido horário náutico (0°=N, 90°=E, 180°=S, 270°=W).
+          const rotation = new THREE.Matrix4().makeRotationZ(-headingRad);
+          const mercatorTransform = new THREE.Matrix4()
+            .makeTranslation(coord.x, coord.y, zElevation)
+            .scale(new THREE.Vector3(M, -M, M))
+            .multiply(rotation);
+
+          threeCamera.projectionMatrix = new THREE.Matrix4()
+            .fromArray(matrix)
+            .multiply(mercatorTransform);
+
+          bObj.modelMesh.visible = (boatRenderMode === 'model');
+          bObj.arrowMesh.visible = (boatRenderMode === 'arrow');
+
+          threeRenderer.render(bObj.scene, threeCamera);
+        });
+
+      } catch (e) {
+        console.error('[Coach 3D Render Error]', e);
+      }
+      map.triggerRepaint();
+    }
+  };
+}
+
+function updateCoach3DBoats() {
+  // Posições agora são computadas diretamente no render com precisão 64-bit por embarcação
+}
+
+function interpolatePointAtTime(points, targetTime) {
+  if (!points || !points.length) return null;
+  if (targetTime <= points[0].t) return points[0];
+  if (targetTime >= points[points.length-1].t) return points[points.length-1];
+
+  let lo = 0, hi = points.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].t <= targetTime) lo = mid; else hi = mid;
+  }
+  const a = points[lo], b = points[hi];
+  const f = (targetTime - a.t) / (b.t - a.t || 1);
+
+  let dh = (b.heading - a.heading + 540) % 360 - 180;
+  return {
+    lat: a.lat + (b.lat - a.lat)*f,
+    lng: a.lng + (b.lng - a.lng)*f,
+    speedKmh: a.speedKmh + (b.speedKmh - a.speedKmh)*f,
+    heading: (a.heading + dh*f + 360)%360,
+    cumDistM: (a.cumDistM || 0) + (((b.cumDistM || 0) - (a.cumDistM || 0))*f)
+  };
+}
+
+// =========================================================================
+// 3. ANIMATION LOOP & COACH TELEMETRY
+// =========================================================================
+let lastPerfTimestamp = null;
+
+function renderLoop(perfTimestamp) {
+  if (lastPerfTimestamp === null) lastPerfTimestamp = perfTimestamp;
+  const deltaSec = Math.max(0.001, Math.min(0.1, (perfTimestamp - lastPerfTimestamp) / 1000));
+  lastPerfTimestamp = perfTimestamp;
+
+  if (isPlaying) {
+    simTimeSec += deltaSec * playSpeed;
+    if (simTimeSec > maxTimeSec) simTimeSec = minTimeSec;
+  }
+
+  const progressRatio = (maxTimeSec > minTimeSec) ? (simTimeSec - minTimeSec) / (maxTimeSec - minTimeSec) : 0;
+  document.getElementById('scrub').value = progressRatio * 1000;
+  document.getElementById('timer').textContent = formatTime(simTimeSec - minTimeSec);
+
+  const selTr = tracksData[selectedTrackIdx];
+  if (selTr && selTr.points.length) {
+    const pt = interpolatePointAtTime(selTr.points, simTimeSec);
+    if (pt) {
+      updateCoachWidgets(pt);
+
+      if (camMode === 'follow' && map) {
+        if (smoothCam.lng === null) {
+          smoothCam.lng = pt.lng; smoothCam.lat = pt.lat; smoothCam.heading = pt.heading;
+        }
+        const factor = Math.min(1, deltaSec * 8.0 * Math.max(1, playSpeed));
+        smoothCam.lng += (pt.lng - smoothCam.lng) * factor;
+        smoothCam.lat += (pt.lat - smoothCam.lat) * factor;
+
+        let dBearing = (pt.heading - smoothCam.heading + 540) % 360 - 180;
+        smoothCam.heading = (smoothCam.heading + dBearing * factor + 360) % 360;
+
+        if (userInteracting) {
+          map.jumpTo({ center: [smoothCam.lng, smoothCam.lat] });
+        } else {
+          map.jumpTo({
+            center: [smoothCam.lng, smoothCam.lat],
+            bearing: smoothCam.heading,
+            pitch: 75
+          });
+        }
+      }
+    }
+  }
+
+  drawTelemetryChart();
+  requestAnimationFrame(renderLoop);
+}
+
+function updateCoachWidgets(sel) {
+  if (!sel) return;
+
+  document.getElementById('ang-hd').textContent = `${Math.round(sel.heading)}°`;
+  const windDir = 45; // Vento NE
+  const angleToWind = Math.abs((sel.heading - windDir + 540) % 360 - 180);
+  
+  let windTxt = `${Math.round(angleToWind)}° (Través / Reaching)`;
+  if (angleToWind < 45) windTxt = `${Math.round(angleToWind)}° (Contra / Upwind)`;
+  else if (angleToWind > 135) windTxt = `${Math.round(angleToWind)}° (Popa / Downwind)`;
+  document.getElementById('ang-wind').textContent = windTxt;
+
+  document.getElementById('ang-wave').textContent = `${Math.round((angleToWind + 15) % 180)}°`;
+  document.getElementById('ang-vmg').textContent = `${(sel.speedKmh * Math.cos((angleToWind * Math.PI) / 180)).toFixed(1)} km/h`;
+
+  tracksData.forEach((tr, i) => {
+    const valEl = document.getElementById(`val-${i}`);
+    if (valEl) {
+      const pt = interpolatePointAtTime(tr.points, simTimeSec);
+      if (pt) valEl.textContent = `${pt.speedKmh.toFixed(1)} km/h`;
+    }
+  });
+}
+
+// =========================================================================
+// 4. GRÁFICOS & LISTA DE ATLETAS
+// =========================================================================
+function initAthleteUI() {
+  const listEl = document.getElementById('athlete-list');
+  listEl.innerHTML = '';
+
+  tracksData.forEach((tr, i) => {
+    const row = document.createElement('div');
+    row.className = `athlete-row ${i === selectedTrackIdx ? 'selected' : ''}`;
+    row.id = `row-${i}`;
+    row.innerHTML = `
+      <span class="dot" style="color: ${tr.color};"></span>
+      <span class="n">${tr.name}</span>
+      <span class="v" id="val-${i}">0.0 km/h</span>
+    `;
+
+    row.addEventListener('click', () => {
+      document.querySelectorAll('.athlete-row').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      selectedTrackIdx = i;
+      populateSplitsTable();
+    });
+
+    listEl.appendChild(row);
+  });
+
+  populateSplitsTable();
+}
+
+function populateSplitsTable() {
+  const tbody = document.getElementById('splits-tbody');
+  tbody.innerHTML = '';
+
+  const tr = tracksData[selectedTrackIdx];
+  if (!tr || !tr.points.length) return;
+
+  const totalDist = tr.points[tr.points.length - 1].cumDistM || 4000;
+  const numSplits = 4;
+  const splitDist = totalDist / numSplits;
+
+  for (let i = 1; i <= numSplits; i++) {
+    const dTarget = i * splitDist;
+    const pt = tr.points.find(p => p.cumDistM >= dTarget) || tr.points[tr.points.length - 1];
+    const prevPt = tr.points.find(p => p.cumDistM >= (i - 1) * splitDist) || tr.points[0];
+    const tSpan = Math.max(1, pt.t - prevPt.t);
+    const dSpanKm = (pt.cumDistM - prevPt.cumDistM) / 1000;
+    const avgSpd = dSpanKm > 0 ? (dSpanKm / (tSpan / 3600)) : 8.5;
+    const paceStr = avgSpd > 1 ? formatTime(3600 / avgSpd) : '04:15';
+
+    const r = document.createElement('tr');
+    r.innerHTML = `<td>Km ${((i-1)*dSpanKm + 1).toFixed(1)} ➔ ${i === numSplits ? 'Chegada' : `Boia ${i}`}</td><td>${formatTime(tSpan)}</td><td>${paceStr} /km</td>`;
+    tbody.appendChild(r);
+  }
+}
+
+function initChartLegend() {
+  const leg = document.getElementById('chart-legend');
+  leg.innerHTML = '';
+  tracksData.forEach(tr => {
+    leg.innerHTML += `<span><span class="sw" style="background: ${tr.color};"></span>${tr.name}</span>`;
+  });
+}
+
+function drawTelemetryChart() {
+  const canvas = document.getElementById('chart-canvas');
+  const wrap = document.getElementById('chart-wrap');
+  canvas.width = wrap.clientWidth - 32;
+  canvas.height = wrap.clientHeight - 24;
+
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let y = 10; y < h; y += 30) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  tracksData.forEach(tr => {
+    if (!tr.points.length) return;
+    ctx.strokeStyle = tr.color;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+
+    tr.points.forEach((pt, idx) => {
+      const nx = (pt.t - minTimeSec) / (maxTimeSec - minTimeSec || 1);
+      const ny = 1 - (pt.speedKmh - 5) / 12;
+      const x = nx * w;
+      const y = Math.max(5, Math.min(h - 5, ny * h));
+
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  });
+
+  const curX = ((simTimeSec - minTimeSec) / (maxTimeSec - minTimeSec || 1)) * w;
+  ctx.strokeStyle = '#ffb020';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(curX, 0); ctx.lineTo(curX, h); ctx.stroke();
+}
+
+function formatTime(sec) {
+  if (isNaN(sec) || sec < 0) return '00:00.0';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.floor((sec % 1) * 10);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`;
+}
+
+function initEvents() {
+  document.getElementById('btn-play').addEventListener('click', () => {
+    isPlaying = !isPlaying;
+    const icon = document.querySelector('#btn-play i');
+    if (icon) icon.className = isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+  });
+
+  document.querySelectorAll('[data-speed]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      playSpeed = Number(e.currentTarget.dataset.speed);
+    });
+  });
+
+  document.querySelectorAll('.cam-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      camMode = e.currentTarget.dataset.cam;
+
+      if (camMode === 'overview' && map && tracksData.length && tracksData[0].points.length) {
+        const bounds = new mapboxgl.LngLatBounds();
+        tracksData.forEach(t => t.points.forEach(p => bounds.extend([p.lng, p.lat])));
+        map.fitBounds(bounds, { padding: 50, pitch: 45, duration: 1000 });
+      }
+    });
+  });
+
+  document.getElementById('scrub').addEventListener('input', (e) => {
+    const frac = Number(e.target.value) / 1000;
+    simTimeSec = minTimeSec + frac * (maxTimeSec - minTimeSec);
+  });
+
+  document.querySelectorAll('.btn-boat-mode').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      setBoatRenderMode(e.currentTarget.getAttribute('data-mode'));
+    });
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if (e.key === 'm' || e.key === 'M') {
+      setBoatRenderMode(boatRenderMode === 'model' ? 'arrow' : 'model');
+    }
+  });
+
+  setBoatRenderMode(boatRenderMode);
+}
+
+window.addEventListener('DOMContentLoaded', initContract);
+</script>
+</body>
+</html>

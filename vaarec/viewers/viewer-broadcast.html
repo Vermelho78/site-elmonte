@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VAAREC • Broadcast Tático Náutico</title>
+<meta name="description" content="Visualizador tático de regatas estilo broadcast com telemetria 3D, câmeras múltiplas, leaderboard em tempo real e análise de corrida no VAAREC.">
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Mapbox GL JS v3 -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+
+<!-- Three.js + GLTFLoader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="Model/canoe_model_base64.js"></script>
+<script>
+if (typeof window !== 'undefined' && !window.EMBEDDED_CANOE_MODEL_DATA_URI) {
+  ['/Model/canoe_model_base64.js', '../Model/canoe_model_base64.js', './Model/canoe_model_base64.js', 'canoe_model_base64.js'].forEach(p => {
+    const s = document.createElement('script'); s.src = p; document.head.appendChild(s);
+  });
+}
+</script>
+
+<!-- VAAREC Client (Opcional) -->
+<script>
+if (typeof VaarecClient === 'undefined') {
+  const s = document.createElement('script');
+  s.src = '/vaarec-client.js';
+  document.head.appendChild(s);
+}
+</script>
+
+<style>
+:root {
+  --bg-deep: #040A12;
+  --bg-deep-2: #081522;
+  --glass: rgba(10, 22, 34, 0.82);
+  --glass-border: rgba(120, 220, 255, 0.22);
+  --cyan: #00F2FE;
+  --cyan-dim: rgba(0, 242, 254, 0.35);
+  --amber: #ffb020;
+  --amber-dim: rgba(255, 176, 32, 0.35);
+  --danger: #ff4d6d;
+  --text: #d9eef6;
+  --muted: #6f8ea0;
+  --font-display: 'Rajdhani', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #07090e;
+  font-family: var(--font-body); color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+#app { position: relative; width: 100vw; height: 100vh; }
+#map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+#hud-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Topbar */
+#topbar {
+  position: absolute; top: 14px; left: 14px; right: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; pointer-events: auto; z-index: 50;
+}
+#topbar .brand {
+  font-family: var(--font-display); font-weight: 700; font-size: 18px;
+  letter-spacing: 2px; color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-dim);
+}
+#topbar .brand span {
+  color: var(--muted); font-weight: 400; font-size: 11px; letter-spacing: 1px; display: block;
+}
+#topbar .timer {
+  font-family: var(--font-mono); font-size: 24px; letter-spacing: 2px; color: var(--amber);
+  text-shadow: 0 0 10px var(--amber-dim); font-weight: 700;
+}
+.playback { display: flex; align-items: center; gap: 6px; }
+.btn {
+  font-family: var(--font-display); font-weight: 600; letter-spacing: 1px;
+  background: rgba(255,255,255,0.06); color: var(--text);
+  border: 1px solid var(--glass-border); border-radius: 6px;
+  padding: 6px 12px; cursor: pointer; font-size: 13px;
+  transition: all .15s ease; pointer-events: auto;
+}
+.btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 10px var(--cyan-dim); }
+.btn.active { background: var(--cyan-dim); border-color: var(--cyan); color: #eafffe; box-shadow: 0 0 14px var(--cyan-dim); }
+.btn.play { width: 42px; text-align: center; font-size: 14px; }
+
+/* Compass Ribbon */
+#compass-wrap {
+  position: absolute; top: 78px; left: 50%; transform: translateX(-50%);
+  width: 420px; height: 52px; pointer-events: none; overflow: hidden; z-index: 50;
+}
+#compass-canvas { width: 100%; height: 100%; }
+.compass-marker {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent;
+  border-top: 9px solid var(--amber); filter: drop-shadow(0 0 6px var(--amber-dim));
+}
+
+/* Leaderboard */
+#leaderboard {
+  position: absolute; top: 78px; right: 14px; width: 290px;
+  padding: 14px; pointer-events: auto; max-height: 55vh; overflow-y: auto; z-index: 50;
+}
+#leaderboard h3 {
+  font-family: var(--font-display); font-size: 13px; letter-spacing: 2px; color: var(--muted);
+  margin-bottom: 10px; text-transform: uppercase; display: flex; justify-content: space-between;
+}
+.lb-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px;
+  cursor: pointer; transition: all .15s; margin-bottom: 4px;
+}
+.lb-row:hover { background: rgba(255,255,255,0.08); transform: translateX(-2px); }
+.lb-row.selected { background: var(--cyan-dim); box-shadow: 0 0 10px var(--cyan-dim) inset; border: 1px solid var(--cyan); }
+.lb-pos { font-family: var(--font-mono); font-size: 13px; color: var(--muted); width: 18px; font-weight: 700; }
+.lb-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 6px currentColor; flex-shrink: 0; }
+.lb-name { flex: 1; font-family: var(--font-display); font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-delta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: right; }
+.lb-delta.leader { color: var(--amber); font-weight: 700; }
+
+/* HUD Left */
+#hud-left {
+  position: absolute; bottom: 84px; left: 14px; width: 260px;
+  padding: 14px 18px; pointer-events: auto; z-index: 50;
+}
+#hud-left .boat-tag {
+  font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: 1px;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+#hud-left .boat-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
+.metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.metric-row .label { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+.metric-row .value { font-family: var(--font-mono); font-size: 18px; color: var(--cyan); text-shadow: 0 0 8px var(--cyan-dim); font-weight: 700; }
+.metric-row .value.amber { color: var(--amber); text-shadow: 0 0 8px var(--amber-dim); }
+.metric-row .unit { font-size: 11px; color: var(--muted); margin-left: 4px; font-family: var(--font-body); }
+
+/* Minimap */
+#minimap-wrap {
+  position: absolute; bottom: 84px; right: 14px; width: 190px; height: 190px;
+  padding: 8px; pointer-events: none; z-index: 50;
+}
+#minimap-canvas { width: 100%; height: 100%; border-radius: 6px; }
+
+/* Camera Switcher */
+#cam-switcher {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; padding: 8px 14px; pointer-events: auto; z-index: 60;
+}
+
+/* Scrubber */
+#scrub {
+  position: absolute; bottom: 64px; left: 14px; right: 14px;
+  -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.18); pointer-events: auto; cursor: pointer; z-index: 50;
+}
+#scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--cyan); box-shadow: 0 0 10px var(--cyan); cursor: pointer;
+}
+
+.loading-veil {
+  position: absolute; inset: 0; background: var(--bg-deep); z-index: 100;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  font-family: var(--font-display); letter-spacing: 2px; color: var(--cyan); font-weight: 700;
+}
+
+.competitor-marker { pointer-events: auto; cursor: pointer; }
+.competitor-tag {
+  background: rgba(4, 10, 18, 0.85); border: 1px solid var(--boat-color, #00F2FE);
+  border-radius: 4px; padding: 3px 6px; font-family: var(--font-display); font-size: 11px;
+  font-weight: 700; color: #fff; display: flex; align-items: center; gap: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5); transform: translateY(-10px);
+}
+
+/* ================================================================
+   MOBILE RESPONSIVE ADAPTATION (PORTRAIT • NO OVERLAPPING ELEMENTS)
+   ================================================================ */
+@media (max-width: 768px) {
+  #topbar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    padding: 6px 10px;
+    gap: 6px;
+    border-radius: 8px;
+    align-items: center;
+  }
+  #topbar .brand {
+    font-size: 13px;
+    letter-spacing: 1px;
+    line-height: 1.1;
+    max-width: 125px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+  }
+  #race-title-txt {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+  }
+  #race-sub-txt {
+    display: none;
+  }
+  #topbar .timer {
+    font-size: 15px;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+  .playback {
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .btn {
+    padding: 4px 6px;
+    font-size: 11px;
+    border-radius: 4px;
+  }
+  .btn.play {
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .playback .btn[data-speed="5"],
+  .playback .btn[data-speed="30"] {
+    display: none;
+  }
+  .boat-mode-toggle {
+    margin-left: 2px !important;
+  }
+  .btn.btn-boat-mode {
+    padding: 3px 5px !important;
+    font-size: 9px !important;
+  }
+
+  /* Compass Ribbon: placed below topbar */
+  #compass-wrap {
+    top: 60px;
+    width: min(92vw, 340px);
+    height: 36px;
+    border-radius: 6px;
+  }
+  .compass-marker {
+    border-top-width: 6px;
+  }
+
+  /* Minimap: upper-left below compass */
+  #minimap-wrap {
+    top: 104px;
+    left: 8px;
+    bottom: auto;
+    right: auto;
+    width: 84px;
+    height: 84px;
+    padding: 4px;
+    border-radius: 6px;
+  }
+
+  /* Leaderboard: upper-right, slim translucent card */
+  #leaderboard {
+    top: 104px;
+    right: 8px;
+    width: 175px;
+    max-height: 25vh;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(8, 16, 26, 0.72);
+  }
+  #leaderboard h3 {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  .lb-row {
+    padding: 4px 6px;
+    gap: 4px;
+    margin-bottom: 2px;
+  }
+  .lb-pos {
+    font-size: 11px;
+    width: 14px;
+  }
+  .lb-name {
+    font-size: 11px;
+    max-width: 85px;
+  }
+  .lb-delta {
+    font-size: 10px;
+  }
+
+  /* HUD Left: horizontal telemetry strip */
+  #hud-left {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: 94px;
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+  #hud-left .boat-tag {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  #hud-left .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  #hud-left .metric-row {
+    border-top: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 0;
+    text-align: center;
+  }
+  #hud-left .metric-row .label {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+  #hud-left .metric-row .value {
+    font-size: 14px;
+  }
+  #hud-left .metric-row .unit {
+    font-size: 8px;
+    display: inline-block;
+    margin-left: 2px;
+  }
+
+  /* Scrubber */
+  #scrub {
+    bottom: 58px;
+    left: 10px;
+    right: 10px;
+    height: 4px;
+  }
+
+  /* Camera Switcher: scrolling horizontal capsule at bottom */
+  #cam-switcher {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    height: 40px;
+    transform: none;
+    display: flex;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 8px;
+    gap: 4px;
+    border-radius: 8px;
+    scrollbar-width: none;
+  }
+  #cam-switcher::-webkit-scrollbar {
+    display: none;
+  }
+  .btn.cam-btn {
+    font-size: 10px;
+    padding: 5px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map-container"></div>
+
+  <div id="hud-overlay">
+    <div id="topbar" class="glass">
+      <div class="brand">
+        <span id="race-title-txt">VAAREC BROADCAST TÁTICO</span>
+        <span id="race-sub-txt">VA'A OC6 · V1 · SURFSKI · REMO — REPLAY 3D MAPBOX</span>
+      </div>
+      <div class="timer" id="timer-display">00:00.0</div>
+      <div class="playback">
+        <button class="btn play" id="btn-play"><i class="fa-solid fa-play"></i></button>
+        <button class="btn" data-speed="1">1x</button>
+        <button class="btn active" data-speed="2">2x</button>
+        <button class="btn" data-speed="5">5x</button>
+        <button class="btn" data-speed="10">10x</button>
+        <button class="btn" data-speed="30">30x</button>
+        <div class="boat-mode-toggle" style="display:inline-flex; gap:2px; margin-left:6px; background:rgba(255,255,255,0.06); padding:2px; border-radius:6px; border:1px solid var(--glass-border);">
+          <button class="btn btn-boat-mode active" data-mode="model" title="Exibir Modelo 3D da Canoa [M]" style="padding:4px 8px; font-size:11px;"><i class="fa-solid fa-ship"></i> 3D</button>
+          <button class="btn btn-boat-mode" data-mode="arrow" title="Exibir Seta Alinhada [M]" style="padding:4px 8px; font-size:11px;"><i class="fa-solid fa-location-arrow"></i> Seta</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="compass-wrap">
+      <canvas id="compass-canvas" width="420" height="52"></canvas>
+      <div class="compass-marker"></div>
+    </div>
+
+    <div id="leaderboard" class="glass">
+      <h3>Classificação <span>Delta</span></h3>
+      <div id="lb-list"></div>
+    </div>
+
+    <div id="hud-left" class="glass">
+      <div class="boat-tag">
+        <span class="boat-dot" id="sel-dot"></span>
+        <span id="sel-name">Canoa Selecionada</span>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-row"><span class="label">Velocidade</span><span><span class="value" id="m-speed">0.0</span><span class="unit">km/h</span></span></div>
+        <div class="metric-row"><span class="label">Pace</span><span><span class="value" id="m-pace">0:00</span><span class="unit">/km</span></span></div>
+        <div class="metric-row"><span class="label">VMG</span><span><span class="value amber" id="m-vmg">0.0</span><span class="unit">km/h</span></span></div>
+        <div class="metric-row"><span class="label">Restante</span><span><span class="value amber" id="m-dist">0.00</span><span class="unit">km</span></span></div>
+      </div>
+    </div>
+
+    <div id="minimap-wrap" class="glass">
+      <canvas id="minimap-canvas" width="190" height="190"></canvas>
+    </div>
+
+    <div id="cam-switcher" class="glass">
+      <button class="btn cam-btn active" data-cam="chase">CHASE 3D</button>
+      <button class="btn cam-btn" data-cam="cockpit">COCKPIT POV</button>
+      <button class="btn cam-btn" data-cam="drone">DRONE HELI</button>
+      <button class="btn cam-btn" data-cam="topdown">TOP-DOWN</button>
+      <button class="btn cam-btn" data-cam="buoy">BOIA CAM</button>
+    </div>
+
+    <input type="range" id="scrub" min="0" max="1000" value="0">
+  </div>
+
+  <div class="loading-veil" id="loading-veil"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><br>CARREGANDO TELEMETRIA VAAREC…</div>
+</div>
+
+<script>
+const MAPBOX_TOKEN = "pk.eyJ1IjoidmVybWVsaG9tb250ZSIsImEiOiJjbTIwd2lpMTIwbXZjMnFwdGl6N3IyMTd5In0.wHyz3cKuR7KNtVTZ14LYzQ";
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+let map = null;
+let CONTRACT = null;
+let tracksData = [];
+let buoysData = [];
+let selectedTrackIdx = 0;
+
+let simTimeSec = 0;
+let isPlaying = false;
+let playSpeed = 2;
+let minTimeSec = 0, maxTimeSec = 1200;
+let cameraMode = 'chase'; // chase, cockpit, drone, topdown, buoy
+
+let threeScene, threeCamera, threeRenderer;
+let boat3DObjects = []; // Array of { trackIdx, group, marker, elTag }
+const smoothCam = { lng: null, lat: null, heading: 0, pitch: 75, zoom: 20.0 };
+let userInteracting = false;
+
+function haversineDistanceMeters(p1, p2) {
+  const R = 6371000;
+  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((p1.lat * Math.PI) / 180) * Math.cos((p2.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculateHeading(p1, p2) {
+  if (!p1 || !p2) return 0;
+  const lat1 = (p1.lat * Math.PI) / 180;
+  const lat2 = (p2.lat * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  const rad = Math.atan2(y, x);
+  return ((rad * 180) / Math.PI + 360) % 360;
+}
+
+function sanitizeTrackPoints(pts) {
+  if (!Array.isArray(pts) || !pts.length) return [];
+
+  let rawTimes = [];
+  pts.forEach(p => {
+    let tVal = null;
+    if (p.tRel != null) tVal = Number(p.tRel);
+    else if (p.t != null) tVal = Number(p.t);
+    else if (p.timestamp != null) tVal = Number(p.timestamp);
+    else if (p.absT != null) tVal = Number(p.absT);
+    else if (p.time) tVal = new Date(p.time).getTime();
+    rawTimes.push(tVal);
+  });
+
+  const firstT = rawTimes[0] != null ? rawTimes[0] : 0;
+  const lastT = rawTimes[rawTimes.length - 1] != null ? rawTimes[rawTimes.length - 1] : rawTimes.length;
+  const rawSpan = Math.abs(lastT - firstT);
+
+  const isMillis = (rawSpan > 5000 && pts.length < rawSpan / 50) || firstT > 1e9;
+
+  const clean = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const lat = Number(p.lat ?? p.latitude);
+    const lng = Number(p.lon ?? p.lng ?? p.longitude);
+    const ele = Number(p.ele ?? p.alt ?? 0);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) continue;
+
+    let tSec = 0;
+    if (rawTimes[i] != null) {
+      tSec = isMillis ? (rawTimes[i] - firstT) / 1000 : (rawTimes[i] - firstT);
+    } else {
+      tSec = i;
+    }
+
+    let speedKmh = Number(p.spdKmh ?? p.speedKmh ?? p.speed_kmh ?? p.speed ?? 0);
+    clean.push({ lat, lng, ele, t: tSec, speedKmh });
+  }
+
+  clean.sort((a, b) => a.t - b.t);
+
+  let cumDist = 0;
+  for (let i = 0; i < clean.length; i++) {
+    if (i > 0) {
+      const stepM = haversineDistanceMeters(clean[i - 1], clean[i]);
+      cumDist += stepM;
+      const dt = clean[i].t - clean[i - 1].t;
+      if ((clean[i].speedKmh === 0 || isNaN(clean[i].speedKmh)) && dt > 0.1) {
+        clean[i].speedKmh = (stepM / dt) * 3.6;
+      }
+    }
+    clean[i].cumDistM = cumDist;
+    const next = clean[i + 1] || clean[i];
+    const prev = clean[i - 1] || clean[i];
+    clean[i].heading = calculateHeading(clean[i], next !== clean[i] ? next : prev);
+  }
+
+  return clean;
+}
+
+// =========================================================================
+// 1. CARREGAMENTO DO CONTRATO
+// =========================================================================
+async function initContract() {
+  // 1. Suporte a carregamento via URL (?data=caminho.json ou ?json=caminho.json)
+  const urlParams = new URLSearchParams(window.location.search);
+  const directDataUrl = urlParams.get('data') || urlParams.get('json') || urlParams.get('contract') || urlParams.get('file');
+  if (directDataUrl) {
+    try {
+      const res = await fetch(directDataUrl);
+      if (res.ok) CONTRACT = await res.json();
+    } catch(e) {
+      console.warn('Erro ao carregar contrato via URL:', e);
+    }
+  }
+
+  // 2. Suporte a contrato arrastado via Drag & Drop
+  if (!CONTRACT && typeof sessionStorage !== 'undefined') {
+    const droppedContract = sessionStorage.getItem('vaarec_dropped_contract');
+    if (droppedContract) {
+      try {
+        CONTRACT = JSON.parse(droppedContract);
+        sessionStorage.removeItem('vaarec_dropped_contract');
+      } catch(e) {}
+    }
+  }
+
+  // 3. Suporte a window.CONTRACT embutido ou slug na nuvem
+  if (!CONTRACT && window.CONTRACT && typeof window.CONTRACT === 'object') {
+    CONTRACT = window.CONTRACT;
+  } else if (!CONTRACT) {
+    const slug = typeof VaarecClient !== 'undefined' ? VaarecClient.getSlugFromUrl() : null;
+    if (slug && typeof VaarecClient !== 'undefined') {
+      try { CONTRACT = await VaarecClient.fetchMeta(slug); } catch(e) {}
+    }
+  }
+
+  let rawTracks = CONTRACT?.tracks || CONTRACT?.sportPackage?.tracks || CONTRACT?.tracksData || CONTRACT?.data?.tracks || [];
+
+  if (!rawTracks.length) {
+    CONTRACT = buildDemoContract();
+    rawTracks = CONTRACT.tracks;
+  }
+
+  tracksData = rawTracks.map((tr, i) => {
+    const ptsRaw = tr.points || tr.data || tr.gpsData || [];
+    const pts = sanitizeTrackPoints(ptsRaw);
+
+    return {
+      id: tr.id || `track-${i+1}`,
+      name: tr.name || `Canoa ${i+1}`,
+      color: tr.color || ['#00F2FE', '#ffb020', '#ff4d6d', '#7cff8a', '#c77dff', '#ffe600'][i % 6],
+      points: pts
+    };
+  }).filter(tr => tr.points.length > 0);
+
+  const rawBuoys = CONTRACT.buoys || CONTRACT.sportPackage?.buoys || CONTRACT.waypoints || [];
+  buoysData = rawBuoys.map((b, i) => ({
+    id: b.id || `buoy-${i+1}`,
+    name: b.name || `Boia ${i+1}`,
+    lat: Number(b.lat ?? b.latitude ?? 0),
+    lng: Number(b.lon ?? b.lng ?? b.longitude ?? 0),
+    order: Number(b.sequenceOrder ?? b.order ?? i+1)
+  }));
+
+  if (tracksData.length && tracksData[0].points.length) {
+    minTimeSec = 0;
+    maxTimeSec = Math.max(...tracksData.map(t => t.points[t.points.length - 1].t));
+    simTimeSec = minTimeSec;
+  }
+
+  document.getElementById('race-title-txt').textContent = CONTRACT.name || CONTRACT.title || 'VAAREC BROADCAST TÁTICO';
+  document.getElementById('loading-veil').style.display = 'none';
+
+  initMap();
+  initEvents();
+}
+
+function buildDemoContract() {
+  const ORIGIN = { lat: -27.4292, lng: -48.4805 };
+  const wps = [{ x: 0, z: 0 }, { x: 350, z: -1000 }, { x: -250, z: -2000 }, { x: 200, z: -2800 }, { x: -50, z: -100 }];
+  let tot = 0; for (let i=1; i<wps.length; i++) tot += Math.hypot(wps[i].x - wps[i-1].x, wps[i].z - wps[i-1].z);
+
+  function getPt(frac) {
+    let acc = 0, target = frac * tot;
+    for (let i=1; i<wps.length; i++) {
+      const d = Math.hypot(wps[i].x - wps[i-1].x, wps[i].z - wps[i-1].z);
+      if (target <= acc + d || i === wps.length - 1) {
+        const f = (target - acc) / (d || 1);
+        return { x: wps[i-1].x + (wps[i].x - wps[i-1].x)*f, z: wps[i-1].z + (wps[i].z - wps[i-1].z)*f };
+      }
+      acc += d;
+    }
+    return wps[wps.length-1];
+  }
+
+  const defs = [
+    { name: 'Canoa 1 • Rodrigo (Líder)', color: '#00F2FE', spd: 14.5 },
+    { name: 'Canoa 2 • Marcos Costa', color: '#ffb020', spd: 14.1 },
+    { name: 'Canoa 3 • Equipe Floripa', color: '#ff4d6d', spd: 13.8 },
+    { name: 'Canoa 4 • Tribo Va\'a', color: '#7cff8a', spd: 13.4 }
+  ];
+
+  const tracks = defs.map((d, idx) => {
+    const pts = []; let cum = 0; const dur = 1200; let prev = getPt(0);
+    for (let t=0; t<=dur; t+=2) {
+      const spdKmh = d.spd + Math.sin(t*0.02 + idx)*0.8;
+      const spdMs = spdKmh / 3.6;
+      const frac = Math.min(1, (cum + spdMs * 2) / tot);
+      const pos = getPt(frac);
+      pos.x += Math.sin(idx + t*0.015) * 8;
+      cum += Math.hypot(pos.x - prev.x, pos.z - prev.z);
+      const heading = (Math.atan2(pos.x - prev.x, -(pos.z - prev.z)) * 180 / Math.PI + 360) % 360;
+      pts.push({
+        lat: ORIGIN.lat - (pos.z / 111139),
+        lng: ORIGIN.lng + (pos.x / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))),
+        t, spdKmh: +spdKmh.toFixed(1), heading: +heading.toFixed(1), cumDistM: +cum.toFixed(1)
+      });
+      prev = pos;
+    }
+    return { id: `tr-${idx+1}`, name: d.name, color: d.color, points: pts };
+  });
+
+  const buoys = [
+    { name: 'Boia 1', lat: ORIGIN.lat - (-1000 / 111139), lng: ORIGIN.lng + (350 / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))), sequenceOrder: 1 },
+    { name: 'Boia 2 (Viragem)', lat: ORIGIN.lat - (-2000 / 111139), lng: ORIGIN.lng + (-250 / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))), sequenceOrder: 2 },
+    { name: 'Boia 3', lat: ORIGIN.lat - (-2800 / 111139), lng: ORIGIN.lng + (200 / (111139 * Math.cos(ORIGIN.lat * Math.PI / 180))), sequenceOrder: 3 }
+  ];
+
+  return { name: 'Campeonato Catarinense 2026', totalDistanceKm: +(tot/1000).toFixed(2), tracks, buoys };
+}
+
+// =========================================================================
+// 2. MAPBOX GL JS & THREE.JS 3D CUSTOM LAYER
+// =========================================================================
+function initMap() {
+  const firstPt = tracksData[0]?.points[0] || { lng: -48.4805, lat: -27.4292, heading: 45 };
+  smoothCam.lng = firstPt.lng;
+  smoothCam.lat = firstPt.lat;
+  smoothCam.heading = firstPt.heading || 45;
+
+  map = new mapboxgl.Map({
+    container: 'map-container',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [firstPt.lng, firstPt.lat],
+    zoom: 18.5,
+    pitch: 72,
+    maxPitch: 85,
+    bearing: firstPt.heading || 45,
+    antialias: true,
+    interactive: true,
+    projection: 'mercator'
+  });
+
+  // Permitir ao usuário girar e dar zoom livremente na canoa 3D sem brigar com o camera-chase
+  map.on('dragstart', () => { userInteracting = true; });
+  map.on('rotatestart', () => { userInteracting = true; });
+  map.on('pitchstart', () => { userInteracting = true; });
+  map.on('wheel', () => { userInteracting = true; });
+  map.on('dblclick', () => { userInteracting = false; });
+
+  map.on('style.load', () => {
+    try {
+      if (!map.getSource('mapbox-dem')) {
+        map.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14
+        });
+      }
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+    } catch(e) {}
+
+    try {
+      if (typeof map.setFog === 'function') {
+        map.setFog({ range: [0.5, 10], color: '#07090e', 'horizon-blend': 0.3 });
+      }
+    } catch(e) {}
+
+    if (!map.getLayer('vaarec-broadcast-3d-layer')) {
+      map.addLayer(createThreeJSCustomLayer());
+    }
+
+    buoysData.forEach(b => {
+      const el = document.createElement('div');
+      el.style.width = '14px'; el.style.height = '14px';
+      el.style.borderRadius = '50%'; el.style.background = '#ffb020';
+      el.style.border = '2px solid #fff';
+      el.style.boxShadow = '0 0 12px #ffb020';
+      new mapboxgl.Marker({ element: el }).setLngLat([b.lng, b.lat]).addTo(map);
+    });
+
+    requestAnimationFrame(renderLoop);
+  });
+}
+
+// Calibração Oficial Definida no Laboratório 3D (model-test.html / model-SKILL.md)
+const CANOE_3D_CONFIG = {
+  modelPath: '/Model/canoe_3D.glb',
+  positionOffset: { x: 0.0, y: 0.0, z: 0.10 },
+  rotationOffsetDeg: { x: 0.0, y: 0.0, z: -90.0, order: 'ZYX' },
+  scale: { uniform: true, scaleU: 0.0913 },
+  elevationZAboveWater: 0.10
+};
+
+let gltfCanoeBaseMesh = null;
+let isModelLoading = false;
+
+function loadCalibratedCanoeModel(onLoadedCallback) {
+  if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') return;
+  if (gltfCanoeBaseMesh) {
+    if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+    return;
+  }
+  isModelLoading = true;
+  const loader = new THREE.GLTFLoader();
+  
+  if (window.EMBEDDED_CANOE_MODEL_DATA_URI) {
+    loader.load(
+      window.EMBEDDED_CANOE_MODEL_DATA_URI,
+      (gltf) => {
+        gltfCanoeBaseMesh = gltf.scene || gltf.scenes[0];
+        gltfCanoeBaseMesh.traverse((child) => {
+          if (child.isMesh && child.geometry && !child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+        });
+        isModelLoading = false;
+        console.log('✅ [3D] Modelo canoe_3D.glb carregado via Data URI Base64');
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+      },
+      undefined,
+      (err) => {
+        console.warn('[3D] Falha ao carregar Data URI, tentando CDN e caminhos relativos...', err);
+        tryLoad(0);
+      }
+    );
+    return;
+  }
+
+  const modelPaths = [
+    'https://ahqwpngtawzstghcnxpa.supabase.co/storage/v1/object/public/vaarec-data/models/canoe_3D.glb',
+    'Model/canoe_3D.glb',
+    './Model/canoe_3D.glb',
+    '/vaarec/viewers/Model/canoe_3D.glb',
+    '/Model/canoe_3D.glb',
+    '../Model/canoe_3D.glb',
+    'canoe_3D.glb',
+    '../public/Model/canoe_3D.glb'
+  ];
+
+  function tryLoad(idx = 0) {
+    if (idx >= modelPaths.length) {
+      isModelLoading = false;
+      console.warn("[3D] Modelo canoe_3D.glb não encontrado nos caminhos relativos. Usando geometria procedural Va\'a.");
+      return;
+    }
+    loader.load(
+      modelPaths[idx],
+      (gltf) => {
+        gltfCanoeBaseMesh = gltf.scene || gltf.scenes[0];
+        gltfCanoeBaseMesh.traverse((child) => {
+          if (child.isMesh && child.geometry && !child.geometry.attributes.normal) {
+            child.geometry.computeVertexNormals();
+          }
+        });
+        isModelLoading = false;
+        console.log('✅ [3D] Modelo canoe_3D.glb calibrado carregado via: ' + modelPaths[idx]);
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(gltfCanoeBaseMesh);
+      },
+      undefined,
+      () => tryLoad(idx + 1)
+    );
+  }
+  tryLoad(0);
+}
+
+function applyCanoeCalibrationToMesh(meshClone, colorHex = '#00F2FE') {
+  meshClone.traverse((child) => {
+    if (child.isMesh) {
+      if (child.geometry && !child.geometry.attributes.normal) {
+        child.geometry.computeVertexNormals();
+      }
+      child.material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        roughness: 0.35,
+        metalness: 0.15,
+        side: THREE.DoubleSide
+      });
+      child.frustumCulled = false;
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  // 1. Posição / Offset
+  meshClone.position.set(
+    CANOE_3D_CONFIG.positionOffset.x,
+    CANOE_3D_CONFIG.positionOffset.y,
+    CANOE_3D_CONFIG.positionOffset.z
+  );
+
+  // 2. Rotação Euler calibrada (Rot Z: -90° para alinhar proa com +Y)
+  meshClone.rotation.order = CANOE_3D_CONFIG.rotationOffsetDeg.order || 'ZYX';
+  meshClone.rotation.set(
+    (CANOE_3D_CONFIG.rotationOffsetDeg.x * Math.PI) / 180,
+    (CANOE_3D_CONFIG.rotationOffsetDeg.y * Math.PI) / 180,
+    (CANOE_3D_CONFIG.rotationOffsetDeg.z * Math.PI) / 180
+  );
+
+  // 3. Escala proporcional calibrada (12m de comprimento real)
+  const s = CANOE_3D_CONFIG.scale.scaleU || 0.0913;
+  meshClone.scale.set(s, s, s);
+  meshClone.updateMatrixWorld(true);
+
+  return meshClone;
+}
+
+function createVaACanoeMesh(colorHex = '#00F2FE') {
+  const group = new THREE.Group();
+
+  // 1. Casco Principal Va'a
+  const hullGeo = new THREE.ConeGeometry(0.65, 12.0, 10);
+  hullGeo.scale(0.65, 1.0, 0.85);
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.3,
+    metalness: 0.1,
+    side: THREE.DoubleSide
+  });
+  const hull = new THREE.Mesh(hullGeo, hullMat);
+  hull.rotation.x = -Math.PI / 2;
+  hull.position.set(0, 0, 0.4);
+  group.add(hull);
+
+  // Proa colorida (+Y)
+  const bowGeo = new THREE.ConeGeometry(0.70, 3.2, 10);
+  bowGeo.scale(0.65, 1.0, 0.85);
+  const bowMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: 0.6,
+    roughness: 0.25,
+    metalness: 0.1,
+    side: THREE.DoubleSide
+  });
+  const bow = new THREE.Mesh(bowGeo, bowMat);
+  bow.rotation.x = -Math.PI / 2;
+  bow.position.set(0, 4.6, 0.4);
+  group.add(bow);
+
+  // 2. Flutuador Ama (a bombordo / -X = -2.2m)
+  const amaGeo = new THREE.ConeGeometry(0.40, 6.5, 8);
+  amaGeo.scale(0.75, 1.0, 0.75);
+  const amaMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: 0.5,
+    roughness: 0.3,
+    metalness: 0.1,
+    side: THREE.DoubleSide
+  });
+  const ama = new THREE.Mesh(amaGeo, amaMat);
+  ama.rotation.x = -Math.PI / 2;
+  ama.position.set(-2.2, 0, 0.3);
+  group.add(ama);
+
+  // 3. Iakos
+  const iakoGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6);
+  const iakoMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.5, metalness: 0.2 });
+  
+  const iako1 = new THREE.Mesh(iakoGeo, iakoMat);
+  iako1.rotation.z = Math.PI / 2;
+  iako1.position.set(-1.1, 2.0, 0.6);
+  group.add(iako1);
+
+  const iako2 = new THREE.Mesh(iakoGeo, iakoMat);
+  iako2.rotation.z = Math.PI / 2;
+  iako2.position.set(-1.1, -2.0, 0.6);
+  group.add(iako2);
+
+  // Desativar frustum culling para evitar descarte pelo Mapbox Mercator
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
+function createAlignedArrowMesh(colorHex = '#00F2FE') {
+  const group = new THREE.Group();
+
+  // 1. Seta Direcional Tática Náutica (Chevron Esportivo de Alta Legibilidade e Alto Contraste)
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 9.5);           // Ponta da proa
+  shape.lineTo(4.2, -6.0);        // Asa externa estibordo
+  shape.lineTo(1.6, -3.5);        // Reentrância estibordo
+  shape.lineTo(0, -1.5);          // Vértice central cauda/popa
+  shape.lineTo(-1.6, -3.5);       // Reentrância bombordo
+  shape.lineTo(-4.2, -6.0);       // Asa externa bombordo
+  shape.closePath();
+
+  const extrudeSettings = {
+    steps: 1,
+    depth: 0.85,                  // Altura/espessura nítida de 85cm acima d'água
+    bevelEnabled: true,
+    bevelThickness: 0.25,
+    bevelSize: 0.20,
+    bevelOffset: 0,
+    bevelSegments: 3
+  };
+  const arrowGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  arrowGeo.translate(0, 0, 0.35);
+
+  const mainMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorHex),
+    emissive: new THREE.Color(colorHex),
+    emissiveIntensity: 0.85,      // Brilho tático vibrante
+    roughness: 0.20,
+    metalness: 0.30,
+    side: THREE.DoubleSide
+  });
+  const arrowMesh = new THREE.Mesh(arrowGeo, mainMat);
+  group.add(arrowMesh);
+
+  // 2. Crista longitudinal luminosa para indicação de rumo ultra-nítida
+  const spineGeo = new THREE.CylinderGeometry(0.22, 0.22, 12.0, 8);
+  const spineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: true });
+  const spine = new THREE.Mesh(spineGeo, spineMat);
+  spine.position.set(0, 1.2, 1.25);
+  group.add(spine);
+
+  // 3. Ponta cônica de proa de alto contraste
+  const tipGeo = new THREE.ConeGeometry(0.55, 2.2, 8);
+  const tipMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: true });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.rotation.x = -Math.PI / 2;
+  tip.position.set(0, 9.6, 0.95);
+  group.add(tip);
+
+  // Desativar frustum culling em todas as partes da seta
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.frustumCulled = false;
+    }
+  });
+
+  return group;
+}
+
+let boatRenderMode = (typeof localStorage !== 'undefined' && localStorage.getItem('vaarec_boat_render_mode')) || 'model';
+
+function setBoatRenderMode(mode) {
+  boatRenderMode = mode === 'arrow' ? 'arrow' : 'model';
+  try { localStorage.setItem('vaarec_boat_render_mode', boatRenderMode); } catch(e) {}
+
+  if (boatRenderMode === 'model' && !gltfCanoeBaseMesh && !isModelLoading) {
+    loadCalibratedCanoeModel((baseMesh) => {
+      boat3DObjects.forEach((bObj) => {
+        const tr = tracksData[bObj.trackIdx];
+        if (bObj.modelMesh) {
+          bObj.group.remove(bObj.modelMesh);
+        }
+        bObj.modelMesh = applyCanoeCalibrationToMesh(baseMesh.clone(true), tr?.color || '#00F2FE');
+        bObj.modelMesh.visible = (boatRenderMode === 'model');
+        bObj.group.add(bObj.modelMesh);
+        bObj.group.updateMatrixWorld(true);
+      });
+      if (map) map.triggerRepaint();
+    });
+  }
+
+  boat3DObjects.forEach(b => {
+    if (b.modelMesh) b.modelMesh.visible = (boatRenderMode === 'model');
+    if (b.arrowMesh) b.arrowMesh.visible = (boatRenderMode === 'arrow');
+  });
+
+  document.querySelectorAll('.btn-boat-mode').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === boatRenderMode);
+  });
+
+  if (map) map.triggerRepaint();
+}
+
+function createThreeJSCustomLayer() {
+  return {
+    id: 'vaarec-broadcast-3d-layer',
+    type: 'custom',
+    renderingMode: '3d',
+    onAdd: function (mapInstance, gl) {
+      threeCamera = new THREE.Camera();
+
+      threeRenderer = new THREE.WebGLRenderer({
+        canvas: mapInstance.getCanvas(),
+        context: gl,
+        antialias: true
+      });
+      threeRenderer.autoClear = false;
+      threeRenderer.setPixelRatio(1);
+
+      boat3DObjects = [];
+      tracksData.forEach((tr, i) => {
+        const boatScene = new THREE.Scene();
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        boatScene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        sunLight.position.set(30, -50, 40);
+        boatScene.add(sunLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xdff0ff, 0x06111e, 0.7);
+        boatScene.add(hemiLight);
+
+        const boatGroup = new THREE.Group();
+        boatGroup.matrixAutoUpdate = true;
+        
+        let modelChild = null;
+        if (gltfCanoeBaseMesh) {
+          modelChild = applyCanoeCalibrationToMesh(gltfCanoeBaseMesh.clone(true), tr.color);
+        } else {
+          modelChild = createVaACanoeMesh(tr.color);
+        }
+        boatGroup.add(modelChild);
+
+        const arrowChild = createAlignedArrowMesh(tr.color || '#00F2FE');
+        boatGroup.add(arrowChild);
+
+        modelChild.visible = (boatRenderMode === 'model');
+        arrowChild.visible = (boatRenderMode === 'arrow');
+        
+        boatScene.add(boatGroup);
+        boatGroup.updateMatrixWorld(true);
+        boat3DObjects.push({ trackIdx: i, scene: boatScene, group: boatGroup, modelMesh: modelChild, arrowMesh: arrowChild });
+      });
+
+      // Carregar modelo 3D GLB calibrado de forma assíncrona ou instantânea via Base64
+      loadCalibratedCanoeModel((baseMesh) => {
+        boat3DObjects.forEach((bObj) => {
+          const tr = tracksData[bObj.trackIdx];
+          if (bObj.modelMesh) {
+            bObj.group.remove(bObj.modelMesh);
+          }
+          bObj.modelMesh = applyCanoeCalibrationToMesh(baseMesh.clone(true), tr?.color || '#00F2FE');
+          bObj.modelMesh.visible = (boatRenderMode === 'model');
+          bObj.group.add(bObj.modelMesh);
+          bObj.group.updateMatrixWorld(true);
+        });
+        if (map) map.triggerRepaint();
+      });
+    },
+    render: function (gl, matrix) {
+      if (!threeRenderer || !threeCamera) return;
+
+      try {
+        if (typeof threeRenderer.resetState === 'function') {
+          threeRenderer.resetState();
+        } else if (threeRenderer.state && typeof threeRenderer.state.reset === 'function') {
+          threeRenderer.state.reset();
+        }
+
+        boat3DObjects.forEach(bObj => {
+          const track = tracksData[bObj.trackIdx];
+          if (!track || !track.points || !track.points.length) return;
+
+          const pt = interpolatePointAtTime(track.points, simTimeSec);
+          if (!pt) return;
+
+          const coord = mapboxgl.MercatorCoordinate.fromLngLat([pt.lng, pt.lat], 0.0);
+          const M = coord.meterInMercatorCoordinateUnits();
+          const terrainElevation = (map.getTerrain() && typeof map.queryTerrainElevation === 'function')
+            ? (map.queryTerrainElevation([pt.lng, pt.lat]) || 0)
+            : 0;
+          const zElevation = coord.z + ((terrainElevation + 0.15) * M);
+          const headingRad = ((pt.heading || 0) * Math.PI) / 180;
+
+          // Orientação precisa na cartografia Mercator do Mapbox:
+          // Inverter Y (scale(M, -M, M)) alinha o +Y da canoa com o Norte verdadeiro (-Y Mercator).
+          // Rotação por -headingRad faz o rumo girar no sentido horário náutico (0°=N, 90°=E, 180°=S, 270°=W).
+          const rotation = new THREE.Matrix4().makeRotationZ(-headingRad);
+          const mercatorTransform = new THREE.Matrix4()
+            .makeTranslation(coord.x, coord.y, zElevation)
+            .scale(new THREE.Vector3(M, -M, M))
+            .multiply(rotation);
+
+          threeCamera.projectionMatrix = new THREE.Matrix4()
+            .fromArray(matrix)
+            .multiply(mercatorTransform);
+
+          bObj.modelMesh.visible = (boatRenderMode === 'model');
+          bObj.arrowMesh.visible = (boatRenderMode === 'arrow');
+
+          threeRenderer.render(bObj.scene, threeCamera);
+        });
+
+      } catch (e) {
+        console.error('[3D Render Error]', e);
+      }
+      map.triggerRepaint();
+    }
+  };
+}
+
+function update3DBoatPositions() {
+  // Posições agora são computadas diretamente no render com precisão 64-bit por embarcação
+}
+
+function interpolatePointAtTime(points, targetTime) {
+  if (!points || !points.length) return null;
+  if (targetTime <= points[0].t) return points[0];
+  if (targetTime >= points[points.length - 1].t) return points[points.length - 1];
+
+  let low = 0, high = points.length - 1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (points[mid].t <= targetTime) low = mid + 1;
+    else high = mid - 1;
+  }
+
+  const p1 = points[Math.max(0, high)];
+  const p2 = points[Math.min(points.length - 1, high + 1)];
+  const span = p2.t - p1.t;
+  const f = span > 0 ? (targetTime - p1.t) / span : 0;
+
+  let dHeading = (p2.heading - p1.heading + 540) % 360 - 180;
+  return {
+    lat: p1.lat + (p2.lat - p1.lat) * f,
+    lng: p1.lng + (p2.lng - p1.lng) * f,
+    speedKmh: p1.speedKmh + (p2.speedKmh - p1.speedKmh) * f,
+    heading: (p1.heading + dHeading * f + 360) % 360,
+    cumDistM: (p1.cumDistM || 0) + (((p2.cumDistM || 0) - (p1.cumDistM || 0)) * f)
+  };
+}
+
+// =========================================================================
+// 3. MAIN RENDER LOOP & CAMERA TRACKING
+// =========================================================================
+let lastPerfTimestamp = null;
+
+function renderLoop(perfTimestamp) {
+  if (lastPerfTimestamp === null) lastPerfTimestamp = perfTimestamp;
+  const deltaSec = Math.max(0.001, Math.min(0.1, (perfTimestamp - lastPerfTimestamp) / 1000));
+  lastPerfTimestamp = perfTimestamp;
+
+  if (isPlaying) {
+    simTimeSec += deltaSec * playSpeed;
+    if (simTimeSec > maxTimeSec) simTimeSec = minTimeSec;
+  }
+
+  const progressRatio = (maxTimeSec > minTimeSec) ? (simTimeSec - minTimeSec) / (maxTimeSec - minTimeSec) : 0;
+  document.getElementById('scrub').value = progressRatio * 1000;
+  document.getElementById('timer-display').textContent = formatTime(simTimeSec - minTimeSec);
+
+  const currentStates = [];
+  tracksData.forEach((tr, i) => {
+    const pt = interpolatePointAtTime(tr.points, simTimeSec);
+    if (!pt) return;
+    currentStates.push({
+      idx: i, id: tr.id, name: tr.name, color: tr.color,
+      lng: pt.lng, lat: pt.lat, heading: pt.heading,
+      speedKmh: pt.speedKmh, cumDistM: pt.cumDistM || 0
+    });
+  });
+
+  updateCamera(currentStates, deltaSec);
+
+  if (currentStates.length) {
+    updateLeaderboard(currentStates);
+    updateSelectedHUD(currentStates);
+    drawCompass(currentStates[selectedTrackIdx]?.heading || 0);
+    drawMiniMap(currentStates);
+  }
+
+  requestAnimationFrame(renderLoop);
+}
+
+function updateCamera(states, deltaSec) {
+  if (!map || !states.length) return;
+  const sel = states[selectedTrackIdx] || states[0];
+  if (!sel) return;
+
+  let targetPitch = 72, targetZoom = 18.5, targetBearing = sel.heading;
+
+  if (cameraMode === 'chase') {
+    targetPitch = 72;
+    targetZoom = 18.5;
+    targetBearing = sel.heading;
+  } else if (cameraMode === 'cockpit') {
+    targetPitch = 82;
+    targetZoom = 19.8;
+    targetBearing = sel.heading;
+  } else if (cameraMode === 'drone') {
+    targetPitch = 58;
+    targetZoom = 18.2;
+    targetBearing = (sel.heading + Math.sin(simTimeSec * 0.25) * 40 + 360) % 360;
+  } else if (cameraMode === 'topdown') {
+    targetPitch = 0;
+    targetZoom = 17.5;
+    targetBearing = 0;
+  } else if (cameraMode === 'buoy') {
+    targetPitch = 60;
+    targetZoom = 18.0;
+    targetBearing = (sel.heading + 90) % 360;
+  }
+
+  if (smoothCam.lng === null) {
+    smoothCam.lng = sel.lng; smoothCam.lat = sel.lat; smoothCam.heading = sel.heading;
+  }
+
+  // Acompanhamento contínuo e responsivo, adaptado à velocidade de reprodução (playSpeed)
+  const factor = isPlaying ? Math.min(1.0, deltaSec * 8.0 * Math.max(1, playSpeed)) : 1.0;
+  smoothCam.lng += (sel.lng - smoothCam.lng) * factor;
+  smoothCam.lat += (sel.lat - smoothCam.lat) * factor;
+
+  let dBearing = (targetBearing - smoothCam.heading + 540) % 360 - 180;
+  smoothCam.heading = (smoothCam.heading + dBearing * factor + 360) % 360;
+
+  // O centro NUNCA perde a canoa. Se o usuário estiver interagindo (órbita/zoom),
+  // preserva o pitch, zoom e bearing manuais do usuário, mantendo o foco na embarcação.
+  map.jumpTo({
+    center: [smoothCam.lng, smoothCam.lat],
+    bearing: userInteracting ? map.getBearing() : smoothCam.heading,
+    pitch: userInteracting ? map.getPitch() : targetPitch,
+    zoom: userInteracting ? map.getZoom() : targetZoom
+  });
+}
+
+function selectBoat(idx) {
+  userInteracting = false;
+  selectedTrackIdx = idx;
+  const tr = tracksData[selectedTrackIdx];
+  if (tr && tr.points.length) {
+    const pt = interpolatePointAtTime(tr.points, simTimeSec);
+    if (pt && map) {
+      smoothCam.lng = pt.lng;
+      smoothCam.lat = pt.lat;
+      smoothCam.heading = pt.heading;
+    }
+  }
+}
+
+// =========================================================================
+// 4. UI HUD, LEADERBOARD & GAUGES
+// =========================================================================
+function updateLeaderboard(states) {
+  const sorted = [...states].sort((a, b) => b.cumDistM - a.cumDistM);
+  const leaderDist = sorted[0]?.cumDistM || 0;
+
+  const listEl = document.getElementById('lb-list');
+  listEl.innerHTML = '';
+
+  sorted.forEach((item, pos) => {
+    const row = document.createElement('div');
+    row.className = `lb-row ${item.idx === selectedTrackIdx ? 'selected' : ''}`;
+    
+    const deltaM = Math.round(leaderDist - item.cumDistM);
+    const deltaTxt = pos === 0 ? 'LÍDER' : `+${deltaM}m`;
+
+    row.innerHTML = `
+      <span class="lb-pos">#${pos+1}</span>
+      <span class="lb-dot" style="color: ${item.color};"></span>
+      <span class="lb-name">${item.name}</span>
+      <span class="lb-delta ${pos === 0 ? 'leader' : ''}">${deltaTxt}</span>
+    `;
+
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectBoat(item.idx);
+    });
+
+    listEl.appendChild(row);
+  });
+}
+
+function updateSelectedHUD(states) {
+  const sel = states[selectedTrackIdx] || states[0];
+  if (!sel) return;
+
+  document.getElementById('sel-name').textContent = sel.name;
+  document.getElementById('sel-dot').style.color = sel.color;
+  document.getElementById('m-speed').textContent = sel.speedKmh.toFixed(1);
+
+  if (sel.speedKmh > 1.5) {
+    document.getElementById('m-pace').textContent = formatTime(3600 / sel.speedKmh);
+  } else {
+    document.getElementById('m-pace').textContent = '--:--';
+  }
+
+  document.getElementById('m-vmg').textContent = (sel.speedKmh * 0.95).toFixed(1);
+  const totalKm = CONTRACT.totalDistanceKm || (tracksData[0]?.points[tracksData[0].points.length - 1]?.cumDistM / 1000) || 6.2;
+  const remKm = Math.max(0, totalKm - (sel.cumDistM / 1000));
+  document.getElementById('m-dist').textContent = remKm.toFixed(2);
+}
+
+function drawCompass(heading) {
+  const c = document.getElementById('compass-canvas');
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(7, 14, 24, 0.85)';
+  ctx.fillRect(0, 0, w, h);
+
+  const cx = w / 2;
+  const ppx = 3.5;
+  const startDeg = Math.floor(heading - cx / ppx);
+  const endDeg = Math.ceil(heading + cx / ppx);
+
+  for (let d = startDeg; d <= endDeg; d++) {
+    const norm = (d + 3600) % 360;
+    const x = cx + (d - heading) * ppx;
+
+    if (norm % 45 === 0) {
+      ctx.strokeStyle = '#00F2FE';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x, h - 18); ctx.stroke();
+
+      const labels = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+      ctx.fillStyle = '#00F2FE';
+      ctx.font = 'bold 12px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(labels[norm], x, h - 24);
+    } else if (norm % 15 === 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x, h - 10); ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle = '#ffb020';
+  ctx.font = 'bold 13px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${Math.round(heading)}°`, cx, 16);
+}
+
+function drawMiniMap(states) {
+  const c = document.getElementById('minimap-canvas');
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(4, 10, 18, 0.92)';
+  ctx.fillRect(0, 0, w, h);
+
+  const allPts = tracksData.flatMap(t => t.points);
+  if (!allPts.length) return;
+
+  const lngs = allPts.map(p => p.lng);
+  const lats = allPts.map(p => p.lat);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const pad = 12;
+
+  function toMap(lng, lat) {
+    const nx = (lng - minLng) / (maxLng - minLng || 1);
+    const ny = (lat - minLat) / (maxLat - minLat || 1);
+    return { x: pad + nx * (w - pad * 2), y: pad + (1 - ny) * (h - pad * 2) };
+  }
+
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  tracksData[0].points.forEach((pt, i) => {
+    const m = toMap(pt.lng, pt.lat);
+    if (i === 0) ctx.moveTo(m.x, m.y); else ctx.lineTo(m.x, m.y);
+  });
+  ctx.stroke();
+
+  buoysData.forEach(b => {
+    const m = toMap(b.lng, b.lat);
+    ctx.fillStyle = '#ffb020';
+    ctx.beginPath(); ctx.arc(m.x, m.y, 4, 0, Math.PI * 2); ctx.fill();
+  });
+
+  states.forEach(s => {
+    const m = toMap(s.lng, s.lat);
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, s.idx === selectedTrackIdx ? 5.5 : 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (s.idx === selectedTrackIdx) {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(m.x, m.y, 7.5, 0, Math.PI * 2); ctx.stroke();
+    }
+  });
+}
+
+function formatTime(sec) {
+  if (isNaN(sec) || sec < 0) return '00:00.0';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.floor((sec % 1) * 10);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`;
+}
+
+function initEvents() {
+  document.getElementById('btn-play').addEventListener('click', () => {
+    isPlaying = !isPlaying;
+    const icon = document.querySelector('#btn-play i');
+    if (icon) icon.className = isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+  });
+
+  document.querySelectorAll('[data-speed]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      playSpeed = Number(e.currentTarget.dataset.speed);
+    });
+  });
+
+  document.querySelectorAll('.cam-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      cameraMode = e.currentTarget.dataset.cam;
+      userInteracting = false;
+    });
+  });
+
+  document.getElementById('scrub').addEventListener('input', (e) => {
+    const frac = Number(e.target.value) / 1000;
+    simTimeSec = minTimeSec + frac * (maxTimeSec - minTimeSec);
+  });
+
+  document.querySelectorAll('.btn-boat-mode').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      setBoatRenderMode(e.currentTarget.getAttribute('data-mode'));
+    });
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if (e.key === 'm' || e.key === 'M') {
+      setBoatRenderMode(boatRenderMode === 'model' ? 'arrow' : 'model');
+    }
+  });
+
+  setBoatRenderMode(boatRenderMode);
+}
+
+window.addEventListener('DOMContentLoaded', initContract);
+</script>
+</body>
+</html>

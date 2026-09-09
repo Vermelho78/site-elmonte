@@ -28,7 +28,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <!-- Estilos Customizados com Cache-Busting -->
-  <link rel="stylesheet" href="./style.css?v=5.3" />
+  <link rel="stylesheet" href="./style.css?v=6.0" />
   <style>
     /* Critical Component Fallbacks para impedir cache obsoleto do navegador */
     .sidebar { height: calc(100vh - 104px) !important; bottom: 20px !important; }
@@ -40,6 +40,26 @@
     .btn-option.active { background: rgba(0, 242, 254, 0.15) !important; color: #00f2fe !important; border-color: rgba(0, 242, 254, 0.5) !important; box-shadow: 0 0 12px rgba(0, 242, 254, 0.2) !important; }
     .input-dark { background: rgba(15, 23, 42, 0.82) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: #00f2fe !important; font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; padding: 8px 12px !important; border-radius: 8px !important; outline: none !important; }
     .bbox-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; font-size: 12px !important; }
+
+    /* Dropdown Expansível de Exportação */
+    .dropdown-export-wrapper { position: relative !important; display: inline-block !important; }
+    .btn-export-toggle { background: linear-gradient(135deg, #00F2FE 0%, #3B82F6 100%) !important; color: #07090e !important; font-weight: 700 !important; border: 1px solid rgba(0, 242, 254, 0.6) !important; box-shadow: 0 0 16px rgba(0, 242, 254, 0.35) !important; padding: 8px 16px !important; border-radius: 8px !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; transition: all 0.2s ease !important; }
+    .btn-export-toggle:hover { transform: translateY(-1px) !important; box-shadow: 0 0 24px rgba(0, 242, 254, 0.55) !important; }
+    .dropdown-arrow { font-size: 10px !important; transition: transform 0.2s ease !important; }
+    .dropdown-export-wrapper.active .dropdown-arrow { transform: rotate(180deg) !important; }
+    .dropdown-export-menu { position: absolute !important; top: calc(100% + 8px) !important; right: 0 !important; width: 300px !important; background: rgba(11, 17, 30, 0.97) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border: 1px solid rgba(0, 242, 254, 0.3) !important; border-radius: 12px !important; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 242, 254, 0.15) !important; padding: 8px !important; display: none !important; flex-direction: column !important; gap: 4px !important; z-index: 2000 !important; animation: dropdownFadeIn 0.15s ease-out !important; }
+    .dropdown-export-wrapper.active .dropdown-export-menu { display: flex !important; }
+    @keyframes dropdownFadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .dropdown-header { font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; color: #64748b !important; padding: 6px 8px 4px 8px !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+    .dropdown-divider { height: 1px !important; background: rgba(255, 255, 255, 0.08) !important; margin: 4px 0 !important; }
+    .dropdown-item { width: 100% !important; background: transparent !important; border: 1px solid transparent !important; border-radius: 8px !important; padding: 8px 10px !important; display: flex !important; align-items: center !important; gap: 10px !important; cursor: pointer !important; text-align: left !important; transition: all 0.15s ease !important; color: #f8fafc !important; text-decoration: none !important; }
+    .dropdown-item:hover { background: rgba(30, 41, 59, 0.7) !important; border-color: rgba(255, 255, 255, 0.12) !important; transform: translateX(2px) !important; }
+    .dropdown-item.item-highlight { background: rgba(16, 185, 129, 0.08) !important; border-color: rgba(16, 185, 129, 0.25) !important; }
+    .dropdown-item.item-highlight:hover { background: rgba(16, 185, 129, 0.18) !important; border-color: rgba(16, 185, 129, 0.45) !important; }
+    .item-icon-box { width: 32px !important; height: 32px !important; border-radius: 8px !important; display: flex !important; align-items: center !important; justify-content: center !important; font-size: 14px !important; flex-shrink: 0 !important; }
+    .item-text { display: flex !important; flex-direction: column !important; gap: 2px !important; min-width: 0 !important; }
+    .item-title { font-size: 13px !important; font-weight: 600 !important; color: #f8fafc !important; line-height: 1.2 !important; }
+    .item-desc { font-size: 10px !important; color: #94a3b8 !important; line-height: 1.2 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   </style>
 </head>
 <body class="dark-theme">
@@ -73,21 +93,93 @@
       <button class="btn btn-secondary" id="btn-import-json" title="Importar Contrato JSON">
         <i class="fa-solid fa-upload"></i> Importar Contrato
       </button>
-      <button class="btn btn-primary" id="btn-export-all" title="Exportar Pacote Completo (JSON + Viewers Padrão, Desafio e Raia com um único clique)" style="background:linear-gradient(135deg, #10B981, #059669); border-color:#10B981; color:#fff; font-weight:700; display:inline-flex; align-items:center; gap:6px; box-shadow:0 0 14px rgba(16,185,129,0.3);">
-        <i class="fa-solid fa-box-archive"></i> Exportar Tudo
-      </button>
-      <button class="btn btn-primary" id="btn-export-json" title="Exportar Contrato JSON e Viewer Regata">
-        <i class="fa-solid fa-download"></i> Exportar Contrato
-      </button>
-      <button class="btn btn-accent" id="btn-export-slim" title="Exportar viewer Slim (Minimalista, Fullscreen & Timeline Vertical)" style="background:linear-gradient(135deg,rgba(0,242,254,0.18),rgba(0,242,254,0.06));border-color:rgba(0,242,254,0.4);color:#00F2FE;">
-        <i class="fa-solid fa-expand"></i> Gerar Slim
-      </button>
-      <button class="btn btn-accent" id="btn-export-desafio" title="Exportar viewer de Desafio (duelo entre dois atletas)" style="background:linear-gradient(135deg,rgba(212,160,23,0.15),rgba(212,160,23,0.08));border-color:rgba(212,160,23,0.4);color:#D4A017;">
-        <i class="fa-solid fa-trophy"></i> Gerar Desafio
-      </button>
-      <button class="btn btn-accent" id="btn-export-raia" title="Exportar viewer de Treino em Raia (análise de séries)" style="background:linear-gradient(135deg,rgba(34,211,238,0.12),rgba(34,211,238,0.05));border-color:rgba(34,211,238,0.35);color:#22D3EE;">
-        <i class="fa-solid fa-chart-line"></i> Gerar Raia
-      </button>
+      <!-- Dropdown Expansível de Exportação & Geração de Viewers -->
+      <div class="dropdown-export-wrapper" id="dropdown-export-wrapper">
+        <button class="btn btn-export-toggle" id="btn-export-dropdown-toggle" title="Menu de Exportação e Geração de Viewers">
+          <i class="fa-solid fa-file-export"></i>
+          <span>Exportar &amp; Gerar</span>
+          <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+        </button>
+
+        <div class="dropdown-export-menu" id="dropdown-export-menu">
+          <div class="dropdown-header">
+            <i class="fa-solid fa-box-archive"></i> PACOTE COMPLETO
+          </div>
+          
+          <button class="dropdown-item item-highlight" id="btn-export-all" title="Exportar Contrato JSON + Todos os 5 Viewers (Padrão, POV 3D, Slim, Desafio e Raia)">
+            <div class="item-icon-box" style="background: rgba(16,185,129,0.2); color:#10B981;">
+              <i class="fa-solid fa-box-archive"></i>
+            </div>
+            <div class="item-text">
+              <span class="item-title">Exportar Tudo</span>
+              <span class="item-desc">JSON + Todos os 5 Viewers em um clique</span>
+            </div>
+          </button>
+
+          <div class="dropdown-divider"></div>
+
+          <div class="dropdown-header">
+            <i class="fa-solid fa-vr-cardboard"></i> VIEWERS &amp; TELEMETRIA
+          </div>
+
+          <button class="dropdown-item" id="btn-export-pov" title="Gerar Viewer POV 3D em 1ª pessoa no cockpit com a proa branca, bússola e relevo 3D">
+            <div class="item-icon-box" style="background: rgba(0,242,254,0.18); color:#00F2FE;">
+              <i class="fa-solid fa-compass"></i>
+            </div>
+            <div class="item-text">
+              <span class="item-title">Gerar POV 3D</span>
+              <span class="item-desc">Cockpit 1ª pessoa, proa branca &amp; relevo DEM</span>
+            </div>
+          </button>
+
+          <button class="dropdown-item" id="btn-export-slim" title="Gerar Viewer Slim (Minimalista, Fullscreen & Timeline Vertical)">
+            <div class="item-icon-box" style="background: rgba(59,130,246,0.18); color:#3B82F6;">
+              <i class="fa-solid fa-expand"></i>
+            </div>
+            <div class="item-text">
+              <span class="item-title">Gerar Slim</span>
+              <span class="item-desc">Minimalista, tela cheia &amp; timeline vertical</span>
+            </div>
+          </button>
+
+          <button class="dropdown-item" id="btn-export-desafio" title="Gerar Viewer de Desafio (duelo sincronizado entre 2 canoas)">
+            <div class="item-icon-box" style="background: rgba(212,160,23,0.18); color:#D4A017;">
+              <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div class="item-text">
+              <span class="item-title">Gerar Desafio</span>
+              <span class="item-desc">Duelo 1v1 com telemetria lado a lado</span>
+            </div>
+          </button>
+
+          <button class="dropdown-item" id="btn-export-raia" title="Gerar Viewer de Treino em Raia (análise de séries)">
+            <div class="item-icon-box" style="background: rgba(34,211,238,0.18); color:#22D3EE;">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div class="item-text">
+              <span class="item-title">Gerar Raia</span>
+              <span class="item-desc">Treinos intervalados &amp; séries na raia</span>
+            </div>
+          </button>
+
+          <div class="dropdown-divider"></div>
+
+          <div class="dropdown-header">
+            <i class="fa-solid fa-code"></i> DADOS BRUTOS
+          </div>
+
+          <button class="dropdown-item" id="btn-export-json" title="Exportar apenas o Contrato Master JSON da prova">
+            <div class="item-icon-box" style="background: rgba(148,163,184,0.18); color:#94A3B8;">
+              <i class="fa-solid fa-download"></i>
+            </div>
+            <div class="item-text">
+              <span class="item-title">Exportar Contrato JSON</span>
+              <span class="item-desc">Arquivo de dados oficial (.json)</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <a href="/gpx-studio.html" class="btn btn-primary" title="Abrir VAAREC GPX Skills Studio (Decupagem, Trimming e Composição)" style="background:linear-gradient(135deg,rgba(0,242,254,0.2),rgba(139,92,246,0.2)); border-color:#00F2FE; color:#fff; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
         <i class="fa-solid fa-sliders"></i> GPX Studio
       </a>
