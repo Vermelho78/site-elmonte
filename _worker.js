@@ -98,7 +98,19 @@ export default {
 
     // 3. Fallback to static assets
     if (env && env.ASSETS) {
-      return env.ASSETS.fetch(request);
+      const response = await env.ASSETS.fetch(request);
+      if (pathname === "/" || pathname.endsWith(".html") || !pathname.includes(".")) {
+        const newHeaders = new Headers(response.headers);
+        newHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        newHeaders.set("CDN-Cache-Control", "no-store");
+        newHeaders.set("Cloudflare-CDN-Cache-Control", "no-store");
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders,
+        });
+      }
+      return response;
     }
 
     return new Response("Not Found", { status: 404 });

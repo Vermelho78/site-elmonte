@@ -24,6 +24,40 @@ export default {
       return new Response(null, { headers: corsHeaders() });
     }
 
+    // 1b. Handle VAAREC Magic Link Email Dispatcher via Resend
+    if (pathname === "/api/vaarec-send-email" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const { to, subject, html } = body;
+        const resendApiKey = atob('cmVfRjJEQ3VDUHJfNlVIdGdGaGpVVlp5TlA4c2EyZmEyRFhr');
+
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: "VAAREC <onboarding@resend.dev>",
+            to: Array.isArray(to) ? to : [to],
+            subject: subject || "🏆 Seu Acesso ao Replay VAAREC",
+            html: html
+          })
+        });
+
+        const resData = await resendRes.json();
+        return new Response(JSON.stringify(resData), {
+          status: resendRes.status,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "Resend email dispatch error", details: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders() }
+        });
+      }
+    }
+
     // 2. Proxy API and Socket.IO directly to Render backend
     if (
       pathname.startsWith("/api/") ||
@@ -64,7 +98,19 @@ export default {
 
     // 3. Fallback to static assets
     if (env && env.ASSETS) {
-      return env.ASSETS.fetch(request);
+      const response = await env.ASSETS.fetch(request);
+      if (pathname === "/" || pathname.endsWith(".html") || !pathname.includes(".")) {
+        const newHeaders = new Headers(response.headers);
+        newHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        newHeaders.set("CDN-Cache-Control", "no-store");
+        newHeaders.set("Cloudflare-CDN-Cache-Control", "no-store");
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders,
+        });
+      }
+      return response;
     }
 
     return new Response("Not Found", { status: 404 });
